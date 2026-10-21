@@ -1,0 +1,380 @@
+import { z } from 'zod';
+
+export const id = () => crypto.randomUUID();
+const ID = z
+  .string()
+  .min(1)
+  .max(80)
+  .regex(/^[a-zA-Z0-9_-]+$/);
+const Name = z.string().min(1).max(160);
+const NumberValue = z.number().finite().min(-1e7).max(1e7);
+export const Vec3Schema = z.tuple([NumberValue, NumberValue, NumberValue]);
+export type Vec3 = z.infer<typeof Vec3Schema>;
+export const TransformSchema = z
+  .object({ position: Vec3Schema, rotation: Vec3Schema, scale: Vec3Schema })
+  .strict();
+export const identity = () => ({
+  position: [0, 0, 0] as Vec3,
+  rotation: [0, 0, 0] as Vec3,
+  scale: [1, 1, 1] as Vec3,
+});
+export const GeometrySchema = z
+  .object({
+    id: ID,
+    name: Name,
+    positions: z.array(Vec3Schema).min(3).max(100000),
+    triangles: z
+      .array(
+        z.tuple([
+          z.number().int().nonnegative(),
+          z.number().int().nonnegative(),
+          z.number().int().nonnegative(),
+        ]),
+      )
+      .min(1)
+      .max(200000),
+  })
+  .strict();
+export type Geometry = z.infer<typeof GeometrySchema>;
+export const MaterialSchema = z
+  .object({
+    id: ID,
+    name: Name,
+    color: z.string().regex(/^#[\da-fA-F]{6}$/),
+    roughness: z.number().min(0).max(1),
+    metalness: z.number().min(0).max(1),
+  })
+  .strict();
+export const LightSchema = z
+  .object({
+    kind: z.enum(['point', 'directional']),
+    color: z.string().regex(/^#[\da-fA-F]{6}$/),
+    intensity: z.number().min(0).max(10000),
+  })
+  .strict();
+export const CameraSchema = z
+  .object({
+    fov: z.number().min(5).max(150),
+    near: z.number().positive(),
+    far: z.number().positive(),
+  })
+  .strict();
+export const EntitySchema = z
+  .object({
+    id: ID,
+    name: Name,
+    sceneId: ID,
+    parentId: ID.nullable(),
+    kind: z.enum(['mesh', 'camera', 'light', 'group']),
+    transform: TransformSchema,
+    visible: z.boolean(),
+    geometryId: ID.optional(),
+    materialId: ID.optional(),
+    camera: CameraSchema.optional(),
+    light: LightSchema.optional(),
+  })
+  .strict();
+export type Entity = z.infer<typeof EntitySchema>;
+export const SceneSchema = z
+  .object({
+    id: ID,
+    name: Name,
+    background: z.string().regex(/^#[\da-fA-F]{6}$/),
+    ambient: z.number().min(0).max(5),
+  })
+  .strict();
+export const KeySchema = z
+  .object({
+    frame: z.number().int().min(0).max(1000000),
+    value: Vec3Schema,
+    interpolation: z.enum(['constant', 'linear', 'smooth']),
+  })
+  .strict();
+export const AnimationTrackSchema = z
+  .object({
+    id: ID,
+    entityId: ID,
+    property: z.enum(['position', 'rotation', 'scale']),
+    keys: z.array(KeySchema).max(10000),
+  })
+  .strict();
+export type AnimationTrack = z.infer<typeof AnimationTrackSchema>;
+export const AssetSchema = z
+  .object({
+    id: ID,
+    name: Name,
+    kind: z.enum(['image', 'video', 'audio']),
+    mime: z.enum([
+      'image/png',
+      'image/jpeg',
+      'image/webp',
+      'video/mp4',
+      'video/webm',
+      'audio/wav',
+      'audio/x-wav',
+      'audio/mpeg',
+      'audio/ogg',
+    ]),
+    blobId: z.string().regex(/^[a-f0-9]{64}$/),
+    bytes: z.number().int().nonnegative(),
+    duration: z.number().nonnegative().optional(),
+    width: z.number().int().positive().optional(),
+    height: z.number().int().positive().optional(),
+  })
+  .strict();
+export type Asset = z.infer<typeof AssetSchema>;
+export const ShotSchema = z.object({ id: ID, name: Name, sceneId: ID, cameraId: ID }).strict();
+export const ClipSchema = z
+  .object({
+    id: ID,
+    name: Name,
+    kind: z.enum(['shot', 'image', 'video', 'audio']),
+    sourceId: ID,
+    start: z.number().int().nonnegative().max(1000000),
+    duration: z.number().int().positive().max(1000000),
+    sourceIn: z.number().int().nonnegative().max(1000000),
+    channel: z.number().int().min(0).max(31),
+    muted: z.boolean(),
+    volume: z.number().min(0).max(2),
+  })
+  .strict();
+export type Clip = z.infer<typeof ClipSchema>;
+export const TimelineSchema = z
+  .object({
+    id: ID,
+    fps: z.number().int().min(1).max(120),
+    duration: z.number().int().min(1).max(1000000),
+    width: z.number().int().min(64).max(3840).multipleOf(2),
+    height: z.number().int().min(64).max(2160).multipleOf(2),
+    clips: z.array(ClipSchema).max(10000),
+  })
+  .strict();
+export const WorkflowNodeSchema = z
+  .object({
+    id: ID,
+    name: Name,
+    kind: z.enum(['timeline', 'render', 'prompt', 'seedance']),
+    text: z.string().max(10000).optional(),
+    x: z.number(),
+    y: z.number(),
+  })
+  .strict();
+export const WorkflowSchema = z
+  .object({
+    id: ID,
+    name: Name,
+    nodes: z.array(WorkflowNodeSchema).max(100),
+    edges: z.array(z.object({ from: ID, to: ID }).strict()).max(200),
+  })
+  .strict();
+export type Workflow = z.infer<typeof WorkflowSchema>;
+export const ArtifactSchema = z
+  .object({
+    id: ID,
+    jobId: ID,
+    name: Name,
+    mime: z.string(),
+    bytes: z.number().int().nonnegative(),
+    sha256: z.string(),
+    createdAt: z.string(),
+  })
+  .strict();
+export type Artifact = z.infer<typeof ArtifactSchema>;
+export const GenerationJobSchema = z
+  .object({
+    id: ID,
+    projectId: ID,
+    projectRevision: z.number().int(),
+    kind: z.enum(['render', 'workflow']),
+    status: z.enum(['queued', 'running', 'succeeded', 'failed', 'cancelled', 'interrupted']),
+    progress: z.number().min(0).max(1),
+    message: z.string(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    requestKey: ID,
+    artifact: ArtifactSchema.optional(),
+  })
+  .strict();
+export type GenerationJob = z.infer<typeof GenerationJobSchema>;
+export type Revision = {
+  id: string;
+  projectId: string;
+  number: number;
+  actor: 'user' | 'agent' | 'system';
+  label: string;
+  command: unknown;
+  createdAt: string;
+};
+export const ProjectSchema = z
+  .object({
+    format: z.literal('frameforge-project'),
+    schemaVersion: z.literal(1),
+    id: ID,
+    name: Name,
+    revision: z.number().int().nonnegative(),
+    createdAt: z.string(),
+    updatedAt: z.string(),
+    conventions: z
+      .object({
+        units: z.literal('metres'),
+        coordinates: z.literal('right-handed-y-up'),
+        rotation: z.literal('euler-xyz-radians'),
+        color: z.literal('srgb-input-linear-working-aces-output'),
+        time: z.literal('integer-frames-zero-based-half-open'),
+      })
+      .strict(),
+    scenes: z.array(SceneSchema).min(1).max(100),
+    entities: z.array(EntitySchema).max(2000),
+    geometries: z.array(GeometrySchema).max(2000),
+    materials: z.array(MaterialSchema).max(2000),
+    animationTracks: z.array(AnimationTrackSchema).max(6000),
+    assets: z.array(AssetSchema).max(10000),
+    shots: z.array(ShotSchema).max(10000),
+    timeline: TimelineSchema,
+    workflows: z.array(WorkflowSchema).max(100),
+    artifacts: z.array(ArtifactSchema).max(10000),
+  })
+  .strict();
+export type Project = z.infer<typeof ProjectSchema>;
+
+export function workflowOrder(workflow: Workflow) {
+  const nodes = new Map(workflow.nodes.map((n) => [n.id, n]));
+  if (nodes.size !== workflow.nodes.length) throw new Error('工作流节点 ID 重复');
+  const visited = new Set<string>(),
+    active = new Set<string>(),
+    order: Workflow['nodes'] = [];
+  const edges = new Set<string>();
+  for (const e of workflow.edges) {
+    if (!nodes.has(e.from) || !nodes.has(e.to)) throw new Error('工作流连接引用不存在的节点');
+    const signature = `${e.from}:${e.to}`;
+    if (edges.has(signature)) throw new Error('工作流连接重复');
+    edges.add(signature);
+    const from = nodes.get(e.from)!,
+      to = nodes.get(e.to)!;
+    if (
+      !(
+        (from.kind === 'timeline' && to.kind === 'render') ||
+        (from.kind === 'prompt' && to.kind === 'seedance')
+      )
+    )
+      throw new Error('工作流端口类型不兼容');
+  }
+  function visit(node: Workflow['nodes'][number]) {
+    if (active.has(node.id)) throw new Error('工作流不能循环依赖');
+    if (visited.has(node.id)) return;
+    active.add(node.id);
+    for (const e of workflow.edges.filter((e) => e.to === node.id)) visit(nodes.get(e.from)!);
+    active.delete(node.id);
+    visited.add(node.id);
+    order.push(node);
+  }
+  workflow.nodes.forEach(visit);
+  return order;
+}
+
+export function parseProject(input: unknown): Project {
+  const p = ProjectSchema.parse(input);
+  const ids = new Set<string>();
+  for (const item of [
+    ...p.scenes,
+    ...p.entities,
+    ...p.geometries,
+    ...p.materials,
+    ...p.animationTracks,
+    ...p.assets,
+    ...p.shots,
+    p.timeline,
+    ...p.timeline.clips,
+    ...p.workflows,
+    ...p.artifacts,
+    ...p.workflows.flatMap((w) => w.nodes),
+  ]) {
+    if (ids.has(item.id)) throw new Error(`重复对象 ID：${item.id}`);
+    ids.add(item.id);
+  }
+  const entities = new Map(p.entities.map((e) => [e.id, e]));
+  const scenes = new Set(p.scenes.map((s) => s.id));
+  const geometries = new Set(p.geometries.map((g) => g.id));
+  const materials = new Set(p.materials.map((m) => m.id));
+  for (const asset of p.assets)
+    if (!asset.mime.startsWith(asset.kind + '/')) throw new Error('素材 MIME 与类型不匹配');
+  for (const g of p.geometries)
+    for (const t of g.triangles) {
+      if (new Set(t).size !== 3 || t.some((i) => i >= g.positions.length))
+        throw new Error(`无效三角面：${g.name}`);
+    }
+  for (const e of p.entities) {
+    if (!scenes.has(e.sceneId)) throw new Error('对象所属场景不存在');
+    if (e.kind === 'mesh' && (!geometries.has(e.geometryId!) || !materials.has(e.materialId!)))
+      throw new Error('网格缺少几何体或材质');
+    if (e.kind === 'camera' && (!e.camera || e.camera.far <= e.camera.near))
+      throw new Error('摄影机裁剪范围无效');
+    if (e.kind === 'light' && !e.light) throw new Error('灯光参数缺失');
+    if (e.transform.scale.some((v) => Math.abs(v) < 0.00001)) throw new Error('缩放不能为零');
+    const ancestors = new Set([e.id]);
+    let parentId = e.parentId;
+    while (parentId) {
+      if (ancestors.has(parentId)) throw new Error('对象层级存在循环');
+      ancestors.add(parentId);
+      const parent = entities.get(parentId);
+      if (!parent || parent.sceneId !== e.sceneId) throw new Error('父对象必须在同一场景');
+      parentId = parent.parentId;
+    }
+  }
+  const paths = new Set<string>();
+  for (const track of p.animationTracks) {
+    if (!entities.has(track.entityId)) throw new Error('动画目标不存在');
+    const path = `${track.entityId}:${track.property}`;
+    if (paths.has(path)) throw new Error('同一属性不能有重复动画轨道');
+    paths.add(path);
+    if (track.keys.some((k, i) => i > 0 && k.frame <= track.keys[i - 1].frame))
+      throw new Error('关键帧必须按帧序排列且不重复');
+    if (
+      track.property === 'scale' &&
+      track.keys.some((k) => k.value.some((v) => Math.abs(v) < 0.00001))
+    )
+      throw new Error('关键帧缩放不能为零');
+  }
+  for (const s of p.shots)
+    if (
+      !scenes.has(s.sceneId) ||
+      entities.get(s.cameraId)?.kind !== 'camera' ||
+      entities.get(s.cameraId)?.sceneId !== s.sceneId
+    )
+      throw new Error('镜头摄影机引用无效');
+  for (const c of p.timeline.clips) {
+    if (c.start + c.duration > p.timeline.duration) throw new Error('片段超出时间轴范围');
+    if (c.kind === 'shot') {
+      if (!p.shots.some((s) => s.id === c.sourceId)) throw new Error('片段引用的镜头不存在');
+    } else {
+      const asset = p.assets.find((a) => a.id === c.sourceId);
+      if (!asset || asset.kind !== c.kind) throw new Error('片段素材类型不匹配');
+      if (
+        asset.duration !== undefined &&
+        (c.sourceIn + c.duration) / p.timeline.fps > asset.duration + 1 / p.timeline.fps
+      )
+        throw new Error('片段超出素材时长');
+    }
+  }
+  for (let channel = 0; channel < 32; channel++) {
+    const clips = p.timeline.clips
+      .filter((c) => c.channel === channel)
+      .sort((a, b) => a.start - b.start);
+    for (let i = 1; i < clips.length; i++)
+      if (clips[i].start < clips[i - 1].start + clips[i - 1].duration)
+        throw new Error('同一轨道的片段不能重叠');
+  }
+  p.workflows.forEach(workflowOrder);
+  return p;
+}
+
+export function migrateProject(input: unknown) {
+  if (
+    typeof input !== 'object' ||
+    !input ||
+    !('schemaVersion' in input) ||
+    input.schemaVersion !== 1
+  )
+    throw new Error('不支持此项目版本；原文件未修改');
+  return parseProject(input);
+}

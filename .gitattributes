@@ -1,0 +1,4 @@
+* text=auto eol=lf
+# Preserve upstream license bytes and whitespace exactly.
+third_party/licenses/** -text -whitespace
+*.mp4 -text
