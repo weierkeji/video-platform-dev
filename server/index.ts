@@ -13,6 +13,7 @@ import { z } from 'zod';
 import { createServer as createViteServer } from 'vite';
 import { Store, Conflict } from './store';
 import { Jobs } from './jobs';
+import { providerStatus } from './seedance';
 import { browserPath } from './runtime';
 import { probeMedia, audioOffset } from './media';
 import { AssetSchema, id, migrateProject, type Asset, type Project } from '../src/core/model';
@@ -229,15 +230,9 @@ const server = createServer(async (req, res) => {
       } catch {}
       json(res, {
         status: 'ok',
-        version: '0.2.0',
+        version: '0.3.0',
         browser: !!browser,
-        providers: [
-          {
-            id: 'seedance',
-            status: 'not-implemented',
-            message: '正式接口适配器尚未接入；不会返回模拟生成结果',
-          },
-        ],
+        providers: [providerStatus()],
       });
       return;
     }
@@ -327,12 +322,18 @@ const server = createServer(async (req, res) => {
             requestKey: z.string().uuid(),
             kind: z.enum(['render', 'workflow']),
             workflowId: z.string().optional(),
+            outputNodeId: z.string().uuid().optional(),
           })
           .strict()
           .parse(await data(req));
         const existing = store.jobs(projectId).find((j) => j.requestKey === input.requestKey);
         if (existing) {
-          if (existing.projectRevision !== input.baseRevision || existing.kind !== input.kind)
+          if (
+            existing.projectRevision !== input.baseRevision ||
+            existing.kind !== input.kind ||
+            existing.workflowId !== input.workflowId ||
+            existing.outputNodeId !== input.outputNodeId
+          )
             throw new Conflict('此提交键已用于不同的任务，请使用新键');
           json(res, existing, 202);
           return;
@@ -341,7 +342,13 @@ const server = createServer(async (req, res) => {
           throw new Conflict('导出前请刷新最新项目');
         json(
           res,
-          jobs.submit(envelope.project, input.requestKey, input.kind, input.workflowId),
+          jobs.submit(
+            envelope.project,
+            input.requestKey,
+            input.kind,
+            input.workflowId,
+            input.outputNodeId,
+          ),
           202,
         );
         return;
@@ -400,6 +407,15 @@ const server = createServer(async (req, res) => {
           .strict()
           .parse(await data(req));
         json(res, jobs.retry(jobId, input.requestKey), 202);
+        return;
+      }
+      if (req.method === 'POST' && action === 'resume') {
+        if (!job.provider) throw new Error('本地渲染请使用重试');
+        const input = z
+          .object({ taskId: z.string().max(200).optional() })
+          .strict()
+          .parse(await data(req));
+        json(res, jobs.generation.resume(jobId, input.taskId), 202);
         return;
       }
       if (req.method === 'GET' && !action) {

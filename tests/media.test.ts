@@ -5,7 +5,7 @@ import { resolve, join, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { DatabaseSync } from 'node:sqlite';
 import { newProject } from '../src/core/factory';
-import { migrateProject, id, type Project } from '../src/core/model';
+import { migrateProject, id, PROJECT_VERSION, type Project } from '../src/core/model';
 import { fitRect, audioSegment } from '../src/core/media';
 import { Store } from '../server/store';
 
@@ -77,11 +77,11 @@ test('v1 migration preserves appearance, video silence and original input bytes'
   }
   const before = JSON.stringify(legacy),
     next = migrateProject(legacy);
-  assert.equal(next.schemaVersion, 2);
+  assert.equal(next.schemaVersion, PROJECT_VERSION);
   assert.equal(next.timeline.clips[0].fit, 'stretch');
   assert.equal(next.timeline.clips[0].volume, 0);
   assert.equal(JSON.stringify(legacy), before);
-  assert.throws(() => migrateProject({ ...legacy, schemaVersion: 3 }), /不支持/);
+  assert.throws(() => migrateProject({ ...legacy, schemaVersion: PROJECT_VERSION + 1 }), /不支持/);
   assert.throws(() => migrateProject({ ...legacy, schemaVersion: '1' }), /不支持/);
 });
 test('database migration backs up and upgrades project, undo history, revisions and job snapshots atomically', () => {
@@ -131,12 +131,12 @@ test('database migration backs up and upgrades project, undo history, revisions 
     );
     store.close();
     store = new Store(directory);
-    assert.equal(store.get(p.id).project.schemaVersion, 2);
+    assert.equal(store.get(p.id).project.schemaVersion, PROJECT_VERSION);
     assert.equal(store.job(jobId).snapshot.timeline.clips[0].fit, 'stretch');
     const row = store.db.prepare('SELECT history FROM projects WHERE id=?').get(p.id) as {
       history: string;
     };
-    assert.equal(JSON.parse(row.history)[0].schemaVersion, 2);
+    assert.equal(JSON.parse(row.history)[0].schemaVersion, PROJECT_VERSION);
     assert.equal(
       store.change(p.id, 0, revisionId, 'user', 'restore', 'restore').project.timeline.clips[0].fit,
       'stretch',
@@ -149,7 +149,7 @@ test('database migration backs up and upgrades project, undo history, revisions 
       backup_name: string;
     };
     assert.equal(migration.from_version, 1);
-    assert.equal(migration.to_version, 2);
+    assert.equal(migration.to_version, PROJECT_VERSION);
     assert.equal(migration.backup_name, backups[0]);
     const backup = new DatabaseSync(join(directory, 'backups', backups[0]), { readOnly: true });
     try {

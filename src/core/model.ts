@@ -1,4 +1,7 @@
 import { z } from 'zod';
+import { GenerationOptionsSchema, GenerationRequestSchema } from './generation';
+
+export const PROJECT_VERSION = 3;
 
 export const id = () => crypto.randomUUID();
 const ID = z
@@ -158,6 +161,7 @@ export const WorkflowNodeSchema = z
     name: Name,
     kind: z.enum(['timeline', 'render', 'prompt', 'seedance']),
     text: z.string().max(10000).optional(),
+    generation: GenerationOptionsSchema.optional(),
     x: z.number(),
     y: z.number(),
   })
@@ -196,6 +200,21 @@ export const GenerationJobSchema = z
     updatedAt: z.string(),
     requestKey: ID,
     artifact: ArtifactSchema.optional(),
+    workflowId: ID.optional(),
+    outputNodeId: ID.optional(),
+    provider: z
+      .object({
+        id: z.literal('seedance'),
+        request: GenerationRequestSchema,
+        taskId: z.string().max(200).optional(),
+        phase: z.enum(['ready', 'submitting', 'polling', 'downloading', 'done', 'uncertain']),
+        remoteStatus: z
+          .enum(['queued', 'running', 'succeeded', 'failed', 'cancelled', 'expired'])
+          .optional(),
+        cancelRequested: z.boolean().optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export type GenerationJob = z.infer<typeof GenerationJobSchema>;
@@ -211,7 +230,7 @@ export type Revision = {
 export const ProjectSchema = z
   .object({
     format: z.literal('frameforge-project'),
-    schemaVersion: z.literal(2),
+    schemaVersion: z.literal(PROJECT_VERSION),
     id: ID,
     name: Name,
     revision: z.number().int().nonnegative(),
@@ -367,7 +386,15 @@ export function parseProject(input: unknown): Project {
       if (clips[i].start < clips[i - 1].start + clips[i - 1].duration)
         throw new Error('同一轨道的片段不能重叠');
   }
-  p.workflows.forEach(workflowOrder);
+  p.workflows.forEach((w) => {
+    workflowOrder(w);
+    for (const n of w.nodes) {
+      if (n.generation && n.kind !== 'seedance') throw new Error('生成参数只能属于 Seedance 节点');
+      for (const ref of [n.generation?.firstFrameId, n.generation?.lastFrameId])
+        if (ref && !p.assets.some((a) => a.id === ref && a.kind === 'image'))
+          throw new Error('生成参考图片不存在');
+    }
+  });
   return p;
 }
 
@@ -376,16 +403,18 @@ export function migrateProject(input: unknown) {
     typeof input !== 'object' ||
     !input ||
     !('schemaVersion' in input) ||
-    (input.schemaVersion !== 1 && input.schemaVersion !== 2)
+    ![1, 2, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
+    typeof input.schemaVersion !== 'number'
   )
     throw new Error('不支持此项目版本；原文件未修改');
-  if (input.schemaVersion === 2) return parseProject(input);
+  if (input.schemaVersion === PROJECT_VERSION) return parseProject(input);
   // v1 always stretched images and kept video sound at its saved volume.
   // Preserve those decisions rather than changing existing edits on upgrade.
   const next = structuredClone(input) as Record<string, unknown>;
   const timeline = next.timeline as { clips?: Record<string, unknown>[] } | undefined;
   if (!timeline || !Array.isArray(timeline.clips)) throw new Error('旧项目时间轴无效');
-  timeline.clips = timeline.clips.map((clip) => ({ ...clip, fit: 'stretch' }));
-  next.schemaVersion = 2;
+  if (input.schemaVersion === 1)
+    timeline.clips = timeline.clips.map((clip) => ({ ...clip, fit: 'stretch' }));
+  next.schemaVersion = PROJECT_VERSION;
   return parseProject(next);
 }

@@ -1,5 +1,4 @@
 import { Worker } from 'node:worker_threads';
-import { mkdirSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   id,
@@ -9,27 +8,34 @@ import {
   type Project,
 } from '../src/core/model';
 import { Store } from './store';
+import { GenerationJobs } from './generation-jobs';
 
 export class Jobs {
   active?: { id: string; worker: Worker };
   closing = false;
+  generation: GenerationJobs;
   constructor(
     public store: Store,
     public origin: string,
   ) {
+    this.generation = new GenerationJobs(store);
     for (const job of store.jobs())
-      if (job.status === 'running') {
+      if (!job.provider && job.status === 'running') {
         job.status = 'interrupted';
         job.message = '服务中断；可重试原始快照';
         store.saveJob(job);
       }
     setTimeout(() => this.pump(), 100);
   }
-  submit(project: Project, requestKey: string, kind: 'render' | 'workflow', workflowId?: string) {
-    if (project.timeline.duration > 2400)
-      throw new Error('此版本单次后台导出最多 2400 帧；请先缩短时间轴');
-    if (project.timeline.duration * project.timeline.width * project.timeline.height > 500_000_000)
-      throw new Error('当前单任务最多渲染 5 亿像素帧，请缩短时长或降低分辨率');
+  submit(
+    project: Project,
+    requestKey: string,
+    kind: 'render' | 'workflow',
+    workflowId?: string,
+    outputNodeId?: string,
+  ) {
+    const existing = this.store.jobs(project.id).find((j) => j.requestKey === requestKey);
+    if (existing) return existing;
     if (
       this.store.jobs().filter((j) => j.status === 'queued' || j.status === 'running').length >= 20
     )
@@ -38,9 +44,17 @@ export class Jobs {
       const workflow = project.workflows.find((w) => w.id === workflowId);
       if (!workflow) throw new Error('工作流不存在');
       const nodes = workflowOrder(workflow);
-      if (nodes.some((n) => n.kind === 'seedance'))
-        throw new Error('Seedance 适配器尚未接入；此工作流不能执行外部生成');
-      const outputs = nodes.filter((n) => n.kind === 'render');
+      const candidates = nodes.filter((n) => n.kind === 'render' || n.kind === 'seedance');
+      const outputs = outputNodeId ? candidates.filter((n) => n.id === outputNodeId) : candidates;
+      if (outputs.length !== 1) throw new Error('请选择一个输出节点执行');
+      if (outputs[0].kind === 'seedance')
+        return this.generation.submit(
+          project,
+          requestKey,
+          workflow.id,
+          outputs[0].id,
+          outputNodeId,
+        );
       if (
         outputs.length !== 1 ||
         !workflow.edges.some(
@@ -49,12 +63,18 @@ export class Jobs {
       )
         throw new Error('当前本地工作流需要一个时间轴节点连接一个渲染节点');
     }
+    if (project.timeline.duration > 2400)
+      throw new Error('此版本单次后台导出最多 2400 帧；请先缩短时间轴');
+    if (project.timeline.duration * project.timeline.width * project.timeline.height > 500_000_000)
+      throw new Error('当前单任务最多渲染 5 亿像素帧，请缩短时长或降低分辨率');
     const now = new Date().toISOString(),
       job: GenerationJob = {
         id: id(),
         projectId: project.id,
         projectRevision: project.revision,
         kind,
+        workflowId,
+        outputNodeId,
         status: 'queued',
         progress: 0,
         message: '等待渲染资源',
@@ -68,6 +88,7 @@ export class Jobs {
   }
   cancel(jobId: string) {
     const { job } = this.store.job(jobId);
+    if (job.provider) return this.generation.cancel(jobId);
     if (!['queued', 'running'].includes(job.status)) return job;
     job.status = 'cancelled';
     job.message = '已取消';
@@ -77,13 +98,14 @@ export class Jobs {
   }
   retry(jobId: string, requestKey: string) {
     const { job, snapshot } = this.store.job(jobId);
+    if (job.provider) return this.generation.retry(jobId, requestKey);
     if (!['failed', 'cancelled', 'interrupted'].includes(job.status))
       throw new Error('仅可重试失败、取消或中断的任务');
     return this.submit(snapshot, requestKey, 'render');
   }
   pump() {
     if (this.active || this.closing) return;
-    const job = this.store.jobs().find((j) => j.status === 'queued');
+    const job = this.store.jobs().find((j) => !j.provider && j.status === 'queued');
     if (!job) return;
     const { snapshot } = this.store.job(job.id);
     job.status = 'running';
@@ -117,42 +139,25 @@ export class Jobs {
         if (message.type === 'done') {
           try {
             const artifact = message.artifact!;
-            mkdirSync(join(this.store.directory, 'blobs'), { recursive: true });
-            copyFileSync(
+            this.store.registerResult(
+              job.id,
+              artifact,
+              {
+                id: id(),
+                name: artifact.name,
+                kind: 'video',
+                mime: 'video/mp4',
+                blobId: artifact.sha256,
+                bytes: artifact.bytes,
+                duration: snapshot.timeline.duration / snapshot.timeline.fps,
+                width: snapshot.timeline.width,
+                height: snapshot.timeline.height,
+                hasAudio: message.hasAudio,
+                audioStart: 0,
+              },
               join(this.store.directory, 'renders', job.id, 'output.mp4'),
-              join(this.store.directory, 'blobs', artifact.sha256),
             );
-            this.store.addBlob(artifact.sha256, artifact.mime, artifact.bytes);
-            const latest = this.store.get(job.projectId).project;
-            this.store.change(
-              latest.id,
-              latest.revision,
-              [
-                { type: 'artifact.add', artifact },
-                {
-                  type: 'asset.add',
-                  asset: {
-                    id: id(),
-                    name: artifact.name,
-                    kind: 'video',
-                    mime: 'video/mp4',
-                    blobId: artifact.sha256,
-                    bytes: artifact.bytes,
-                    duration: snapshot.timeline.duration / snapshot.timeline.fps,
-                    width: snapshot.timeline.width,
-                    height: snapshot.timeline.height,
-                    hasAudio: message.hasAudio,
-                    audioStart: 0,
-                  },
-                },
-              ],
-              'system',
-              '导出结果加入素材库',
-            );
-            current.status = 'succeeded';
-            current.progress = 1;
-            current.message = '导出完成；成片已加入项目素材库';
-            current.artifact = artifact;
+            return;
           } catch (error) {
             current.status = 'failed';
             current.message = `登记导出结果失败：${String(error)}`;
@@ -186,6 +191,7 @@ export class Jobs {
   }
   async close() {
     this.closing = true;
+    await this.generation.close();
     const active = this.active;
     if (active) {
       active.worker.postMessage('cancel');

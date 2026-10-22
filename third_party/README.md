@@ -16,6 +16,7 @@
 | Chrome | 155.0.8059.82 | 用户已安装浏览器，遵从自身条款 |
 | FFmpeg / ffprobe | 9.0.2 Gyan full shared | 外部进程媒体处理；本机 build 含 GPL/version3 组件，不随仓库分发；未来打包需核对构建配置、对应源码及 GPL 义务 |
 | REA | 6.7.0 | 研究工具，不进入产品；自有代码 MIT，第三方另计 |
+| Seedance / 火山方舟 | 由配置的模型/接入点 ID 决定；尚未真实调用 | 外部模型服务，适用供应商服务条款与账号权限；平台未分发模型权重或供应商 SDK，自主实现 HTTP 适配和任务管理，不将模型能力归为自研 |
 
 [inventory.json](inventory.json) 来自实际 lockfile/安装包，记录 40 个已安装包的版本、许可、类别和未修改状态。全平台精确解析见 `package-lock.json`，许可文本见 [licenses](licenses/)。更新：`node scripts/notices.mjs`。
 

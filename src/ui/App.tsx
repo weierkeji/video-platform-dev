@@ -246,7 +246,11 @@ export function App() {
       clearInterval(timer);
     };
   }, [projectId, envelope?.project.revision]);
-  const submit = async (kind: 'render' | 'workflow', workflowId?: string) => {
+  const submit = async (
+    kind: 'render' | 'workflow',
+    workflowId?: string,
+    outputNodeId?: string,
+  ) => {
     const p = projectRef.current!;
     try {
       setError('');
@@ -255,6 +259,7 @@ export function App() {
         requestKey: id(),
         kind,
         workflowId,
+        outputNodeId,
       });
       setTab('jobs');
       setNotice('任务已提交；可继续编辑项目');
@@ -359,7 +364,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.2</small>
+            FRAMEFORGE<small>创作工作台 · 0.3</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -680,7 +685,7 @@ export function App() {
             <WorkflowPanel
               p={p}
               send={(c, l) => void send(c, l)}
-              run={(w) => void submit('workflow', w)}
+              run={(w, output) => void submit('workflow', w, output)}
             />
           )}
         </section>
@@ -781,26 +786,52 @@ export function App() {
                     }
                   </span>
                   <span>r{j.projectRevision}</span>
-                  <progress max={1} value={j.progress} />
+                  <progress
+                    max={1}
+                    value={j.provider && j.status === 'running' ? undefined : j.progress}
+                  />
                   <span className="job-message">{j.message}</span>
+                  {j.provider?.taskId && <small title="供应商任务 ID">{j.provider.taskId}</small>}
                   {['queued', 'running'].includes(j.status) && (
                     <button onClick={() => void api(`/jobs/${j.id}/cancel`, {}).catch(fail)}>
                       取消
                     </button>
                   )}
-                  {['failed', 'cancelled', 'interrupted'].includes(j.status) && (
-                    <button
-                      onClick={() =>
-                        void api(`/jobs/${j.id}/retry`, { requestKey: id() }).catch(fail)
-                      }
-                    >
-                      重试原快照
-                    </button>
-                  )}
+                  {['failed', 'cancelled', 'interrupted'].includes(j.status) &&
+                    !(j.provider && j.status === 'interrupted') && (
+                      <button
+                        onClick={() =>
+                          void api(`/jobs/${j.id}/retry`, { requestKey: id() }).catch(fail)
+                        }
+                      >
+                        {j.provider ? '重新生成（新计费）' : '重试原快照'}
+                      </button>
+                    )}
                   {j.artifact && (
                     <a className="button" href={`/api/jobs/${j.id}/artifact`}>
                       下载 MP4
                     </a>
+                  )}
+                  {j.provider && j.status === 'interrupted' && (
+                    <form
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        const taskId = String(
+                          new FormData(event.currentTarget).get('taskId') || '',
+                        ).trim();
+                        void api(`/jobs/${j.id}/resume`, taskId ? { taskId } : {}).catch(fail);
+                      }}
+                    >
+                      {!j.provider.taskId && (
+                        <input
+                          name="taskId"
+                          aria-label="恢复供应商任务 ID"
+                          placeholder="在供应商控制台核对此次任务 ID"
+                          required
+                        />
+                      )}
+                      <button type="submit">恢复查询</button>
+                    </form>
                   )}
                 </div>
               ))
@@ -872,7 +903,7 @@ export function App() {
       <footer className="statusbar">
         <span>{notice}</span>
         <span>WebGL 实时材质 · ACES · 本地存储</span>
-        <span>外部模型尚未接入</span>
+        <span>Seedance 配置见工作流</span>
       </footer>
       <input
         type="file"

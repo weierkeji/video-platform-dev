@@ -1,0 +1,24 @@
+{
+  "checkedAt": "2026-10-22T06:08:07.992Z",
+  "version": "0.3.0",
+  "browser": "155.0.8059.82",
+  "projectId": "474d19de-845c-4866-a051-e5b3c8096a44",
+  "provider": {
+    "id": "seedance",
+    "status": "missing-credentials",
+    "message": "未配置服务端 ARK_API_KEY",
+    "defaultModel": ""
+  },
+  "externalGenerationExecuted": false,
+  "localJobId": "83036f08-1d6e-449a-b44f-d816a7a8f1ef",
+  "checks": [
+    "prompt and parameter editing",
+    "typed graph connection",
+    "reload persistence",
+    "disabled paid action",
+    "server missing-configuration rejection without job",
+    "independent local output",
+    "portable generation configuration reimport"
+  ],
+  "pageErrors": []
+}

@@ -5,7 +5,7 @@ import { mkdir, writeFile, readFile } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { chromium } from 'playwright-core';
 import { browserPath, ffmpegPath, ffprobePath } from '../server/runtime';
-import type { Asset, Project, GenerationJob } from '../src/core/model';
+import { PROJECT_VERSION, type Asset, type Project, type GenerationJob } from '../src/core/model';
 
 const origin = process.env.STUDIO_URL || 'http://127.0.0.1:4173',
   output = resolve('.local/checks/media');
@@ -332,7 +332,7 @@ try {
   };
   assert.ok(exportPixels.center[0] > 180 && exportPixels.edge[0] < 15 && exportPixels.top[2] > 180);
   const bundle = await api<{ project: Project; blobs: unknown[] }>(`/projects/${p.id}/export`);
-  assert.equal(bundle.project.schemaVersion, 2);
+  assert.equal(bundle.project.schemaVersion, PROJECT_VERSION);
   await writeFile(join(output, 'edited.ffstudio'), JSON.stringify(bundle));
   const reopened = await api<{ project: Project }>('/projects/import', bundle);
   assert.equal(reopened.project.timeline.clips.find((c) => c.id === right.id)?.sourceIn, 24);
@@ -370,7 +370,7 @@ try {
       'video original audio export',
       'silent video export',
       'pre/post clip silence',
-      'portable v2 reimport',
+      'portable project reimport',
     ],
     pageErrors: errors,
   };

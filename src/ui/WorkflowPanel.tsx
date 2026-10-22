@@ -1,6 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { id, type Project, type Workflow } from '../core/model';
 import { type Command } from '../core/commands';
+import {
+  GenerationOptionsSchema,
+  type GenerationOptions,
+  type ProviderStatus,
+} from '../core/generation';
 
 export function WorkflowPanel({
   p,
@@ -9,12 +14,25 @@ export function WorkflowPanel({
 }: {
   p: Project;
   send: (commands: Command[], label: string) => void;
-  run: (workflowId: string) => void;
+  run: (workflowId: string, outputNodeId?: string) => void;
 }) {
   const w = p.workflows[0],
     [kind, setKind] = useState<'timeline' | 'render' | 'prompt' | 'seedance'>('prompt'),
     [from, setFrom] = useState(''),
     [to, setTo] = useState('');
+  const [provider, setProvider] = useState<ProviderStatus>();
+  useEffect(() => {
+    let active = true;
+    void fetch('/api/health')
+      .then((r) => r.json())
+      .then((r) => {
+        if (active) setProvider(r.providers[0]);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
   const put = (workflow: Workflow, label: string) =>
     send([{ type: 'workflow.put', workflow }], label);
   if (!w) return null;
@@ -77,7 +95,7 @@ export function WorkflowPanel({
                 : n.kind === 'render'
                   ? '逐帧渲染 → FFmpeg → 素材库'
                   : n.kind === 'seedance'
-                    ? '未接入：无法执行外部生成'
+                    ? provider?.message || '读取供应商配置…'
                     : '文本输入'}
             </p>
             {n.kind === 'prompt' && (
@@ -98,11 +116,20 @@ export function WorkflowPanel({
               />
             )}
             <footer>
-              {n.kind === 'seedance'
-                ? '待实现适配器'
-                : n.kind === 'prompt'
-                  ? '文本端口'
-                  : '项目端口'}
+              {n.kind === 'seedance' ? (
+                <button
+                  disabled={provider?.status !== 'configured'}
+                  onClick={() => run(w.id, n.id)}
+                >
+                  生成视频（付费）
+                </button>
+              ) : n.kind === 'render' ? (
+                <button onClick={() => run(w.id, n.id)}>渲染此输出</button>
+              ) : n.kind === 'prompt' ? (
+                '文本端口'
+              ) : (
+                '项目端口'
+              )}
             </footer>
           </article>
         ))}
@@ -114,7 +141,7 @@ export function WorkflowPanel({
           onChange={(e) => setKind(e.target.value as typeof kind)}
         >
           <option value="prompt">文本输入</option>
-          <option value="seedance">Seedance（未接入）</option>
+          <option value="seedance">Seedance 视频生成</option>
           <option value="timeline">时间轴</option>
           <option value="render">渲染输出</option>
         </select>
@@ -185,9 +212,155 @@ export function WorkflowPanel({
           </span>
         ))}
       </div>
+      {w.nodes
+        .filter((n) => n.kind === 'seedance')
+        .map((n) => {
+          const options = GenerationOptionsSchema.parse(n.generation || {});
+          const update = (patch: Partial<GenerationOptions>) =>
+            put(
+              {
+                ...w,
+                nodes: w.nodes.map((x) =>
+                  x.id === n.id ? { ...x, generation: { ...options, ...patch } } : x,
+                ),
+              },
+              '修改生成参数',
+            );
+          return (
+            <section className="generation-settings" key={n.id}>
+              <h3>{n.name} · 生成设置</h3>
+              <p>
+                {provider?.message || '读取供应商配置…'}
+                。提示词及所选图片会发送到火山方舟；结果回到本项目素材库。
+              </p>
+              <div className="generation-fields">
+                <label>
+                  模型 / 接入点 ID
+                  <input
+                    aria-label="模型 ID"
+                    key={options.model || ''}
+                    defaultValue={options.model || ''}
+                    placeholder={provider?.defaultModel || '填写已开通模型 ID'}
+                    onBlur={(e) => update({ model: e.target.value.trim() || undefined })}
+                  />
+                </label>
+                <label>
+                  模型系列
+                  <select
+                    aria-label="模型系列"
+                    value={options.profile}
+                    onChange={(e) =>
+                      update({ profile: e.target.value as GenerationOptions['profile'] })
+                    }
+                  >
+                    {['1.0-pro', '1.0-pro-fast', '2.0', '2.0-fast', '2.0-mini', '2.5'].map((v) => (
+                      <option key={v}>{v}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  时长（秒）
+                  <input
+                    aria-label="生成时长"
+                    type="number"
+                    min={2}
+                    max={30}
+                    key={options.duration}
+                    defaultValue={options.duration}
+                    onBlur={(e) => update({ duration: Number(e.target.value) })}
+                  />
+                </label>
+                <label>
+                  分辨率
+                  <select
+                    aria-label="生成分辨率"
+                    value={options.resolution}
+                    onChange={(e) =>
+                      update({ resolution: e.target.value as GenerationOptions['resolution'] })
+                    }
+                  >
+                    {['480p', '720p', '1080p', '4k'].map((v) => (
+                      <option key={v}>{v}</option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  画幅
+                  <select
+                    aria-label="生成画幅"
+                    value={options.ratio}
+                    onChange={(e) =>
+                      update({ ratio: e.target.value as GenerationOptions['ratio'] })
+                    }
+                  >
+                    {['16:9', '4:3', '1:1', '3:4', '9:16', '21:9', 'adaptive'].map((v) => (
+                      <option key={v} value={v}>
+                        {v === 'adaptive' ? '自适应' : v}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  随机种子（-1 随机）
+                  <input
+                    aria-label="生成种子"
+                    type="number"
+                    min={-1}
+                    max={2147483647}
+                    key={options.seed}
+                    defaultValue={options.seed}
+                    onBlur={(e) => update({ seed: Number(e.target.value) })}
+                  />
+                </label>
+                {(['firstFrameId', 'lastFrameId'] as const).map((field) => (
+                  <label key={field}>
+                    {field === 'firstFrameId' ? '首帧图片' : '尾帧图片'}
+                    <select
+                      aria-label={field === 'firstFrameId' ? '首帧图片' : '尾帧图片'}
+                      value={options[field] || ''}
+                      onChange={(e) => update({ [field]: e.target.value || undefined })}
+                    >
+                      <option value="">不使用</option>
+                      {p.assets
+                        .filter((a) => a.kind === 'image')
+                        .map((a) => (
+                          <option key={a.id} value={a.id}>
+                            {a.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                ))}
+                {!options.profile.startsWith('1.0') && (
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={options.generateAudio}
+                      onChange={(e) => update({ generateAudio: e.target.checked })}
+                    />
+                    生成原声
+                  </label>
+                )}
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={options.watermark}
+                    onChange={(e) => update({ watermark: e.target.checked })}
+                  />
+                  AI 生成水印
+                </label>
+              </div>
+              <p className="muted">
+                系列用于参数校验，须与模型 ID 对应。首尾帧支持 PNG/JPEG/WebP，每张最多 20
+                MB；Seedance 2.5
+                使用首尾帧时请选择自适应画幅。密钥在启动服务前配置，项目文件不保存密钥。
+              </p>
+            </section>
+          );
+        })}
       <p className="muted">
-        本地时间轴 →
-        渲染流程可执行。外部模型节点仅保存编排意图；接口适配器尚未实现，执行时会明确报错。
+        时间轴 → 渲染输出；提示词 →
+        Seedance。多个输出时请使用对应节点的执行按钮。生成中断后可恢复同一任务；重新生成会创建新的计费任务。
       </p>
     </div>
   );

@@ -1,13 +1,16 @@
 import { DatabaseSync } from 'node:sqlite';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { applyCommands } from '../src/core/commands';
 import {
   id,
+  PROJECT_VERSION,
   migrateProject,
   type GenerationJob,
   type Project,
   type Revision,
+  type Artifact,
+  type Asset,
 } from '../src/core/model';
 
 export class Conflict extends Error {}
@@ -49,9 +52,12 @@ export class Store {
     const needsUpgrade =
       projects.some(
         (r) =>
-          JSON.parse(r.json).schemaVersion !== 2 ||
-          JSON.parse(r.history).some((p: { schemaVersion: number }) => p.schemaVersion !== 2),
-      ) || [...revisions, ...jobs].some((r) => JSON.parse(r.snapshot).schemaVersion !== 2);
+          JSON.parse(r.json).schemaVersion !== PROJECT_VERSION ||
+          JSON.parse(r.history).some(
+            (p: { schemaVersion: number }) => p.schemaVersion !== PROJECT_VERSION,
+          ),
+      ) ||
+      [...revisions, ...jobs].some((r) => JSON.parse(r.snapshot).schemaVersion !== PROJECT_VERSION);
     if (!needsUpgrade) return;
     // Validate everything before writing. A failed migration leaves the original database intact.
     const upgraded = projects.map((r) => ({
@@ -69,7 +75,16 @@ export class Store {
     }));
     const backups = join(this.directory, 'backups');
     mkdirSync(backups, { recursive: true });
-    const backupName = `before-schema-v2-${Date.now()}.sqlite`;
+    const previousVersions = [
+      ...new Set([
+        ...projects.flatMap((r) => [
+          JSON.parse(r.json).schemaVersion,
+          ...JSON.parse(r.history).map((p: Project) => p.schemaVersion),
+        ]),
+        ...[...revisions, ...jobs].map((r) => JSON.parse(r.snapshot).schemaVersion),
+      ]),
+    ];
+    const backupName = `before-schema-v${PROJECT_VERSION}-${Date.now()}.sqlite`;
     this.db.prepare('VACUUM INTO ?').run(join(backups, backupName));
     this.db.exec('BEGIN IMMEDIATE');
     try {
@@ -87,14 +102,15 @@ export class Store {
           .run(JSON.stringify(r.project), r.id);
       this.db.prepare('INSERT INTO schema_migrations VALUES (?,?,?,?,?,?)').run(
         id(),
-        1,
-        2,
+        Math.min(...previousVersions),
+        PROJECT_VERSION,
         new Date().toISOString(),
         backupName,
         JSON.stringify({
           projects: upgraded.length,
           revisions: revisionSnapshots.length,
           jobs: jobSnapshots.length,
+          previousVersions,
         }),
       );
       this.db.exec('COMMIT');
@@ -143,7 +159,8 @@ export class Store {
     label: string,
     mode: 'commands' | 'undo' | 'redo' | 'restore' = 'commands',
   ) {
-    this.db.exec('BEGIN IMMEDIATE');
+    const ownsTransaction = !this.db.isTransaction;
+    if (ownsTransaction) this.db.exec('BEGIN IMMEDIATE');
     try {
       const r = this.db.prepare('SELECT * FROM projects WHERE id=?').get(projectId) as
         | Row
@@ -202,8 +219,41 @@ export class Store {
           JSON.stringify(revision),
           JSON.stringify(next),
         );
-      this.db.exec('COMMIT');
+      if (ownsTransaction) this.db.exec('COMMIT');
       return this.get(projectId);
+    } catch (error) {
+      if (ownsTransaction) this.db.exec('ROLLBACK');
+      throw error;
+    }
+  }
+  registerResult(jobId: string, artifact: Artifact, asset: Asset, source: string) {
+    const { job } = this.job(jobId);
+    if (job.status === 'succeeded' && job.artifact) return job;
+    if (job.status === 'cancelled') throw new Error('任务已取消');
+    mkdirSync(join(this.directory, 'blobs'), { recursive: true });
+    copyFileSync(source, join(this.directory, 'blobs', artifact.sha256));
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      this.addBlob(artifact.sha256, artifact.mime, artifact.bytes);
+      const latest = this.get(job.projectId).project;
+      this.change(
+        latest.id,
+        latest.revision,
+        [
+          { type: 'artifact.add', artifact },
+          { type: 'asset.add', asset },
+        ],
+        'system',
+        job.provider ? 'Seedance 结果加入素材库' : '导出结果加入素材库',
+      );
+      job.status = 'succeeded';
+      job.progress = 1;
+      job.artifact = artifact;
+      job.message = '完成；视频已加入项目素材库';
+      if (job.provider) job.provider.phase = 'done';
+      this.saveJob(job);
+      this.db.exec('COMMIT');
+      return job;
     } catch (error) {
       this.db.exec('ROLLBACK');
       throw error;
