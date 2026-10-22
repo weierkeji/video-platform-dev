@@ -230,7 +230,7 @@ const server = createServer(async (req, res) => {
       } catch {}
       json(res, {
         status: 'ok',
-        version: '0.3.0',
+        version: '0.4.0',
         browser: !!browser,
         providers: [providerStatus()],
       });

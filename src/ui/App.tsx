@@ -14,6 +14,7 @@ import { TimelineRenderer } from '../render/timeline';
 import { Viewport } from './Viewport';
 import { Inspector, download } from './Inspector';
 import { Timeline } from './Timeline';
+import { CurveEditor, type KeySelection } from './CurveEditor';
 import { WorkflowPanel } from './WorkflowPanel';
 
 type Envelope = { project: Project; canUndo: boolean; canRedo: boolean };
@@ -37,12 +38,13 @@ export function App() {
     [projects, setProjects] = useState<Summary[]>([]),
     [selected, setSelected] = useState<string | null>(null),
     [selectedClip, setSelectedClip] = useState<string | null>(null),
+    [selectedKey, setSelectedKey] = useState<KeySelection>(null),
     [sceneId, setSceneId] = useState(''),
     [frame, setFrame] = useState(0),
     [playing, setPlaying] = useState(false);
   const [mode, setMode] = useState<'translate' | 'rotate' | 'scale'>('translate'),
     [view, setView] = useState<'scene' | 'sequence'>('scene'),
-    [workspace, setWorkspace] = useState<'studio' | 'workflow'>('studio'),
+    [workspace, setWorkspace] = useState<'studio' | 'curves' | 'workflow'>('studio'),
     [tab, setTab] = useState<'assets' | 'jobs' | 'revisions' | 'commands'>('assets');
   const [busy, setBusy] = useState(false),
     [notice, setNotice] = useState('正在读取项目…'),
@@ -68,6 +70,14 @@ export function App() {
     );
     setSelected((s) => (next.project.entities.some((e) => e.id === s) ? s : null));
     setSelectedClip((s) => (next.project.timeline.clips.some((c) => c.id === s) ? s : null));
+    setSelectedKey((s) =>
+      s &&
+      next.project.animationTracks.some(
+        (t) => t.id === s.trackId && t.keys.some((k) => k.id === s.keyId),
+      )
+        ? s
+        : null,
+    );
     setFrame((f) => Math.min(f, next.project.timeline.duration - 1));
   }, []);
   const refreshList = useCallback(async () => setProjects(await api<Summary[]>('/projects')), []);
@@ -173,7 +183,7 @@ export function App() {
             type: 'key.set',
             entityId,
             property,
-            key: { frame, value: t[property], interpolation: 'linear' },
+            key: { frame, value: t[property] },
           });
         else base[property] = t[property];
       }
@@ -213,14 +223,21 @@ export function App() {
       } else if (e.key.toLowerCase() === 'k' && selectedClip)
         void send([{ type: 'clip.split', id: selectedClip, frame }], '切分片段');
       else if (e.key === 'Delete') {
-        if (selectedClip) void send([{ type: 'clip.delete', id: selectedClip }], '删除片段');
+        if (workspace === 'curves') {
+          const track = projectRef.current?.animationTracks.find(
+            (t) => t.id === selectedKey?.trackId,
+          );
+          const key = track?.keys.find((k) => k.id === selectedKey?.keyId);
+          if (track && key)
+            void send([{ type: 'key.delete', trackId: track.id, frame: key.frame }], '删除关键帧');
+        } else if (selectedClip) void send([{ type: 'clip.delete', id: selectedClip }], '删除片段');
         else if (selected) void send([{ type: 'entity.delete', id: selected }], '删除对象');
       } else if (['g', 'r', 's'].includes(e.key.toLowerCase()))
         setMode(({ g: 'translate', r: 'rotate', s: 'scale' } as const)[e.key.toLowerCase() as 'g']);
     };
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
-  }, [history, send, selected, selectedClip, frame]);
+  }, [history, send, selected, selectedClip, selectedKey, workspace, frame]);
   const projectId = envelope?.project.id;
   useEffect(() => {
     if (!projectId) return;
@@ -270,10 +287,24 @@ export function App() {
   const select = (id: string) => {
     setSelected(id);
     setSelectedClip(null);
+    setSelectedKey(null);
   };
   const selectClip = (id: string) => {
     setSelectedClip(id);
     setSelected(null);
+    setSelectedKey(null);
+  };
+  const selectKey = (s: KeySelection) => {
+    setSelectedKey(s);
+    if (!s) return;
+    const track = projectRef.current?.animationTracks.find((t) => t.id === s.trackId);
+    const key = track?.keys.find((k) => k.id === s.keyId);
+    if (track && key) {
+      setSelected(track.entityId);
+      setSelectedClip(null);
+      setFrame(Math.min(key.frame, projectRef.current!.timeline.duration - 1));
+      setPlaying(false);
+    }
   };
   const importAsset = async (file: File) => {
     try {
@@ -364,7 +395,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.3</small>
+            FRAMEFORGE<small>创作工作台 · 0.4</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -408,6 +439,12 @@ export function App() {
           制作
         </button>
         <button
+          className={workspace === 'curves' ? 'active' : ''}
+          onClick={() => setWorkspace('curves')}
+        >
+          动画曲线
+        </button>
+        <button
           className={workspace === 'workflow' ? 'active' : ''}
           onClick={() => setWorkspace('workflow')}
         >
@@ -429,6 +466,7 @@ export function App() {
           onClick={() => {
             setSelected(null);
             setSelectedClip(null);
+            setSelectedKey(null);
           }}
         >
           项目设置
@@ -471,6 +509,7 @@ export function App() {
             onChange={(event) => {
               setSceneId(event.target.value);
               setSelected(null);
+              setSelectedKey(null);
             }}
           >
             {p.scenes.map((s) => (
@@ -681,6 +720,21 @@ export function App() {
                 }}
               />
             </>
+          ) : workspace === 'curves' ? (
+            <CurveEditor
+              key={`${p.id}/${selected}`}
+              project={p}
+              entity={e}
+              frame={frame}
+              selectedKey={selectedKey}
+              selectKey={selectKey}
+              busy={busy}
+              setFrame={(f) => {
+                setPlaying(false);
+                setFrame(f);
+              }}
+              send={(c, l) => void send(c, l)}
+            />
           ) : (
             <WorkflowPanel
               p={p}
@@ -714,6 +768,8 @@ export function App() {
         selectedClip={selectedClip}
         selectClip={selectClip}
         selectedEntity={selected}
+        selectedKey={selectedKey}
+        selectKey={selectKey}
         send={(c, l) => void send(c, l)}
       />
       <section className="library">

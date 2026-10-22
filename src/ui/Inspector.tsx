@@ -39,6 +39,7 @@ export function NumberInput({
         key={String(value)}
         defaultValue={Number(value.toFixed(4))}
         onBlur={(e) => {
+          if (e.target.value === String(Number(value.toFixed(4)))) return;
           const v = Number(e.target.value);
           if (Number.isFinite(v) && v !== value) onChange(v);
         }}
@@ -351,7 +352,7 @@ export function Inspector({
                 type: 'key.set',
                 entityId: e.id,
                 property,
-                key: { frame, value: t[property], interpolation: 'linear' },
+                key: { frame, value: t[property] },
               })),
               `记录帧 ${frame} 的变换`,
             )
@@ -389,6 +390,7 @@ export function Inspector({
                   <option value="linear">线性</option>
                   <option value="constant">保持</option>
                   <option value="smooth">平滑（smoothstep）</option>
+                  <option value="bezier">Bézier 曲线</option>
                 </select>
               </label>
             ) : null;

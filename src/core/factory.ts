@@ -12,7 +12,7 @@ export function newProject(name = '未命名作品'): Project {
   const geometry = primitive('box');
   const p: Project = {
     format: 'frameforge-project',
-    schemaVersion: 3,
+    schemaVersion: 4,
     id: id(),
     name,
     revision: 0,

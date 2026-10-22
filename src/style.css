@@ -6,6 +6,93 @@
   font-synthesis: none;
   color-scheme: dark;
 }
+.curve-editor {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  background: #111a25;
+}
+.curve-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  flex-wrap: wrap;
+}
+.curve-toolbar strong {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.curve-canvas {
+  display: block;
+  flex: 1;
+  min-height: 160px;
+  width: 100%;
+  touch-action: none;
+  outline: none;
+}
+.curve-grid line {
+  stroke: #293647;
+  stroke-width: 1;
+}
+.curve-grid text,
+.curve-unit {
+  fill: #91a4b9;
+  font-size: 11px;
+  user-select: none;
+}
+.curve-playhead {
+  stroke: #efc883;
+  stroke-width: 1;
+  pointer-events: none;
+}
+.curve-point {
+  cursor: move;
+}
+.curve-hint {
+  color: #91a4b9;
+  font-size: 11px;
+  padding: 5px 12px;
+}
+.curve-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  align-items: end;
+  border: 0;
+  border-top: 1px solid #354252;
+  margin: 0;
+  padding: 8px 12px;
+}
+.curve-fields .field {
+  margin: 0;
+  gap: 4px;
+}
+.curve-handle-fields {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.curve-handle-fields > div {
+  display: flex;
+  gap: 8px;
+}
+.curve-handle-fields .muted {
+  max-width: 220px;
+}
+.curve-error {
+  margin: 0;
+  padding: 8px 12px;
+  color: #ffa394;
+}
+.curve-empty {
+  padding: 30px;
+}
 * {
   box-sizing: border-box;
 }

@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { GenerationOptionsSchema, GenerationRequestSchema } from './generation';
+import { validateTrack } from './animation';
 
-export const PROJECT_VERSION = 3;
+export const PROJECT_VERSION = 4;
 
 export const id = () => crypto.randomUUID();
 const ID = z
@@ -86,13 +87,25 @@ export const SceneSchema = z
     ambient: z.number().min(0).max(5),
   })
   .strict();
-export const KeySchema = z
+export const HandleModeSchema = z.enum(['free', 'aligned', 'vector', 'auto-clamped']);
+export const HandleSchema = z
   .object({
-    frame: z.number().int().min(0).max(1000000),
-    value: Vec3Schema,
-    interpolation: z.enum(['constant', 'linear', 'smooth']),
+    mode: HandleModeSchema,
+    left: z.tuple([NumberValue, NumberValue]),
+    right: z.tuple([NumberValue, NumberValue]),
   })
   .strict();
+export const KeySchema = z
+  .object({
+    id: ID,
+    frame: z.number().int().min(0).max(1000000),
+    value: Vec3Schema,
+    interpolation: z.enum(['constant', 'linear', 'smooth', 'bezier']),
+    handles: z.tuple([HandleSchema, HandleSchema, HandleSchema]).optional(),
+  })
+  .strict();
+export type Keyframe = z.infer<typeof KeySchema>;
+export type KeyHandles = NonNullable<Keyframe['handles']>;
 export const AnimationTrackSchema = z
   .object({
     id: ID,
@@ -349,8 +362,7 @@ export function parseProject(input: unknown): Project {
     const path = `${track.entityId}:${track.property}`;
     if (paths.has(path)) throw new Error('同一属性不能有重复动画轨道');
     paths.add(path);
-    if (track.keys.some((k, i) => i > 0 && k.frame <= track.keys[i - 1].frame))
-      throw new Error('关键帧必须按帧序排列且不重复');
+    validateTrack(track);
     if (
       track.property === 'scale' &&
       track.keys.some((k) => k.value.some((v) => Math.abs(v) < 0.00001))
@@ -403,7 +415,7 @@ export function migrateProject(input: unknown) {
     typeof input !== 'object' ||
     !input ||
     !('schemaVersion' in input) ||
-    ![1, 2, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
+    ![1, 2, 3, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
     typeof input.schemaVersion !== 'number'
   )
     throw new Error('不支持此项目版本；原文件未修改');
@@ -415,6 +427,10 @@ export function migrateProject(input: unknown) {
   if (!timeline || !Array.isArray(timeline.clips)) throw new Error('旧项目时间轴无效');
   if (input.schemaVersion === 1)
     timeline.clips = timeline.clips.map((clip) => ({ ...clip, fit: 'stretch' }));
+  if (!Array.isArray(next.animationTracks)) throw new Error('旧项目动画数据无效');
+  // Legacy keys were identified by track + frame. Keep that identity consistent across historical snapshots.
+  for (const track of next.animationTracks as { keys: Record<string, unknown>[] }[])
+    track.keys = track.keys.map((key) => ({ ...key, id: `legacy-key-${key.frame}` }));
   next.schemaVersion = PROJECT_VERSION;
   return parseProject(next);
 }

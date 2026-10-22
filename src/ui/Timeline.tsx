@@ -1,6 +1,7 @@
 import { type Command } from '../core/commands';
 import { type Project } from '../core/model';
 import { NumberInput } from './Inspector';
+import type { KeySelection } from './CurveEditor';
 
 export function Timeline({
   p,
@@ -11,6 +12,8 @@ export function Timeline({
   selectedClip,
   selectClip,
   selectedEntity,
+  selectedKey,
+  selectKey,
   send,
 }: {
   p: Project;
@@ -21,6 +24,8 @@ export function Timeline({
   selectedClip: string | null;
   selectClip: (id: string) => void;
   selectedEntity: string | null;
+  selectedKey: KeySelection;
+  selectKey: (selection: KeySelection) => void;
   send: (c: Command[], label: string) => void;
 }) {
   const channels = [...new Set([0, 1, 2, ...p.timeline.clips.map((c) => c.channel)])].sort(
@@ -117,11 +122,14 @@ export function Timeline({
               <div className="track-content">
                 {t.keys.map((k) => (
                   <button
-                    key={k.frame}
-                    className={'keyframe ' + (k.frame === frame ? 'active' : '')}
+                    key={k.id}
+                    className={
+                      'keyframe ' +
+                      (selectedKey?.trackId === t.id && selectedKey.keyId === k.id ? 'active' : '')
+                    }
                     title={`帧 ${k.frame} · ${k.interpolation}；右键删除`}
                     style={{ left: `${(k.frame / p.timeline.duration) * 100}%` }}
-                    onClick={() => setFrame(k.frame)}
+                    onClick={() => selectKey({ trackId: t.id, keyId: k.id })}
                     onContextMenu={(e) => {
                       e.preventDefault();
                       send([{ type: 'key.delete', trackId: t.id, frame: k.frame }], '删除关键帧');

@@ -73,8 +73,8 @@ test('keyframe replacement, interpolation and held endpoints follow frame semant
     entityId: id(),
     property: 'position',
     keys: [
-      { frame: 0, value: [0, 0, 0], interpolation: 'linear' },
-      { frame: 10, value: [10, 20, 30], interpolation: 'constant' },
+      { id: id(), frame: 0, value: [0, 0, 0], interpolation: 'linear' },
+      { id: id(), frame: 10, value: [10, 20, 30], interpolation: 'constant' },
     ],
   };
   assert.deepEqual(sampleTrack(track, 5), [5, 10, 15]);

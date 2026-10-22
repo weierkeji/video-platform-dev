@@ -6,6 +6,8 @@ import {
   EntitySchema,
   GeometrySchema,
   KeySchema,
+  HandleSchema,
+  HandleModeSchema,
   MaterialSchema,
   SceneSchema,
   ShotSchema,
@@ -18,6 +20,7 @@ import {
   type Project,
 } from './model';
 import { extrudeFace, primitive, subdivide } from './geometry';
+import { editTrack } from './animation';
 
 const ID = z.string().min(1).max(80);
 export const CommandSchema = z.discriminatedUnion('type', [
@@ -76,11 +79,41 @@ export const CommandSchema = z.discriminatedUnion('type', [
       type: z.literal('key.set'),
       entityId: ID,
       property: z.enum(['position', 'rotation', 'scale']),
-      key: KeySchema,
+      key: KeySchema.extend({
+        id: ID.optional(),
+        interpolation: KeySchema.shape.interpolation.optional(),
+      }),
     })
     .strict(),
   z
     .object({ type: z.literal('key.delete'), trackId: ID, frame: z.number().int().nonnegative() })
+    .strict(),
+  z
+    .object({
+      type: z.literal('key.update'),
+      trackId: ID,
+      keyId: ID,
+      patch: KeySchema.pick({ frame: true, value: true, interpolation: true }).partial(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('key.handle'),
+      trackId: ID,
+      keyId: ID,
+      axis: z.number().int().min(0).max(2),
+      side: z.enum(['left', 'right']),
+      offset: HandleSchema.shape.left,
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('key.handles'),
+      trackId: ID,
+      keyId: ID,
+      axis: z.number().int().min(0).max(2),
+      mode: HandleModeSchema,
+    })
     .strict(),
   z
     .object({
@@ -258,11 +291,22 @@ function apply(p: Project, c: Command) {
         t = { id: id(), entityId: c.entityId, property: c.property, keys: [] };
         p.animationTracks.push(t);
       }
+      const previous = t.keys.find((k) => k.frame === c.key.frame);
       t.keys = t.keys.filter((k) => k.frame !== c.key.frame);
-      t.keys.push(c.key);
+      t.keys.push({
+        ...previous,
+        ...c.key,
+        id: previous?.id || c.key.id || id(),
+        interpolation: c.key.interpolation || previous?.interpolation || 'linear',
+      });
       t.keys.sort((a, b) => a.frame - b.frame);
       break;
     }
+    case 'key.update':
+    case 'key.handle':
+    case 'key.handles':
+      editTrack(get(p.animationTracks, c.trackId), c);
+      break;
     case 'key.delete': {
       const t = get(p.animationTracks, c.trackId);
       t.keys = t.keys.filter((k) => k.frame !== c.frame);
