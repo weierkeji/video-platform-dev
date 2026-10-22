@@ -120,6 +120,8 @@ export const AssetSchema = z
     duration: z.number().nonnegative().optional(),
     width: z.number().int().positive().optional(),
     height: z.number().int().positive().optional(),
+    hasAudio: z.boolean().optional(),
+    audioStart: z.number().finite().optional(),
   })
   .strict();
 export type Asset = z.infer<typeof AssetSchema>;
@@ -136,6 +138,7 @@ export const ClipSchema = z
     channel: z.number().int().min(0).max(31),
     muted: z.boolean(),
     volume: z.number().min(0).max(2),
+    fit: z.enum(['contain', 'cover', 'stretch']).default('contain'),
   })
   .strict();
 export type Clip = z.infer<typeof ClipSchema>;
@@ -208,7 +211,7 @@ export type Revision = {
 export const ProjectSchema = z
   .object({
     format: z.literal('frameforge-project'),
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(2),
     id: ID,
     name: Name,
     revision: z.number().int().nonnegative(),
@@ -373,8 +376,16 @@ export function migrateProject(input: unknown) {
     typeof input !== 'object' ||
     !input ||
     !('schemaVersion' in input) ||
-    input.schemaVersion !== 1
+    (input.schemaVersion !== 1 && input.schemaVersion !== 2)
   )
     throw new Error('不支持此项目版本；原文件未修改');
-  return parseProject(input);
+  if (input.schemaVersion === 2) return parseProject(input);
+  // v1 always stretched images and kept video sound at its saved volume.
+  // Preserve those decisions rather than changing existing edits on upgrade.
+  const next = structuredClone(input) as Record<string, unknown>;
+  const timeline = next.timeline as { clips?: Record<string, unknown>[] } | undefined;
+  if (!timeline || !Array.isArray(timeline.clips)) throw new Error('旧项目时间轴无效');
+  timeline.clips = timeline.clips.map((clip) => ({ ...clip, fit: 'stretch' }));
+  next.schemaVersion = 2;
+  return parseProject(next);
 }

@@ -164,6 +164,7 @@ export function Viewport(props: ViewportProps) {
         }
       }
       audio.sync(p.project, p.frame, p.playing);
+      if (audio.error && !cancelled) setError(audio.error);
       if (!cancelled) animation = requestAnimationFrame(() => void loop());
     };
     void loop();

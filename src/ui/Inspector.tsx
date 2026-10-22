@@ -165,6 +165,36 @@ export function Inspector({
               }
             />
           )}
+          {clip.kind !== 'audio' && (
+            <label className="field">
+              画幅适配
+              <select
+                aria-label="画幅适配"
+                value={clip.fit}
+                onChange={(event) =>
+                  send(
+                    [
+                      {
+                        type: 'clip.update',
+                        id: clip.id,
+                        patch: { fit: event.target.value as Clip['fit'] },
+                      },
+                    ],
+                    '修改画幅适配',
+                  )
+                }
+              >
+                <option value="contain">完整显示（保留比例）</option>
+                <option value="cover">填满画幅（居中裁切）</option>
+                <option value="stretch">拉伸至画幅</option>
+              </select>
+            </label>
+          )}
+          {clip.kind === 'video' && (
+            <p className="muted">
+              原声随视频入点和切分同步。音量 0 仅关闭原声；禁用片段会同时关闭画面。
+            </p>
+          )}
           <label className="check">
             <input
               type="checkbox"

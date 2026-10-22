@@ -317,7 +317,8 @@ export function App() {
             sourceIn: 0,
             channel,
             muted: false,
-            volume: asset.kind === 'video' ? 0 : 1,
+            volume: 1,
+            fit: 'contain',
           },
         },
       ],
@@ -358,7 +359,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.1</small>
+            FRAMEFORGE<small>创作工作台 · 0.2</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -590,6 +591,7 @@ export function App() {
                           channel,
                           muted: false,
                           volume: 1,
+                          fit: 'contain',
                         },
                       },
                     ],

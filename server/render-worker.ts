@@ -6,6 +6,7 @@ import { createHash } from 'node:crypto';
 import { chromium } from 'playwright-core';
 import { browserPath, ffmpegPath } from './runtime';
 import { id, type Project } from '../src/core/model';
+import { audioMix, probeMedia } from './media';
 
 const { jobId, origin, directory, project } = workerData as {
   jobId: string;
@@ -14,11 +15,13 @@ const { jobId, origin, directory, project } = workerData as {
   project: Project;
 };
 let cancelled = false;
+const abort = new AbortController();
 let encoder: ReturnType<typeof spawn> | undefined;
 let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
 parentPort!.on('message', (m) => {
   if (m === 'cancel') {
     cancelled = true;
+    abort.abort();
     encoder?.kill();
     void browser?.close();
   }
@@ -44,6 +47,8 @@ async function run() {
   const output = join(directory, 'renders', jobId),
     frames = join(output, 'frames');
   await mkdir(frames, { recursive: true });
+  const mix = await audioMix(project, directory, abort.signal);
+  check();
   browser = await chromium.launch({
     executablePath: browserPath(),
     headless: true,
@@ -86,33 +91,9 @@ async function run() {
       '-i',
       join(frames, '%06d.png'),
     ];
-  const audioClips = project.timeline.clips.filter((c) => !c.muted && c.kind === 'audio');
-  // Video sound requires a separate audio asset in v0.1; fail explicitly if it would be silently omitted.
-  if (project.timeline.clips.some((c) => !c.muted && c.kind === 'video' && c.volume > 0))
-    throw new Error('当前视频片段导出需将音量设为 0；如需原声，请另导入音频轨道');
-  for (const clip of audioClips)
-    args.push(
-      '-i',
-      join(directory, 'blobs', project.assets.find((a) => a.id === clip.sourceId)!.blobId),
-    );
-  if (audioClips.length) {
-    const filters = audioClips.map(
-      (c, i) =>
-        `[${i + 1}:a]atrim=start=${c.sourceIn / fps}:duration=${c.duration / fps},asetpts=PTS-STARTPTS,volume=${c.volume},adelay=${Math.round((c.start / fps) * 1000)}:all=1[a${i}]`,
-    );
-    filters.push(
-      `${audioClips.map((_, i) => `[a${i}]`).join('')}amix=inputs=${audioClips.length}:duration=longest:normalize=0,apad[audio]`,
-    );
-    args.push(
-      '-filter_complex',
-      filters.join(';'),
-      '-map',
-      '0:v',
-      '-map',
-      '[audio]',
-      '-c:a',
-      'aac',
-    );
+  args.push(...mix.inputs);
+  if (mix.hasAudio) {
+    args.push('-filter_complex', mix.filter, '-map', '0:v', '-map', '[audio]', '-c:a', 'aac');
   }
   args.push(
     '-c:v',
@@ -130,6 +111,26 @@ async function run() {
   parentPort!.postMessage({ type: 'progress', progress: 0.9, message: '编码 MP4' });
   await encode(args);
   check();
+  const encoded = await probeMedia(join(output, 'output.mp4'), abort.signal);
+  const videoStream = encoded.streams.find((s) => s.codec_type === 'video'),
+    audioStream = encoded.streams.find((s) => s.codec_type === 'audio');
+  const expectedDuration = project.timeline.duration / fps;
+  if (
+    !videoStream ||
+    videoStream.width !== project.timeline.width ||
+    videoStream.height !== project.timeline.height ||
+    Math.abs(Number(videoStream.duration) - expectedDuration) > 1 / fps ||
+    !Number.isFinite(Number(videoStream.duration))
+  )
+    throw new Error('编码结果的视频尺寸或时长校验失败');
+  if (
+    mix.hasAudio &&
+    (!audioStream ||
+      !Number.isFinite(Number(audioStream.duration)) ||
+      Math.abs(Number(audioStream.duration) - expectedDuration) > 0.1 ||
+      Math.abs(Number(audioStream.start_time || 0)) > 0.05)
+  )
+    throw new Error('编码结果的音轨时长或时间戳校验失败');
   const path = join(output, 'output.mp4'),
     bytes = (await stat(path)).size,
     sha256 = createHash('sha256')
@@ -137,6 +138,7 @@ async function run() {
       .digest('hex');
   parentPort!.postMessage({
     type: 'done',
+    hasAudio: mix.hasAudio,
     artifact: {
       id: id(),
       jobId,
@@ -151,6 +153,7 @@ async function run() {
 const deadline = setTimeout(
   () => {
     cancelled = true;
+    abort.abort();
     encoder?.kill();
     void browser?.close();
   },

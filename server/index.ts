@@ -9,13 +9,12 @@ import {
 } from 'node:fs';
 import { join, resolve, extname } from 'node:path';
 import { createHash } from 'node:crypto';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
 import { z } from 'zod';
 import { createServer as createViteServer } from 'vite';
 import { Store, Conflict } from './store';
 import { Jobs } from './jobs';
-import { browserPath, ffmpegPath } from './runtime';
+import { browserPath } from './runtime';
+import { probeMedia, audioOffset } from './media';
 import { AssetSchema, id, migrateProject, type Asset, type Project } from '../src/core/model';
 import { newProject } from '../src/core/factory';
 
@@ -41,7 +40,6 @@ const vite = production
       },
       appType: 'spa',
     });
-const run = promisify(execFile);
 function json(res: ServerResponse, value: unknown, status = 200) {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -146,17 +144,7 @@ async function upload(req: IncomingMessage) {
   const blobId = createHash('sha256').update(bytes).digest('hex'),
     path = join(directory, 'blobs', blobId);
   writeFileSync(path, bytes);
-  const ffprobe =
-    process.env.STUDIO_FFPROBE_PATH ||
-    (process.env.STUDIO_FFMPEG_PATH
-      ? ffmpegPath().replace(/ffmpeg(\.exe)?$/i, 'ffprobe$1')
-      : 'ffprobe');
-  const { stdout } = await run(
-    ffprobe,
-    ['-v', 'error', '-show_streams', '-show_format', '-of', 'json', path],
-    { timeout: 20000, maxBuffer: 1024 * 1024, windowsHide: true },
-  );
-  const probe = JSON.parse(stdout),
+  const probe = await probeMedia(path),
     kind = mime.split('/')[0] as Asset['kind'];
   const stream = probe.streams?.find(
     (s: { codec_type: string }) => s.codec_type === (kind === 'image' ? 'video' : kind),
@@ -169,6 +157,8 @@ async function upload(req: IncomingMessage) {
     mime: mime as Asset['mime'],
     blobId,
     bytes: bytes.length,
+    hasAudio: probe.streams.some((s) => s.codec_type === 'audio'),
+    audioStart: audioOffset(probe),
   };
   if (stream.width) asset.width = stream.width;
   if (stream.height) asset.height = stream.height;
@@ -239,7 +229,7 @@ const server = createServer(async (req, res) => {
       } catch {}
       json(res, {
         status: 'ok',
-        version: '0.1.0',
+        version: '0.2.0',
         browser: !!browser,
         providers: [
           {

@@ -6,13 +6,15 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 
 | 模块 | 职责 |
 | --- | --- |
-| `src/core/model.ts` | v1 模型、引用/层级/时间轴约束、工作流拓扑检查 |
+| `src/core/model.ts` | v2 模型、v1 迁移、引用/层级/时间轴约束、工作流拓扑检查 |
 | `src/core/commands.ts` | 有限结构化命令，复制状态、整批应用并校验 |
 | `src/core/geometry.ts` | 自主基本几何、共享边中点细分、三角面法向挤出、OBJ 交换 |
 | `src/core/evaluate.ts` | 插值、片段激活区间与源帧映射 |
+| `src/core/media.ts` | 居中画幅矩形、音频源入点与采样边界 |
 | `src/render/` | Three.js 数据桥接、时间轴合成/媒体定位；导出复用同一模块 |
 | `src/ui/` | 选择、属性、手柄、镜头、时间轴、素材、任务和审计入口 |
-| `server/store.ts` | SQLite WAL、版本比较、原子快照/审计、跨重启历史 |
+| `server/store.ts` | SQLite WAL、版本比较、原子快照/审计、跨重启历史、升级备份与迁移记录 |
+| `server/media.ts` | 实际流探测、音轨偏移、48 kHz 立体声混音参数 |
 | `server/jobs.ts` | 队列、去重、取消、重试、中断标记、结果回写 |
 | `server/render-worker.ts` | 限额工作线程、无界面 Chromium 逐帧渲染、FFmpeg 编码 |
 | `server/index.ts` | 本机 API、媒体上传/范围读取、便携包和页面服务 |
@@ -30,7 +32,8 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 - 颜色：sRGB 输入、Three.js 线性着色、ACES 映射、sRGB 输出；只有基础色/粗糙度/金属度，无 OCIO 或专业校色保证。
 - 几何：本地顶点/三角面；修改几何后，预览和导出读取相同数据。线性四分三角形不是平滑曲面细分。
 - 素材：SHA-256 内容寻址，ffprobe 读取真实流信息；便携包 base64 嵌入素材并校验哈希。没有压缩包或缺失媒体重定位流程。
-- 数据版本：schemaVersion=1；显式拒绝未知格式，不修改原文件。没有历史格式迁移实例，不宣称已覆盖升级迁移。
+- 画幅：Clip.fit 为 contain/cover/stretch。默认 contain 保持完整画面、空白处显示低轨；cover 居中裁切源画面；stretch 拉伸。预览和导出共用矩形计算。
+- 数据版本：schemaVersion=2；显式拒绝未知格式。v1 在副本上升级，每个旧片段设为 stretch，保留音量；不改原项目文件。数据库启动时先校验全部待迁移数据，`VACUUM INTO` 备份完整库，再在事务内升级项目、撤销历史、版本与任务快照，并写入 `schema_migrations` 的版本、备份名和计数；不增加用户编辑修订。夹具覆盖升级、原库备份和历史恢复。
 
 ## 编辑、审计与任务
 
@@ -38,7 +41,9 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 
 撤销重做恢复快照，但修订号递增。恢复历史也是一次可撤销操作。actor 是本地声明的 user/agent 标签，不是经过认证的身份；后台产物登记用 system。没有任意 JS、shell 或用户插件执行入口。
 
-任务固定快照并存 requestKey。逐帧黑底，按视觉轨道低到高合成镜头或媒体。FFmpeg 根据同一入点、开始帧和时长裁剪/延迟/混音，使用参数数组调用，不构建 shell 字符串。尚未支持的视频原声不会静默丢弃：非零原声音量会拒绝导出。
+任务固定快照并存 requestKey。逐帧黑底，按视觉轨道低到高合成镜头或媒体。FFmpeg 根据同一入点、开始帧和时长裁剪/延迟/混音，使用参数数组调用，不构建 shell 字符串。视频和独立音频使用第一条音轨；导出重新探测真实文件，兼容没有音轨元数据的旧素材，无音轨视频仍可导出。
+
+音频在 48 kHz 下按边界取整，处理音轨相对容器的开始偏移，以采样数执行 atrim/adelay；用 `asetpts=N/SR/TB` 重建时间戳，避免无效输入时间戳传播。单声道以单位增益复制到立体声；片段增益 0–2，混音关闭隐式归一化。浏览器用 MediaElementAudioSourceNode → GainNode → 共享输出，保持相同增益范围。预览会按时间轴纠偏，但不是采样精度调度；环绕声、多音轨选择和限幅尚未实现。编码后核对视频尺寸/时长及音轨时长/起点，异常结果不会标记成功。
 
 完成后保存实际字节数及 SHA-256，把 MP4 纳入素材，通过系统命令追加 Asset/Artifact 修订。当前编辑器需刷新同步，没有实时订阅。
 

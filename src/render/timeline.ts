@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { activeClips, sourceFrame } from '../core/evaluate';
 import { type Asset, type Project } from '../core/model';
 import { SceneRenderer } from './scene';
+import { fitRect } from '../core/media';
 
 const timeout = <T>(p: Promise<T>, ms: number) =>
   new Promise<T>((resolve, reject) => {
@@ -94,8 +95,30 @@ export class TimelineRenderer {
         }
         source = media;
       }
-      // All visual strips occupy the output rectangle. Higher channels cover lower ones.
-      this.ctx.drawImage(source, 0, 0, width, height);
+      const sourceWidth =
+        source instanceof HTMLVideoElement
+          ? source.videoWidth
+          : source instanceof HTMLImageElement
+            ? source.naturalWidth
+            : width;
+      const sourceHeight =
+        source instanceof HTMLVideoElement
+          ? source.videoHeight
+          : source instanceof HTMLImageElement
+            ? source.naturalHeight
+            : height;
+      const rect = fitRect(sourceWidth, sourceHeight, width, height, clip.fit);
+      this.ctx.drawImage(
+        source,
+        rect.sx,
+        rect.sy,
+        rect.sw,
+        rect.sh,
+        rect.dx,
+        rect.dy,
+        rect.dw,
+        rect.dh,
+      );
     }
   }
   dispose() {
@@ -111,31 +134,104 @@ export class TimelineRenderer {
 }
 
 export class TimelineAudio {
-  media = new Map<string, HTMLAudioElement>();
+  context: AudioContext;
+  output: GainNode;
+  error = '';
+  media = new Map<
+    string,
+    {
+      audio: HTMLAudioElement;
+      source: MediaElementAudioSourceNode;
+      gain: GainNode;
+      pending: boolean;
+      blobId: string;
+    }
+  >();
+  private disposed = false;
+  private unlock = () => {
+    if (this.context.state === 'suspended') void this.context.resume().catch((e) => this.report(e));
+  };
+  constructor() {
+    this.context = new AudioContext({ sampleRate: 48000 });
+    this.output = this.context.createGain();
+    this.output.connect(this.context.destination);
+    document.addEventListener('pointerdown', this.unlock);
+    document.addEventListener('keydown', this.unlock);
+  }
+  private report(error: unknown) {
+    if (this.disposed || (error instanceof DOMException && error.name === 'AbortError')) return;
+    this.error =
+      error instanceof DOMException && error.name === 'NotAllowedError'
+        ? '浏览器暂停了音频；请点击播放启用声音'
+        : `音频预览失败：${String(error)}`;
+  }
+  private release(key: string) {
+    const entry = this.media.get(key);
+    if (!entry) return;
+    entry.audio.pause();
+    entry.audio.removeAttribute('src');
+    entry.audio.load();
+    entry.source.disconnect();
+    entry.gain.disconnect();
+    this.media.delete(key);
+  }
   sync(p: Project, frame: number, playing: boolean) {
+    if (this.disposed) return;
+    if (playing) this.unlock();
     const active = new Set<string>();
-    for (const c of activeClips(p, frame).filter((c) => c.kind === 'audio' || c.kind === 'video')) {
+    for (const c of activeClips(p, frame).filter(
+      (c) => (c.kind === 'audio' || c.kind === 'video') && c.volume > 0,
+    )) {
+      const asset = p.assets.find((a) => a.id === c.sourceId)!;
+      if (asset.hasAudio === false) continue;
       active.add(c.id);
-      let audio = this.media.get(c.id);
-      if (!audio) {
-        audio = new Audio(`/api/blobs/${p.assets.find((a) => a.id === c.sourceId)!.blobId}`);
-        this.media.set(c.id, audio);
+      let entry = this.media.get(c.id);
+      if (entry && entry.blobId !== asset.blobId) {
+        this.release(c.id);
+        entry = undefined;
       }
+      if (!entry) {
+        const audio = new Audio(`/api/blobs/${asset.blobId}`),
+          source = this.context.createMediaElementSource(audio),
+          gain = this.context.createGain();
+        source.connect(gain);
+        gain.connect(this.output);
+        audio.onerror = () => this.report(new Error(`无法解码 ${asset.name}`));
+        entry = { audio, source, gain, pending: false, blobId: asset.blobId };
+        this.media.set(c.id, entry);
+      }
+      const { audio, gain } = entry;
       const time = sourceFrame(c, frame) / p.timeline.fps;
-      if (Math.abs(audio.currentTime - time) > 0.15) audio.currentTime = time;
-      audio.volume = Math.min(1, c.volume);
+      if (
+        ((!playing || audio.paused) && Math.abs(audio.currentTime - time) > 0.001) ||
+        Math.abs(audio.currentTime - time) > 0.15
+      )
+        audio.currentTime = time;
+      gain.gain.setValueAtTime(c.volume, this.context.currentTime);
       if (playing) {
-        void audio.play().catch(() => {});
+        if (audio.paused && !entry.pending) {
+          entry.pending = true;
+          const current = entry;
+          void audio
+            .play()
+            .then(() => {
+              this.error = '';
+            })
+            .catch((e) => this.report(e))
+            .finally(() => {
+              current.pending = false;
+            });
+        }
       } else audio.pause();
     }
-    for (const [key, audio] of this.media) if (!active.has(key) || !playing) audio.pause();
+    for (const key of this.media.keys()) if (!active.has(key)) this.release(key);
   }
   dispose() {
-    for (const audio of this.media.values()) {
-      audio.pause();
-      audio.removeAttribute('src');
-      audio.load();
-    }
-    this.media.clear();
+    this.disposed = true;
+    document.removeEventListener('pointerdown', this.unlock);
+    document.removeEventListener('keydown', this.unlock);
+    for (const key of this.media.keys()) this.release(key);
+    this.output.disconnect();
+    void this.context.close().catch(() => {});
   }
 }

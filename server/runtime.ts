@@ -12,3 +12,8 @@ export function browserPath() {
   return candidate;
 }
 export const ffmpegPath = () => process.env.STUDIO_FFMPEG_PATH || 'ffmpeg';
+export const ffprobePath = () =>
+  process.env.STUDIO_FFPROBE_PATH ||
+  (process.env.STUDIO_FFMPEG_PATH
+    ? ffmpegPath().replace(/ffmpeg(\.exe)?$/i, 'ffprobe$1')
+    : 'ffprobe');

@@ -22,8 +22,86 @@ export class Store {
       CREATE TABLE IF NOT EXISTS revisions(id TEXT PRIMARY KEY,project_id TEXT NOT NULL,number INTEGER NOT NULL,json TEXT NOT NULL,snapshot TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS jobs(id TEXT PRIMARY KEY,project_id TEXT NOT NULL,request_key TEXT NOT NULL,json TEXT NOT NULL,snapshot TEXT NOT NULL, UNIQUE(project_id,request_key));
       CREATE TABLE IF NOT EXISTS blobs(id TEXT PRIMARY KEY,mime TEXT NOT NULL,bytes INTEGER NOT NULL);
+      CREATE TABLE IF NOT EXISTS schema_migrations(id TEXT PRIMARY KEY,from_version INTEGER NOT NULL,to_version INTEGER NOT NULL,created_at TEXT NOT NULL,backup_name TEXT NOT NULL,details TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS revisions_project ON revisions(project_id,number);
     `);
+    try {
+      this.upgradeProjects();
+    } catch (error) {
+      this.db.close();
+      throw error;
+    }
+  }
+  private upgradeProjects() {
+    const projects = this.db.prepare('SELECT id,json,history FROM projects').all() as {
+      id: string;
+      json: string;
+      history: string;
+    }[];
+    const revisions = this.db.prepare('SELECT id,snapshot FROM revisions').all() as {
+      id: string;
+      snapshot: string;
+    }[];
+    const jobs = this.db.prepare('SELECT id,snapshot FROM jobs').all() as {
+      id: string;
+      snapshot: string;
+    }[];
+    const needsUpgrade =
+      projects.some(
+        (r) =>
+          JSON.parse(r.json).schemaVersion !== 2 ||
+          JSON.parse(r.history).some((p: { schemaVersion: number }) => p.schemaVersion !== 2),
+      ) || [...revisions, ...jobs].some((r) => JSON.parse(r.snapshot).schemaVersion !== 2);
+    if (!needsUpgrade) return;
+    // Validate everything before writing. A failed migration leaves the original database intact.
+    const upgraded = projects.map((r) => ({
+      id: r.id,
+      project: migrateProject(JSON.parse(r.json)),
+      history: (JSON.parse(r.history) as unknown[]).map(migrateProject),
+    }));
+    const revisionSnapshots = revisions.map((r) => ({
+      id: r.id,
+      project: migrateProject(JSON.parse(r.snapshot)),
+    }));
+    const jobSnapshots = jobs.map((r) => ({
+      id: r.id,
+      project: migrateProject(JSON.parse(r.snapshot)),
+    }));
+    const backups = join(this.directory, 'backups');
+    mkdirSync(backups, { recursive: true });
+    const backupName = `before-schema-v2-${Date.now()}.sqlite`;
+    this.db.prepare('VACUUM INTO ?').run(join(backups, backupName));
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      for (const r of upgraded)
+        this.db
+          .prepare('UPDATE projects SET json=?,history=? WHERE id=?')
+          .run(JSON.stringify(r.project), JSON.stringify(r.history), r.id);
+      for (const r of revisionSnapshots)
+        this.db
+          .prepare('UPDATE revisions SET snapshot=? WHERE id=?')
+          .run(JSON.stringify(r.project), r.id);
+      for (const r of jobSnapshots)
+        this.db
+          .prepare('UPDATE jobs SET snapshot=? WHERE id=?')
+          .run(JSON.stringify(r.project), r.id);
+      this.db.prepare('INSERT INTO schema_migrations VALUES (?,?,?,?,?,?)').run(
+        id(),
+        1,
+        2,
+        new Date().toISOString(),
+        backupName,
+        JSON.stringify({
+          projects: upgraded.length,
+          revisions: revisionSnapshots.length,
+          jobs: jobSnapshots.length,
+        }),
+      );
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
   }
   list() {
     return (this.db.prepare('SELECT json FROM projects').all() as { json: string }[])

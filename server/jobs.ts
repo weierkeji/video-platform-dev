@@ -34,8 +34,6 @@ export class Jobs {
       this.store.jobs().filter((j) => j.status === 'queued' || j.status === 'running').length >= 20
     )
       throw new Error('本机任务队列已满（20 项），请等待或取消任务');
-    if (project.timeline.clips.some((c) => c.kind === 'video' && !c.muted && c.volume > 0))
-      throw new Error('视频片段请先将音量设为 0；原声请另导入为音频轨道（当前版本限制）');
     if (kind === 'workflow') {
       const workflow = project.workflows.find((w) => w.id === workflowId);
       if (!workflow) throw new Error('工作流不存在');
@@ -103,7 +101,13 @@ export class Jobs {
     this.active = { id: job.id, worker };
     worker.on(
       'message',
-      (message: { type: string; progress?: number; message?: string; artifact?: Artifact }) => {
+      (message: {
+        type: string;
+        progress?: number;
+        message?: string;
+        artifact?: Artifact;
+        hasAudio?: boolean;
+      }) => {
         const current = this.store.job(job.id).job;
         if (current.status === 'cancelled') return;
         if (message.type === 'progress') {
@@ -137,6 +141,8 @@ export class Jobs {
                     duration: snapshot.timeline.duration / snapshot.timeline.fps,
                     width: snapshot.timeline.width,
                     height: snapshot.timeline.height,
+                    hasAudio: message.hasAudio,
+                    audioStart: 0,
                   },
                 },
               ],
