@@ -507,14 +507,18 @@ export function Inspector({
                 {g.positions.length} 顶点 / {g.triangles.length} 面
               </small>
             </h3>
-            <NumberInput
-              label="顶点索引"
-              value={vertex}
-              min={0}
-              max={g.positions.length - 1}
-              step={1}
-              onChange={setVertex}
-            />
+            {g.positions.length > 0 ? (
+              <NumberInput
+                label="顶点索引"
+                value={vertex}
+                min={0}
+                max={g.positions.length - 1}
+                step={1}
+                onChange={setVertex}
+              />
+            ) : (
+              <p className="muted">网格没有顶点。可撤销删除，或返回对象操作。</p>
+            )}
             {g.positions[vertex] && (
               <VectorInput
                 label="顶点位置"
@@ -527,27 +531,33 @@ export function Inspector({
                 }
               />
             )}
-            <NumberInput
-              label="面索引"
-              value={face}
-              min={0}
-              max={g.triangles.length - 1}
-              step={1}
-              onChange={setFace}
-            />
-            <NumberInput label="挤出距离" value={distance} onChange={setDistance} />
-            <div className="button-row">
-              <button
-                onClick={() =>
-                  send([{ type: 'geometry.extrude', id: g.id, face, distance }], '挤出三角面')
-                }
-              >
-                挤出面
-              </button>
-              <button onClick={() => send([{ type: 'geometry.subdivide', id: g.id }], '细分网格')}>
-                线性细分
-              </button>
-            </div>
+            {g.triangles.length > 0 && (
+              <>
+                <NumberInput
+                  label="面索引"
+                  value={face}
+                  min={0}
+                  max={g.triangles.length - 1}
+                  step={1}
+                  onChange={setFace}
+                />
+                <NumberInput label="挤出距离" value={distance} onChange={setDistance} />
+                <div className="button-row">
+                  <button
+                    onClick={() =>
+                      send([{ type: 'geometry.extrude', id: g.id, face, distance }], '挤出三角面')
+                    }
+                  >
+                    挤出面
+                  </button>
+                  <button
+                    onClick={() => send([{ type: 'geometry.subdivide', id: g.id }], '细分网格')}
+                  >
+                    线性细分
+                  </button>
+                </div>
+              </>
+            )}
             <button onClick={() => download(`${e.name}.obj`, exportOBJ(g), 'text/plain')}>
               导出局部网格 OBJ
             </button>

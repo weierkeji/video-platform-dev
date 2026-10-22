@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { GenerationOptionsSchema, GenerationRequestSchema } from './generation';
 import { validateTrack } from './animation';
 
-export const PROJECT_VERSION = 4;
+export const PROJECT_VERSION = 5;
 
 export const id = () => crypto.randomUUID();
 const ID = z
@@ -26,7 +26,7 @@ export const GeometrySchema = z
   .object({
     id: ID,
     name: Name,
-    positions: z.array(Vec3Schema).min(3).max(100000),
+    positions: z.array(Vec3Schema).max(100000),
     triangles: z
       .array(
         z.tuple([
@@ -35,7 +35,6 @@ export const GeometrySchema = z
           z.number().int().nonnegative(),
         ]),
       )
-      .min(1)
       .max(200000),
   })
   .strict();
@@ -415,7 +414,7 @@ export function migrateProject(input: unknown) {
     typeof input !== 'object' ||
     !input ||
     !('schemaVersion' in input) ||
-    ![1, 2, 3, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
+    ![1, 2, 3, 4, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
     typeof input.schemaVersion !== 'number'
   )
     throw new Error('不支持此项目版本；原文件未修改');
@@ -429,8 +428,9 @@ export function migrateProject(input: unknown) {
     timeline.clips = timeline.clips.map((clip) => ({ ...clip, fit: 'stretch' }));
   if (!Array.isArray(next.animationTracks)) throw new Error('旧项目动画数据无效');
   // Legacy keys were identified by track + frame. Keep that identity consistent across historical snapshots.
-  for (const track of next.animationTracks as { keys: Record<string, unknown>[] }[])
-    track.keys = track.keys.map((key) => ({ ...key, id: `legacy-key-${key.frame}` }));
+  if (input.schemaVersion < 4)
+    for (const track of next.animationTracks as { keys: Record<string, unknown>[] }[])
+      track.keys = track.keys.map((key) => ({ ...key, id: `legacy-key-${key.frame}` }));
   next.schemaVersion = PROJECT_VERSION;
   return parseProject(next);
 }

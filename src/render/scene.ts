@@ -95,13 +95,13 @@ export class SceneRenderer {
     this.renderer.render(this.scene, camera);
   }
   clear() {
-    this.scene.traverse((o) => {
+    for (const o of this.objects.values()) {
       if (o instanceof THREE.Mesh) {
         o.geometry.dispose();
         for (const m of Array.isArray(o.material) ? o.material : [o.material]) m.dispose();
       }
       if (o instanceof THREE.Light) o.dispose();
-    });
+    }
     this.scene.clear();
     this.objects.clear();
   }

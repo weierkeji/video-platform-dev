@@ -21,8 +21,10 @@ import {
 } from './model';
 import { extrudeFace, primitive, subdivide } from './geometry';
 import { editTrack } from './animation';
+import { deleteElements, extrudeRegion, mergeVertices, transformVertices } from './mesh';
 
 const ID = z.string().min(1).max(80);
+const MeshIndices = z.array(z.number().int().nonnegative()).min(1).max(200000);
 export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('project.rename'), name: z.string().min(1).max(160) }).strict(),
   z.object({ type: z.literal('scene.add'), scene: SceneSchema }).strict(),
@@ -59,6 +61,31 @@ export const CommandSchema = z.discriminatedUnion('type', [
     })
     .strict(),
   z.object({ type: z.literal('geometry.subdivide'), id: ID }).strict(),
+  z
+    .object({
+      type: z.literal('geometry.transform'),
+      id: ID,
+      indices: MeshIndices,
+      matrix: z.array(z.number().finite().min(-1e7).max(1e7)).length(16),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('geometry.delete'),
+      id: ID,
+      mode: z.enum(['vertex', 'edge', 'face']),
+      indices: MeshIndices,
+    })
+    .strict(),
+  z.object({ type: z.literal('geometry.merge'), id: ID, indices: MeshIndices }).strict(),
+  z
+    .object({
+      type: z.literal('geometry.extrudeRegion'),
+      id: ID,
+      faces: MeshIndices,
+      offset: TransformSchema.shape.position,
+    })
+    .strict(),
   z
     .object({
       type: z.literal('geometry.extrude'),
@@ -277,6 +304,18 @@ function apply(p: Project, c: Command) {
     }
     case 'geometry.subdivide':
       subdivide(get(p.geometries, c.id));
+      break;
+    case 'geometry.transform':
+      transformVertices(get(p.geometries, c.id), c.indices, c.matrix);
+      break;
+    case 'geometry.delete':
+      deleteElements(get(p.geometries, c.id), c.mode, c.indices);
+      break;
+    case 'geometry.merge':
+      mergeVertices(get(p.geometries, c.id), c.indices);
+      break;
+    case 'geometry.extrudeRegion':
+      extrudeRegion(get(p.geometries, c.id), c.faces, c.offset);
       break;
     case 'geometry.extrude':
       extrudeFace(get(p.geometries, c.id), c.face, c.distance);

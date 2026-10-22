@@ -93,6 +93,38 @@
 .curve-empty {
   padding: 30px;
 }
+.mesh-box {
+  position: absolute;
+  border: 1px solid #f4bf78;
+  background: #f4bf7825;
+  pointer-events: none;
+  z-index: 3;
+}
+.mesh-panel > fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.mesh-panel > fieldset > button {
+  display: block;
+  width: 100%;
+  margin: 8px 0;
+}
+.mesh-selection-status {
+  color: #ffd39d;
+}
+.view-toolbar {
+  flex-wrap: wrap;
+}
+.view-actions label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.viewport canvas:focus {
+  outline: none;
+}
 * {
   box-sizing: border-box;
 }
@@ -404,12 +436,12 @@ small {
   background: #111923;
 }
 .view-toolbar {
-  height: 38px;
+  min-height: 38px;
   flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 0 10px;
+  padding: 4px 10px;
   border-bottom: 1px solid #303e4e;
 }
 .segmented {

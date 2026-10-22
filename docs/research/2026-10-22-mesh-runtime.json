@@ -1,0 +1,52 @@
+{
+  "checkedAt": "2026-10-22T07:39:36.832Z",
+  "projectId": "7ed7b815-c45f-4f92-9c4f-169619006043",
+  "importedProjectId": "b5f942d6-3f55-4bcb-82ea-633d1d3649c2",
+  "jobId": "8cec5279-785d-48b9-8174-1dd03086e6ed",
+  "browser": "155.0.8059.82",
+  "format": 5,
+  "visibleBoxVertices": 7,
+  "xrayBoxVertices": 8,
+  "worldDisplacement": [
+    [
+      0.6000000651343056,
+      1.554312234475219e-16,
+      -5.551115123125783e-16
+    ],
+    [
+      0.6000000651343054,
+      1.554312234475219e-16,
+      -4.440892098500626e-16
+    ],
+    [
+      0.6000000651343054,
+      -1.554312234475219e-16,
+      -4.440892098500626e-16
+    ],
+    [
+      0.6000000651343056,
+      -1.554312234475219e-16,
+      -5.551115123125783e-16
+    ]
+  ],
+  "vertices": 12,
+  "triangles": 20,
+  "frames": 12,
+  "orangePixels": 10473,
+  "previewExportMeanAbsoluteDifference": 0.5437962962962963,
+  "checks": [
+    "vertex pick and shift toggle",
+    "occlusion vs xray",
+    "box selection and mode conversion",
+    "edge transform and undo",
+    "connected face region extrusion",
+    "world gizmo with rotated nonuniform parent",
+    "one drag one transaction; Escape cancels",
+    "numeric rotation and scale",
+    "empty mesh save/reload/undo keeps entity",
+    "OBJ download",
+    "MP4 render and portable project reimport",
+    "OBJ retains exact geometry; actual PNG/MP4 pixels match and include the edited mesh"
+  ],
+  "pageErrors": []
+}

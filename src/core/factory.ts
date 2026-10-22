@@ -1,4 +1,4 @@
-import { id, identity, parseProject, type Project } from './model';
+import { id, identity, parseProject, PROJECT_VERSION, type Project } from './model';
 import { primitive } from './geometry';
 
 export function newProject(name = '未命名作品'): Project {
@@ -12,7 +12,7 @@ export function newProject(name = '未命名作品'): Project {
   const geometry = primitive('box');
   const p: Project = {
     format: 'frameforge-project',
-    schemaVersion: 4,
+    schemaVersion: PROJECT_VERSION,
     id: id(),
     name,
     revision: 0,

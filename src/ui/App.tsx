@@ -15,6 +15,8 @@ import { Viewport } from './Viewport';
 import { Inspector, download } from './Inspector';
 import { Timeline } from './Timeline';
 import { CurveEditor, type KeySelection } from './CurveEditor';
+import { MeshPanel } from './MeshPanel';
+import { convertSelection, sameTopology, type MeshMode, type MeshSelection } from '../core/mesh';
 import { WorkflowPanel } from './WorkflowPanel';
 
 type Envelope = { project: Project; canUndo: boolean; canRedo: boolean };
@@ -39,6 +41,8 @@ export function App() {
     [selected, setSelected] = useState<string | null>(null),
     [selectedClip, setSelectedClip] = useState<string | null>(null),
     [selectedKey, setSelectedKey] = useState<KeySelection>(null),
+    [meshSelection, setMeshSelection] = useState<MeshSelection | null>(null),
+    [meshXray, setMeshXray] = useState(false),
     [sceneId, setSceneId] = useState(''),
     [frame, setFrame] = useState(0),
     [playing, setPlaying] = useState(false);
@@ -63,6 +67,20 @@ export function App() {
     projectInput = useRef<HTMLInputElement>(null),
     objInput = useRef<HTMLInputElement>(null);
   const accept = useCallback((next: Envelope) => {
+    const previous = projectRef.current;
+    setMeshSelection((selection) => {
+      if (!selection || previous?.id !== next.project.id) return null;
+      const old = previous.geometries.find((g) => g.id === selection.geometryId),
+        geometry = next.project.geometries.find((g) => g.id === selection.geometryId);
+      if (
+        !geometry ||
+        !next.project.entities.some(
+          (e) => e.id === selection.entityId && e.geometryId === geometry.id,
+        )
+      )
+        return null;
+      return old && sameTopology(old, geometry) ? selection : { ...selection, indices: [] };
+    });
     projectRef.current = next.project;
     setEnvelope(next);
     setSceneId((s) =>
@@ -125,16 +143,16 @@ export function App() {
       setError('');
       setNotice('保存中…');
       try {
-        accept(
-          await api<Envelope>(`/projects/${p.id}/commands`, {
-            baseRevision: p.revision,
-            commands,
-            label,
-            actor,
-          }),
-        );
+        const next = await api<Envelope>(`/projects/${p.id}/commands`, {
+          baseRevision: p.revision,
+          commands,
+          label,
+          actor,
+        });
+        accept(next);
         setNotice(`已保存 · ${label}`);
         await refreshList();
+        return next.project;
       } catch (e) {
         fail(e);
       } finally {
@@ -223,7 +241,20 @@ export function App() {
       } else if (e.key.toLowerCase() === 'k' && selectedClip)
         void send([{ type: 'clip.split', id: selectedClip, frame }], '切分片段');
       else if (e.key === 'Delete') {
-        if (workspace === 'curves') {
+        if (workspace === 'studio' && view === 'scene' && meshSelection) {
+          if (meshSelection.indices.length)
+            void send(
+              [
+                {
+                  type: 'geometry.delete',
+                  id: meshSelection.geometryId,
+                  mode: meshSelection.mode,
+                  indices: meshSelection.indices,
+                },
+              ],
+              '删除网格组件',
+            );
+        } else if (workspace === 'curves') {
           const track = projectRef.current?.animationTracks.find(
             (t) => t.id === selectedKey?.trackId,
           );
@@ -234,10 +265,26 @@ export function App() {
         else if (selected) void send([{ type: 'entity.delete', id: selected }], '删除对象');
       } else if (['g', 'r', 's'].includes(e.key.toLowerCase()))
         setMode(({ g: 'translate', r: 'rotate', s: 'scale' } as const)[e.key.toLowerCase() as 'g']);
+      else if (
+        workspace === 'studio' &&
+        view === 'scene' &&
+        meshSelection &&
+        ['1', '2', '3'].includes(e.key)
+      ) {
+        const g = projectRef.current?.geometries.find((g) => g.id === meshSelection.geometryId);
+        if (g) {
+          const mode = (['vertex', 'edge', 'face'] as const)[Number(e.key) - 1];
+          setMeshSelection({
+            ...meshSelection,
+            mode,
+            indices: convertSelection(g, meshSelection.mode, mode, meshSelection.indices),
+          });
+        }
+      }
     };
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
-  }, [history, send, selected, selectedClip, selectedKey, workspace, frame]);
+  }, [history, send, selected, selectedClip, selectedKey, workspace, view, meshSelection, frame]);
   const projectId = envelope?.project.id;
   useEffect(() => {
     if (!projectId) return;
@@ -285,16 +332,19 @@ export function App() {
     }
   };
   const select = (id: string) => {
+    if (id !== selected) setMeshSelection(null);
     setSelected(id);
     setSelectedClip(null);
     setSelectedKey(null);
   };
   const selectClip = (id: string) => {
+    setMeshSelection(null);
     setSelectedClip(id);
     setSelected(null);
     setSelectedKey(null);
   };
   const selectKey = (s: KeySelection) => {
+    setMeshSelection(null);
     setSelectedKey(s);
     if (!s) return;
     const track = projectRef.current?.animationTracks.find((t) => t.id === s.trackId);
@@ -323,6 +373,35 @@ export function App() {
     } catch (e) {
       fail(e);
     }
+  };
+  const meshMode = (mode: MeshMode | 'object') => {
+    if (mode === 'object') {
+      setMeshSelection(null);
+      return;
+    }
+    const p = projectRef.current!,
+      entity = p.entities.find((e) => e.id === selected),
+      g = p.geometries.find((g) => g.id === entity?.geometryId);
+    if (!entity || !g) return;
+    setPlaying(false);
+    setView('scene');
+    setWorkspace('studio');
+    setMeshSelection({
+      entityId: entity.id,
+      geometryId: g.id,
+      mode,
+      indices: meshSelection
+        ? convertSelection(g, meshSelection.mode, mode, meshSelection.indices)
+        : [],
+    });
+  };
+  const meshSend = async (commands: Command[], label: string, keepFaces = false) => {
+    const selection = meshSelection;
+    const next = await send(commands, label);
+    if (next && keepFaces && selection)
+      setMeshSelection((current) =>
+        current?.entityId === selection.entityId ? { ...selection, mode: 'face' } : current,
+      );
   };
   const addAssetClip = (asset: Asset) => {
     const p = projectRef.current!,
@@ -395,7 +474,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.4</small>
+            FRAMEFORGE<small>创作工作台 · 0.5</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -467,6 +546,7 @@ export function App() {
             setSelected(null);
             setSelectedClip(null);
             setSelectedKey(null);
+            setMeshSelection(null);
           }}
         >
           项目设置
@@ -510,6 +590,7 @@ export function App() {
               setSceneId(event.target.value);
               setSelected(null);
               setSelectedKey(null);
+              setMeshSelection(null);
             }}
           >
             {p.scenes.map((s) => (
@@ -674,6 +755,13 @@ export function App() {
           {workspace === 'studio' ? (
             <>
               <div className="view-toolbar">
+                <button
+                  disabled={e?.kind !== 'mesh'}
+                  className={meshSelection ? 'active' : ''}
+                  onClick={() => meshMode(meshSelection ? 'object' : 'vertex')}
+                >
+                  {meshSelection ? '返回对象' : '编辑网格'}
+                </button>
                 <div className="segmented">
                   <button
                     className={view === 'scene' ? 'active' : ''}
@@ -713,6 +801,24 @@ export function App() {
                 mode={mode}
                 view={view}
                 onTransform={transform}
+                meshSelection={meshSelection}
+                meshXray={meshXray}
+                onMeshXray={setMeshXray}
+                onMeshSelect={(indices) => setMeshSelection((s) => (s ? { ...s, indices } : s))}
+                onMeshTransform={(indices, matrix) =>
+                  void meshSend(
+                    [
+                      {
+                        type: 'geometry.transform',
+                        id: meshSelection!.geometryId,
+                        indices,
+                        matrix,
+                      },
+                    ],
+                    '变换网格组件',
+                  )
+                }
+                busy={busy}
                 onView={(t) => {
                   const shot = p.shots.find((s) => s.sceneId === sceneId);
                   if (shot) transform(shot.cameraId, t);
@@ -745,14 +851,25 @@ export function App() {
         </section>
         <aside className="inspector">
           <fieldset disabled={busy}>
-            <Inspector
-              project={p}
-              entity={e}
-              clip={clip}
-              frame={frame}
-              send={(c, l) => void send(c, l)}
-              transform={transform}
-            />
+            {meshSelection && workspace === 'studio' && view === 'scene' ? (
+              <MeshPanel
+                project={p}
+                geometry={p.geometries.find((g) => g.id === meshSelection.geometryId)!}
+                selection={meshSelection}
+                onMode={meshMode}
+                onSelect={(indices) => setMeshSelection({ ...meshSelection, indices })}
+                send={(c, l, keep) => void meshSend(c, l, keep)}
+              />
+            ) : (
+              <Inspector
+                project={p}
+                entity={e}
+                clip={clip}
+                frame={frame}
+                send={(c, l) => void send(c, l)}
+                transform={transform}
+              />
+            )}
           </fieldset>
         </aside>
       </div>
