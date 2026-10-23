@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { GenerationOptionsSchema, GenerationRequestSchema } from './generation';
 import { validateTrack } from './animation';
 
-export const PROJECT_VERSION = 5;
+export const PROJECT_VERSION = 6;
 
 export const id = () => crypto.randomUUID();
 const ID = z
@@ -27,6 +27,11 @@ export const GeometrySchema = z
     id: ID,
     name: Name,
     positions: z.array(Vec3Schema).max(100000),
+    normals: z.array(Vec3Schema).max(100000).optional(),
+    uv: z
+      .array(z.tuple([NumberValue, NumberValue]))
+      .max(100000)
+      .optional(),
     triangles: z
       .array(
         z.tuple([
@@ -46,6 +51,17 @@ export const MaterialSchema = z
     color: z.string().regex(/^#[\da-fA-F]{6}$/),
     roughness: z.number().min(0).max(1),
     metalness: z.number().min(0).max(1),
+    linearColor: z
+      .tuple([z.number().min(0).max(1), z.number().min(0).max(1), z.number().min(0).max(1)])
+      .optional(),
+    emissive: z
+      .tuple([z.number().min(0).max(1), z.number().min(0).max(1), z.number().min(0).max(1)])
+      .optional(),
+    opacity: z.number().min(0).max(1).optional(),
+    alphaMode: z.enum(['OPAQUE', 'MASK', 'BLEND']).optional(),
+    alphaCutoff: z.number().min(0).max(1).optional(),
+    doubleSided: z.boolean().optional(),
+    flatShading: z.boolean().optional(),
   })
   .strict();
 export const LightSchema = z
@@ -53,13 +69,17 @@ export const LightSchema = z
     kind: z.enum(['point', 'directional']),
     color: z.string().regex(/^#[\da-fA-F]{6}$/),
     intensity: z.number().min(0).max(10000),
+    linearColor: MaterialSchema.shape.linearColor,
+    range: z.number().positive().max(1e7).optional(),
+    direction: z.literal('local-negative-z').optional(),
   })
   .strict();
 export const CameraSchema = z
   .object({
-    fov: z.number().min(5).max(150),
+    fov: z.number().positive().lt(180),
     near: z.number().positive(),
     far: z.number().positive(),
+    aspect: z.number().positive().optional(),
   })
   .strict();
 export const EntitySchema = z
@@ -84,6 +104,14 @@ export const SceneSchema = z
     name: Name,
     background: z.string().regex(/^#[\da-fA-F]{6}$/),
     ambient: z.number().min(0).max(5),
+    source: z
+      .object({
+        format: z.literal('gltf2'),
+        copyright: z.string().max(10000).optional(),
+        generator: z.string().max(10000).optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export const HandleModeSchema = z.enum(['free', 'aligned', 'vector', 'auto-clamped']);
@@ -332,11 +360,17 @@ export function parseProject(input: unknown): Project {
   const materials = new Set(p.materials.map((m) => m.id));
   for (const asset of p.assets)
     if (!asset.mime.startsWith(asset.kind + '/')) throw new Error('素材 MIME 与类型不匹配');
-  for (const g of p.geometries)
+  for (const g of p.geometries) {
+    for (const attr of [g.normals, g.uv])
+      if (attr && attr.length !== g.positions.length)
+        throw new Error(`顶点属性长度不匹配：${g.name}`);
+    if (g.normals?.some((n) => Math.abs(Math.hypot(...n) - 1) > 0.001))
+      throw new Error(`顶点法线必须归一化：${g.name}`);
     for (const t of g.triangles) {
       if (new Set(t).size !== 3 || t.some((i) => i >= g.positions.length))
         throw new Error(`无效三角面：${g.name}`);
     }
+  }
   for (const e of p.entities) {
     if (!scenes.has(e.sceneId)) throw new Error('对象所属场景不存在');
     if (e.kind === 'mesh' && (!geometries.has(e.geometryId!) || !materials.has(e.materialId!)))
@@ -414,7 +448,7 @@ export function migrateProject(input: unknown) {
     typeof input !== 'object' ||
     !input ||
     !('schemaVersion' in input) ||
-    ![1, 2, 3, 4, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
+    ![1, 2, 3, 4, 5, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
     typeof input.schemaVersion !== 'number'
   )
     throw new Error('不支持此项目版本；原文件未修改');

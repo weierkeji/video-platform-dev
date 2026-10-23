@@ -83,7 +83,7 @@ export function Viewport(props: ViewportProps) {
         gizmo.reset();
         gizmo.dragging = false;
         gizmo.axis = null;
-        if (pending?.geometry && overlay) overlay.preview(pending.geometry.positions);
+        if (pending?.geometry && overlay) overlay.preview(pending.geometry.positions, true);
         cancelling = false;
         orbit.enabled = true;
         down = null;
@@ -116,7 +116,7 @@ export function Viewport(props: ViewportProps) {
             p.frame === pending.frame &&
             p.meshSelection === pending.selection;
           if (pending.geometry && overlay) {
-            overlay.preview(pending.geometry.positions);
+            overlay.preview(pending.geometry.positions, true);
             if (valid && pending.matrix && pending.changed)
               current.current.onMeshTransform(pending.indices, pending.matrix);
             return;
@@ -308,6 +308,7 @@ export function Viewport(props: ViewportProps) {
         if (hits[0]) current.current.select(hits[0].object.userData.entityId);
       };
       const keydown = (e: KeyboardEvent) => {
+        if (document.querySelector('.modal-backdrop')) return;
         if ((e.target as HTMLElement).closest('input,textarea,select,[contenteditable]')) return;
         if (
           drag &&

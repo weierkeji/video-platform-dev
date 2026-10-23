@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { evaluatedTransform } from '../core/evaluate';
 import { type Project } from '../core/model';
+import { linearColor, surfaceGeometry, surfaceMaterial } from '../core/surface';
 
 export class SceneRenderer {
   renderer: THREE.WebGLRenderer;
@@ -35,30 +36,33 @@ export class SceneRenderer {
       if (e.kind === 'mesh') {
         const g = p.geometries.find((g) => g.id === e.geometryId)!,
           m = p.materials.find((m) => m.id === e.materialId)!;
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute(g.positions.flat(), 3));
-        geometry.setIndex(g.triangles.flat());
-        geometry.computeVertexNormals();
-        object = new THREE.Mesh(
-          geometry,
-          new THREE.MeshStandardMaterial({
-            color: m.color,
-            roughness: m.roughness,
-            metalness: m.metalness,
-            flatShading: true,
-            side: THREE.DoubleSide,
-          }),
-        );
+        object = new THREE.Mesh(surfaceGeometry(g), surfaceMaterial(m));
         object.castShadow = true;
         object.receiveShadow = true;
       } else if (e.kind === 'camera')
-        object = new THREE.PerspectiveCamera(e.camera!.fov, 1, e.camera!.near, e.camera!.far);
+        object = new THREE.PerspectiveCamera(
+          e.camera!.fov,
+          e.camera!.aspect || 1,
+          e.camera!.near,
+          e.camera!.far,
+        );
       else if (e.kind === 'light') {
         object =
           e.light!.kind === 'point'
-            ? new THREE.PointLight(e.light!.color, e.light!.intensity)
-            : new THREE.DirectionalLight(e.light!.color, e.light!.intensity);
+            ? new THREE.PointLight(
+                linearColor(e.light!.color, e.light!.linearColor),
+                e.light!.intensity,
+                e.light!.range || 0,
+              )
+            : new THREE.DirectionalLight(
+                linearColor(e.light!.color, e.light!.linearColor),
+                e.light!.intensity,
+              );
         const light = object as THREE.PointLight | THREE.DirectionalLight;
+        if (light instanceof THREE.DirectionalLight && e.light!.direction === 'local-negative-z') {
+          light.target.position.set(0, 0, -1);
+          light.add(light.target);
+        }
         light.castShadow = true;
         light.shadow.bias = -0.0002;
         light.shadow.normalBias = 0.04;
@@ -89,7 +93,8 @@ export class SceneRenderer {
     if (this.renderer.domElement.width !== width || this.renderer.domElement.height !== height)
       this.renderer.setSize(width, height, false);
     if (camera instanceof THREE.PerspectiveCamera) {
-      camera.aspect = width / height;
+      const entity = this.project?.entities.find((e) => e.id === camera.userData.entityId);
+      camera.aspect = entity?.camera?.aspect || width / height;
       camera.updateProjectionMatrix();
     }
     this.renderer.render(this.scene, camera);

@@ -3,6 +3,7 @@ import { evaluatedTransform } from '../core/evaluate';
 import { type Command } from '../core/commands';
 import { type Clip, type Entity, type Project, type Vec3 } from '../core/model';
 import { exportOBJ } from '../core/geometry';
+import { displayColor } from '../core/surface';
 
 export function download(name: string, body: Blob | string, type = 'application/json') {
   const url = URL.createObjectURL(body instanceof Blob ? body : new Blob([body], { type }));
@@ -403,7 +404,7 @@ export function Inspector({
               <input
                 aria-label="基础色"
                 type="color"
-                value={m.color}
+                value={m.linearColor ? displayColor(m.linearColor) : m.color}
                 onChange={(event) =>
                   send(
                     [{ type: 'material.update', id: m.id, patch: { color: event.target.value } }],
@@ -422,6 +423,106 @@ export function Inspector({
                 send([{ type: 'material.update', id: m.id, patch: { roughness: v } }], '修改材质')
               }
             />
+            <label className="field">
+              表面着色
+              <select
+                aria-label="表面着色"
+                value={(m.flatShading ?? true) ? 'flat' : 'smooth'}
+                onChange={(event) =>
+                  send(
+                    [
+                      {
+                        type: 'material.update',
+                        id: m.id,
+                        patch: { flatShading: event.target.value === 'flat' },
+                      },
+                    ],
+                    '修改表面着色',
+                  )
+                }
+              >
+                <option value="flat">平面</option>
+                <option value="smooth">顶点法线</option>
+              </select>
+            </label>
+            <label className="check">
+              <input
+                type="checkbox"
+                aria-label="双面材质"
+                checked={m.doubleSided ?? true}
+                onChange={(event) =>
+                  send(
+                    [
+                      {
+                        type: 'material.update',
+                        id: m.id,
+                        patch: { doubleSided: event.target.checked },
+                      },
+                    ],
+                    '修改材质双面',
+                  )
+                }
+              />
+              双面材质
+            </label>
+            <label className="field">
+              透明模式
+              <select
+                aria-label="透明模式"
+                value={m.alphaMode || 'OPAQUE'}
+                onChange={(event) =>
+                  send(
+                    [
+                      {
+                        type: 'material.update',
+                        id: m.id,
+                        patch: { alphaMode: event.target.value as 'OPAQUE' },
+                      },
+                    ],
+                    '修改透明模式',
+                  )
+                }
+              >
+                <option value="OPAQUE">不透明</option>
+                <option value="MASK">阈值裁切</option>
+                <option value="BLEND">透明混合</option>
+              </select>
+            </label>
+            <NumberInput
+              label="不透明度"
+              value={m.opacity ?? 1}
+              min={0}
+              max={1}
+              step={0.05}
+              onChange={(v) =>
+                send([{ type: 'material.update', id: m.id, patch: { opacity: v } }], '修改不透明度')
+              }
+            />
+            {m.alphaMode === 'MASK' && (
+              <NumberInput
+                label="裁切阈值"
+                value={m.alphaCutoff ?? 0.5}
+                min={0}
+                max={1}
+                step={0.05}
+                onChange={(v) =>
+                  send(
+                    [{ type: 'material.update', id: m.id, patch: { alphaCutoff: v } }],
+                    '修改裁切阈值',
+                  )
+                }
+              />
+            )}
+            <VectorInput
+              label="自发光（线性）"
+              value={m.emissive || [0, 0, 0]}
+              onChange={(v) =>
+                send([{ type: 'material.update', id: m.id, patch: { emissive: v } }], '修改自发光')
+              }
+            />
+            <p className="muted">
+              透明混合采用实时排序；复杂交叠不保证顺序无关透明。自发光不会照亮其他对象。
+            </p>
             <NumberInput
               label="金属度"
               value={m.metalness}
@@ -437,6 +538,11 @@ export function Inspector({
         {e.camera && (
           <>
             <h3>摄影机</h3>
+            {e.camera.aspect && (
+              <p className="muted">
+                导入摄影机固定投影宽高比：{e.camera.aspect.toFixed(4)}。输出画幅仍由项目设置决定。
+              </p>
+            )}
             <NumberInput
               label="垂直视角 °"
               value={e.camera.fov}
@@ -459,6 +565,9 @@ export function Inspector({
         {e.light && (
           <>
             <h3>灯光</h3>
+            {e.light.direction && (
+              <p className="muted">光线沿对象局部 −Z 方向；旋转对象可改变照射方向。</p>
+            )}
             <label className="field">
               类型
               <select
@@ -507,6 +616,11 @@ export function Inspector({
                 {g.positions.length} 顶点 / {g.triangles.length} 面
               </small>
             </h3>
+            {g.normals && (
+              <p className="muted">
+                已保留导入法线；修改顶点或拓扑会重新计算法线。撤销可恢复原法线。
+              </p>
+            )}
             {g.positions.length > 0 ? (
               <NumberInput
                 label="顶点索引"

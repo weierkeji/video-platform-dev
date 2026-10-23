@@ -88,6 +88,7 @@ export function subdivide(g: Geometry) {
         pb = g.positions[b];
       edges.set(key, g.positions.length);
       g.positions.push(pa.map((v, i) => (v + pb[i]) / 2) as Vec3);
+      if (g.uv) g.uv.push(g.uv[a].map((v, i) => (v + g.uv![b][i]) / 2) as [number, number]);
     }
     return edges.get(key)!;
   };
@@ -102,6 +103,7 @@ export function subdivide(g: Geometry) {
       [ab, bc, ca],
     ] as [number, number, number][];
   });
+  delete g.normals;
 }
 
 export function extrudeFace(g: Geometry, face: number, distance: number) {
@@ -115,6 +117,7 @@ export function extrudeFace(g: Geometry, face: number, distance: number) {
   if (length < 1e-9) throw new Error('退化三角面无法挤出');
   const next = t.map((i) => {
     g.positions.push(g.positions[i].map((v, j) => v + (normal[j] / length) * distance) as Vec3);
+    if (g.uv) g.uv.push([...g.uv[i]]);
     return g.positions.length - 1;
   });
   g.triangles[face] = next as [number, number, number];
@@ -122,6 +125,7 @@ export function extrudeFace(g: Geometry, face: number, distance: number) {
     const j = (i + 1) % 3;
     g.triangles.push([t[i], t[j], next[j]], [t[i], next[j], next[i]]);
   }
+  delete g.normals;
 }
 
 export function exportOBJ(geometry: Geometry) {

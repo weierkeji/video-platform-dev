@@ -50,6 +50,12 @@ export function MeshPanel({
         网格组件 <button onClick={() => onMode('object')}>完成编辑</button>
       </div>
       <div className="inspector-body mesh-panel">
+        {g.normals && <p className="muted">修改网格会重算导入法线；撤销可恢复。</p>}
+        {g.uv && (
+          <p className="muted">
+            UV0 随顶点保留。挤出复制 UV，合并保留目标点 UV；新侧面尚未自动展开。
+          </p>
+        )}
         <div className="segmented">
           {(['vertex', 'edge', 'face'] as const).map((mode, i) => (
             <button

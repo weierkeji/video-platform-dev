@@ -108,11 +108,16 @@ export class MeshOverlay {
       this.root.add(o);
     }
   }
-  preview(positions: Vec3[]) {
+  preview(positions: Vec3[], restoreNormals = false) {
     const attribute = this.mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
     positions.forEach((p, i) => attribute.setXYZ(i, ...p));
     attribute.needsUpdate = true;
-    this.mesh.geometry.computeVertexNormals();
+    if ((restoreNormals || positions === this.geometry.positions) && this.geometry.normals)
+      this.mesh.geometry.setAttribute(
+        'normal',
+        new THREE.Float32BufferAttribute(this.geometry.normals.flat(), 3),
+      );
+    else this.mesh.geometry.computeVertexNormals();
     this.mesh.geometry.computeBoundingSphere();
     this.mesh.geometry.computeBoundingBox();
     this.redraw(positions);

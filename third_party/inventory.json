@@ -174,6 +174,17 @@
     "modified": false
   },
   {
+    "name": "gltf-validator",
+    "version": "2.0.0-dev.3.10",
+    "license": "Apache-2.0",
+    "role": "development",
+    "licenseFiles": [
+      "licenses/gltf-validator-2.0.0-dev.3.10-LICENSE",
+      "licenses/gltf-validator-2.0.0-dev.3.10-NOTICES"
+    ],
+    "modified": false
+  },
+  {
     "name": "meshoptimizer",
     "version": "0.22.0",
     "license": "MIT",

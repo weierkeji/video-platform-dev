@@ -18,6 +18,7 @@ import { CurveEditor, type KeySelection } from './CurveEditor';
 import { MeshPanel } from './MeshPanel';
 import { convertSelection, sameTopology, type MeshMode, type MeshSelection } from '../core/mesh';
 import { WorkflowPanel } from './WorkflowPanel';
+import { SceneExchange } from './SceneExchange';
 
 type Envelope = { project: Project; canUndo: boolean; canRedo: boolean };
 type Summary = { id: string; name: string; revision: number };
@@ -57,6 +58,7 @@ export function App() {
     [revisions, setRevisions] = useState<Revision[]>([]),
     [newName, setNewName] = useState(''),
     [newDialog, setNewDialog] = useState(false),
+    [exchangeOpen, setExchangeOpen] = useState(false),
     [commandText, setCommandText] = useState(
       '[\n  { "type": "project.rename", "name": "新作品" }\n]',
     ),
@@ -231,6 +233,7 @@ export function App() {
   }, [playing, envelope?.project.timeline.fps, envelope?.project.timeline.duration]);
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
+      if (exchangeOpen || newDialog) return;
       if ((e.target as HTMLElement).closest('input,textarea,select,[contenteditable]')) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
@@ -284,7 +287,19 @@ export function App() {
     };
     window.addEventListener('keydown', listener);
     return () => window.removeEventListener('keydown', listener);
-  }, [history, send, selected, selectedClip, selectedKey, workspace, view, meshSelection, frame]);
+  }, [
+    history,
+    send,
+    selected,
+    selectedClip,
+    selectedKey,
+    workspace,
+    view,
+    meshSelection,
+    frame,
+    exchangeOpen,
+    newDialog,
+  ]);
   const projectId = envelope?.project.id;
   useEffect(() => {
     if (!projectId) return;
@@ -474,7 +489,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.5</small>
+            FRAMEFORGE<small>创作工作台 · 0.6</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -623,6 +638,15 @@ export function App() {
               <option value="group">集合</option>
             </select>
             <button onClick={() => objInput.current?.click()}>OBJ</button>
+            <button
+              disabled={busy}
+              onClick={() => {
+                setPlaying(false);
+                setExchangeOpen(true);
+              }}
+            >
+              glTF
+            </button>
           </div>
           <div className="entity-list">
             {p.entities
@@ -1129,6 +1153,26 @@ export function App() {
           event.target.value = '';
         }}
       />
+      {exchangeOpen && (
+        <SceneExchange
+          key={p.id}
+          project={p}
+          sceneId={sceneId}
+          frame={frame}
+          busy={busy}
+          send={send}
+          onClose={() => setExchangeOpen(false)}
+          onImported={(s) => {
+            setSceneId(s);
+            setSelected(null);
+            setSelectedClip(null);
+            setMeshSelection(null);
+            setWorkspace('studio');
+            setView('scene');
+            setPlaying(false);
+          }}
+        />
+      )}
       {newDialog && (
         <div className="modal-backdrop">
           <form

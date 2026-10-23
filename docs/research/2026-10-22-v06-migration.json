@@ -1,0 +1,15 @@
+{
+  "checkedAt": "2026-10-22T09:30:40.572Z",
+  "migration": {
+    "id": "5dcd32aa-17f6-45c4-9e74-c9c7679357c1",
+    "from_version": 5,
+    "to_version": 6,
+    "created_at": "2026-10-22T09:26:40.091Z",
+    "backup_name": "before-schema-v6-1792661200011.sqlite",
+    "details": "{\"projects\":38,\"revisions\":192,\"jobs\":27,\"previousVersions\":[5]}"
+  },
+  "unchangedExceptSchemaVersion": {
+    "revisions": 192,
+    "jobs": 27
+  }
+}

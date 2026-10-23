@@ -1,0 +1,34 @@
+{
+  "checkedAt": "2026-10-22T09:30:41.532Z",
+  "projectId": "8e8e7284-fc1f-4282-9de6-9e90da4d1b46",
+  "importedProjectId": "55f8b36d-53d2-4249-bf4b-bb57dddab04f",
+  "jobId": "f58a238e-6f59-4664-8c91-540806a6b184",
+  "browser": "155.0.8059.82",
+  "ui": [
+    "new project",
+    "add sphere",
+    "transform",
+    "keyframes",
+    "undo",
+    "redo",
+    "sequence preview",
+    "reload"
+  ],
+  "api": [
+    "audio upload",
+    "audio timeline",
+    "idempotent workflow job including after completion",
+    "MP4 with audio",
+    "portable project reimport",
+    "result registered as asset",
+    "cancel running job",
+    "retry original snapshot"
+  ],
+  "video": {
+    "width": 320,
+    "height": 180,
+    "frames": "24",
+    "duration": "1.000000"
+  },
+  "consoleErrors": []
+}

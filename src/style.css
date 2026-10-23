@@ -1035,6 +1035,20 @@ pre {
   gap: 10px;
   margin: 20px 0;
 }
+.exchange-modal {
+  width: min(720px, 90vw);
+  max-height: 85vh;
+  overflow-y: auto;
+}
+.exchange-modal p,
+.exchange-modal li {
+  line-height: 1.6;
+}
+.exchange-review {
+  padding: 12px;
+  margin: 12px 0;
+  border: 1px solid var(--border);
+}
 .loading {
   padding: 80px;
 }

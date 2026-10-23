@@ -14,7 +14,7 @@ for (const [path, entry] of Object.entries(lock.packages)) {
   if (!path || !existsSync(path)) continue;
   const pkg = JSON.parse(readFileSync(join(path, 'package.json'), 'utf8'));
   const files = readdirSync(path).filter((f) =>
-    /^(license|licence|copying|notice)(\.|$|-)/i.test(f),
+    /^(license|licence|copying|notices?)(\.|$|-)/i.test(f),
   );
   const licenses = [];
   for (const f of files) {

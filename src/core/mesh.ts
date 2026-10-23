@@ -110,9 +110,12 @@ export function transformVertices(g: Geometry, indices: number[], matrix: number
   indices.forEach((i, n) => {
     g.positions[i] = positions[n];
   });
+  delete g.normals;
 }
 function removeVertices(g: Geometry, removing: Set<number>) {
   const remap = new Map<number, number>();
+  if (g.uv) g.uv = g.uv.filter((_, i) => !removing.has(i));
+  delete g.normals;
   g.positions = g.positions.filter((_, i) => {
     if (removing.has(i)) return false;
     remap.set(i, remap.size);
@@ -126,6 +129,7 @@ export function deleteElements(g: Geometry, mode: MeshMode, indices: number[]) {
   const edges = meshEdges(g);
   selectedVertices(g, mode, indices, edges);
   if (!indices.length) throw new Error('请先选择网格元素');
+  delete g.normals;
   if (mode === 'vertex') removeVertices(g, new Set(indices));
   else if (mode === 'face') {
     const selected = new Set(indices);
@@ -206,6 +210,7 @@ export function extrudeRegion(g: Geometry, faces: number[], offset: Vec3) {
   for (const i of vertices) {
     remap.set(i, g.positions.length);
     g.positions.push(g.positions[i].map((v, a) => v + offset[a]) as Vec3);
+    if (g.uv) g.uv.push([...g.uv[i]]);
   }
   for (const face of faces)
     g.triangles[face] = g.triangles[face].map((i) => remap.get(i)!) as [number, number, number];

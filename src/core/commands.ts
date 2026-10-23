@@ -21,6 +21,7 @@ import {
 } from './model';
 import { extrudeFace, primitive, subdivide } from './geometry';
 import { editTrack } from './animation';
+import { displayColor } from './surface';
 import { deleteElements, extrudeRegion, mergeVertices, transformVertices } from './mesh';
 
 const ID = z.string().min(1).max(80);
@@ -28,6 +29,15 @@ const MeshIndices = z.array(z.number().int().nonnegative()).min(1).max(200000);
 export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('project.rename'), name: z.string().min(1).max(160) }).strict(),
   z.object({ type: z.literal('scene.add'), scene: SceneSchema }).strict(),
+  z
+    .object({
+      type: z.literal('scene.import'),
+      scenes: z.array(SceneSchema).min(1).max(100),
+      entities: z.array(EntitySchema).max(2000),
+      geometries: z.array(GeometrySchema).max(2000),
+      materials: z.array(MaterialSchema).max(2000),
+    })
+    .strict(),
   z
     .object({
       type: z.literal('scene.update'),
@@ -188,6 +198,20 @@ function apply(p: Project, c: Command) {
     case 'scene.add':
       p.scenes.push(c.scene);
       break;
+    case 'scene.import':
+      if (
+        c.entities.some(
+          (e) =>
+            !c.scenes.some((s) => s.id === e.sceneId) ||
+            (e.parentId && !c.entities.some((parent) => parent.id === e.parentId)),
+        )
+      )
+        throw new Error('导入场景必须包含其完整对象层级');
+      p.scenes.push(...c.scenes);
+      p.entities.push(...c.entities);
+      p.geometries.push(...c.geometries);
+      p.materials.push(...c.materials);
+      break;
     case 'scene.update':
       Object.assign(get(p.scenes, c.id), c.patch);
       break;
@@ -300,6 +324,7 @@ function apply(p: Project, c: Command) {
       const g = get(p.geometries, c.id);
       if (!g.positions[c.index]) throw new Error('顶点索引不存在');
       g.positions[c.index] = c.position;
+      delete g.normals;
       break;
     }
     case 'geometry.subdivide':
@@ -320,9 +345,13 @@ function apply(p: Project, c: Command) {
     case 'geometry.extrude':
       extrudeFace(get(p.geometries, c.id), c.face, c.distance);
       break;
-    case 'material.update':
-      Object.assign(get(p.materials, c.id), c.patch);
+    case 'material.update': {
+      const m = get(p.materials, c.id);
+      Object.assign(m, c.patch);
+      if (c.patch.linearColor) m.color = displayColor(c.patch.linearColor);
+      else if (c.patch.color !== undefined) delete m.linearColor;
       break;
+    }
     case 'key.set': {
       get(p.entities, c.entityId);
       let t = p.animationTracks.find((t) => t.entityId === c.entityId && t.property === c.property);
