@@ -1049,6 +1049,28 @@ pre {
   margin: 12px 0;
   border: 1px solid var(--border);
 }
+.texture-panel details {
+  border-top: 1px solid #405266;
+  padding: 8px 0;
+}
+.texture-panel summary {
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.texture-preview {
+  display: block;
+  max-width: 100%;
+  height: 80px;
+  object-fit: contain;
+  background: #10161e;
+}
+.texture-panel .button-row {
+  flex-wrap: wrap;
+}
+.texture-panel .button-row .field {
+  flex: 1;
+  min-width: 90px;
+}
 .loading {
   padding: 80px;
 }

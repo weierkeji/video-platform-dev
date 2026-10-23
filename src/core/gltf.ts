@@ -1,6 +1,18 @@
 import { z } from 'zod';
 import { Euler, Matrix4, Quaternion, Vector3 } from 'three';
-import { id, identity, type Entity, type Geometry, type Project, type Vec3 } from './model';
+import {
+  id,
+  identity,
+  textureBinding,
+  textureSlots,
+  type Asset,
+  type Entity,
+  type Geometry,
+  type Project,
+  type Vec3,
+  type TextureBinding,
+} from './model';
+import { checkedImage, imageInfo, sha256 } from './image';
 import { CommandSchema, type Command } from './commands';
 import { evaluatedTransform } from './evaluate';
 import { displayColor, linearColor, surfaceGeometry } from './surface';
@@ -137,6 +149,31 @@ const documentSchema = base.extend({
     .array(base.extend({ uri: z.string().optional(), byteLength: integer.max(50 * 1024 * 1024) }))
     .max(2000)
     .default([]),
+  images: z
+    .array(
+      base.extend({
+        uri: z.string().optional(),
+        bufferView: integer.optional(),
+        mimeType: z.string().optional(),
+      }),
+    )
+    .max(1000)
+    .default([]),
+  textures: z
+    .array(base.extend({ source: integer.optional(), sampler: integer.optional() }))
+    .max(2000)
+    .default([]),
+  samplers: z
+    .array(
+      base.extend({
+        wrapS: integer.default(10497),
+        wrapT: integer.default(10497),
+        magFilter: integer.default(9729),
+        minFilter: integer.default(9987),
+      }),
+    )
+    .max(2000)
+    .default([]),
   animations: z.array(z.unknown()).default([]),
   skins: z.array(z.unknown()).default([]),
   extensionsRequired: z.array(z.string()).default([]),
@@ -149,9 +186,46 @@ export type GLTFImport = {
   defaultSceneId: string;
   notes: string[];
   copyright?: string;
+  images: { asset: Asset; bytes: Uint8Array }[];
 };
 export type ExchangeFile = { name: string; bytes: Uint8Array };
 const LIMIT = 50 * 1024 * 1024;
+const wrapValues = { repeat: 10497, clamp: 33071, mirror: 33648 } as const;
+const filterValues = {
+  nearest: 9728,
+  linear: 9729,
+  'nearest-mipmap-nearest': 9984,
+  'linear-mipmap-nearest': 9985,
+  'nearest-mipmap-linear': 9986,
+  'linear-mipmap-linear': 9987,
+} as const;
+const supportedExtensions = new Set([
+  'KHR_lights_punctual',
+  'KHR_texture_transform',
+  'EXT_texture_webp',
+]);
+function enumName<T extends Record<string, number>>(values: T, value: number): keyof T {
+  const found = Object.entries(values).find(([, v]) => v === value);
+  if (!found) throw new Error(`glTF 采样器枚举无效：${value}`);
+  return found[0] as keyof T;
+}
+function externalFile(uri: string, files: ExchangeFile[]) {
+  let path: string;
+  try {
+    path = decodeURIComponent(uri);
+  } catch {
+    throw new Error('glTF 资源 URI 编码错误');
+  }
+  if (
+    /[\\:#?\x00]/.test(path) ||
+    path.startsWith('/') ||
+    path.split('/').some((p) => !p || p === '..' || p === '.')
+  )
+    throw new Error('glTF 只读取此次选择的相对路径文件，不访问网络或上级目录');
+  const found = files.filter((f) => f.name === path);
+  if (found.length !== 1) throw new Error(`请同时选择唯一的外部资源文件：${path}`);
+  return found[0].bytes;
+}
 function at<T>(items: T[], i: number, label: string): T {
   if (!Number.isInteger(i) || !items[i]) throw new Error(`${label} 索引不存在：${i}`);
   return items[i];
@@ -305,15 +379,25 @@ function accessors(doc: Document, buffers: Uint8Array[]) {
       }),
     );
   };
-  return (index: number, semantic: 'POSITION' | 'NORMAL' | 'TEXCOORD_0' | 'indices') => {
+  return (
+    index: number,
+    semantic: 'POSITION' | 'NORMAL' | 'TEXCOORD_0' | 'TEXCOORD_1' | 'TANGENT' | 'indices',
+  ) => {
     const a = at(doc.accessors, index, 'accessor'),
-      width = semantic === 'indices' ? 1 : semantic === 'TEXCOORD_0' ? 2 : 3;
+      width =
+        semantic === 'indices'
+          ? 1
+          : semantic.startsWith('TEXCOORD_')
+            ? 2
+            : semantic === 'TANGENT'
+              ? 4
+              : 3;
     if (a.type !== (width === 1 ? 'SCALAR' : `VEC${width}`) || a.count < 1)
       throw new Error(`glTF ${semantic} accessor 形状无效`);
     if (
       semantic === 'indices'
         ? ![5121, 5123, 5125].includes(a.componentType) || a.normalized
-        : semantic === 'TEXCOORD_0'
+        : semantic.startsWith('TEXCOORD_')
           ? !(
               (a.componentType === 5126 && !a.normalized) ||
               ([5121, 5123].includes(a.componentType) && a.normalized)
@@ -391,7 +475,10 @@ function nodeTransform(node: Document['nodes'][number]): Entity['transform'] {
   return { position: p.toArray(), rotation: [e.x, e.y, e.z], scale: s.toArray() };
 }
 
-export function importGLTF(bytes: Uint8Array, files: ExchangeFile[] = []): GLTFImport {
+export async function importGLTF(
+  bytes: Uint8Array,
+  files: ExchangeFile[] = [],
+): Promise<GLTFImport> {
   const unpacked = unpackGLTF(bytes),
     doc = documentSchema.parse(unpacked.json),
     notes = new Set(unpacked.notes);
@@ -403,7 +490,7 @@ export function importGLTF(bytes: Uint8Array, files: ExchangeFile[] = []): GLTFI
   )
     unsupported('形态键');
   for (const ext of [...doc.extensionsRequired, ...doc.extensionsUsed])
-    if (ext !== 'KHR_lights_punctual') unsupported(`扩展 ${ext}`);
+    if (!supportedExtensions.has(ext)) unsupported(`扩展 ${ext}`);
   // Unknown extensions are rejected even if not declared by a malformed producer.
   function extensions(value: unknown, depth = 0) {
     if (depth > 100) throw new Error('glTF JSON 嵌套过深');
@@ -411,7 +498,7 @@ export function importGLTF(bytes: Uint8Array, files: ExchangeFile[] = []): GLTFI
     for (const [key, item] of Object.entries(value)) {
       if (key === 'extensions' && item && typeof item === 'object')
         for (const ext of Object.keys(item))
-          if (ext !== 'KHR_lights_punctual') unsupported(`扩展 ${ext}`);
+          if (!supportedExtensions.has(ext)) unsupported(`扩展 ${ext}`);
       if (key === 'extras') {
         notes.add('自定义 extras 元数据未映射到项目。');
         continue;
@@ -420,7 +507,94 @@ export function importGLTF(bytes: Uint8Array, files: ExchangeFile[] = []): GLTFI
     }
   }
   extensions(unpacked.json);
-  const read = accessors(doc, bufferData(doc, unpacked.bin, files));
+  const buffers = bufferData(doc, unpacked.bin, files),
+    read = accessors(doc, buffers);
+  const imageEntries = new Map<number, { asset: Asset; bytes: Uint8Array }>();
+  let imageBytes = 0;
+  const image = (index: number) => {
+    if (imageEntries.has(index)) return imageEntries.get(index)!.asset.id;
+    const source = at(doc.images, index, 'image');
+    if ((source.uri === undefined) === (source.bufferView === undefined))
+      throw new Error('glTF 图片必须且只能指定 URI 或 bufferView');
+    let data: Uint8Array,
+      declaredMime = source.mimeType;
+    if (source.bufferView !== undefined) {
+      const view = at(doc.bufferViews, source.bufferView, 'image.bufferView'),
+        buffer = at(buffers, view.buffer, 'image.buffer');
+      if (view.byteStride || view.byteOffset + view.byteLength > buffer.length || !source.mimeType)
+        throw new Error('glTF 图片缓冲区范围或 MIME 无效');
+      data = buffer.subarray(view.byteOffset, view.byteOffset + view.byteLength);
+    } else if (source.uri!.startsWith('data:')) {
+      const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/]*={0,2})$/.exec(
+        source.uri!,
+      );
+      if (!match || match[2].length % 4) throw new Error('glTF 图片 Data URI 无效');
+      data = Uint8Array.from(atob(match[2]), (c) => c.charCodeAt(0));
+      if (source.mimeType && source.mimeType !== match[1]) throw new Error('glTF 图片 MIME 不匹配');
+      declaredMime = match[1];
+    } else data = externalFile(source.uri!, files);
+    imageBytes += data.length;
+    if (imageBytes > LIMIT) throw new Error('glTF 纹理图片合计超过 50 MB');
+    const info = imageInfo(data);
+    if (declaredMime && declaredMime !== info.mime)
+      throw new Error('glTF 图片实际编码与 MIME 不匹配');
+    const asset: Asset = {
+      id: id(),
+      name: name(source.name, `glTF 图片 ${index + 1}`),
+      kind: 'image',
+      mime: info.mime,
+      bytes: data.length,
+      blobId: '0'.repeat(64),
+      width: info.width,
+      height: info.height,
+    };
+    imageEntries.set(index, { asset, bytes: data });
+    return asset.id;
+  };
+  const binding = (input: unknown): TextureBinding | undefined => {
+    if (input === undefined) return;
+    const info = base.extend({ index: integer, texCoord: integer.default(0) }).parse(input);
+    const texture = at(doc.textures, info.index, 'texture');
+    const source = texture.extensions?.EXT_texture_webp
+      ? z.object({ source: integer }).parse(texture.extensions.EXT_texture_webp).source
+      : texture.source;
+    if (source === undefined) throw new Error('glTF 纹理缺少图片来源');
+    const assetId = image(source),
+      result = textureBinding(assetId);
+    if (
+      texture.extensions?.EXT_texture_webp &&
+      imageEntries.get(source)!.asset.mime !== 'image/webp'
+    )
+      throw new Error('EXT_texture_webp 必须引用 WebP 图片');
+    const sampler =
+      texture.sampler === undefined ? undefined : at(doc.samplers, texture.sampler, 'sampler');
+    if (sampler) {
+      result.wrapS = enumName(wrapValues, sampler.wrapS);
+      result.wrapT = enumName(wrapValues, sampler.wrapT);
+      const mag = enumName(filterValues, sampler.magFilter);
+      if (mag !== 'nearest' && mag !== 'linear') throw new Error('glTF 放大过滤模式无效');
+      result.magFilter = mag;
+      result.minFilter = enumName(filterValues, sampler.minFilter);
+    }
+    let coord = info.texCoord;
+    if (info.extensions?.KHR_texture_transform) {
+      const transform = z
+        .object({
+          offset: vec(2).default([0, 0]),
+          scale: vec(2).default([1, 1]),
+          rotation: z.number().finite().default(0),
+          texCoord: integer.optional(),
+        })
+        .parse(info.extensions.KHR_texture_transform);
+      result.offset = transform.offset as [number, number];
+      result.scale = transform.scale as [number, number];
+      result.rotation = transform.rotation;
+      coord = transform.texCoord ?? coord;
+    }
+    if (coord !== 0 && coord !== 1) unsupported(`UV${coord}（当前保存 UV0/UV1）`);
+    result.texCoord = coord;
+    return result;
+  };
   const command: SceneImport = {
     type: 'scene.import',
     scenes: [],
@@ -434,16 +608,6 @@ export function importGLTF(bytes: Uint8Array, files: ExchangeFile[] = []): GLTFI
     if (materials.has(index)) return materials.get(index)!;
     const m = index === -1 ? undefined : at(doc.materials, index, 'material'),
       pbr = m?.pbrMetallicRoughness;
-    if (
-      [
-        m?.normalTexture,
-        m?.occlusionTexture,
-        m?.emissiveTexture,
-        pbr?.baseColorTexture,
-        pbr?.metallicRoughnessTexture,
-      ].some((t) => t !== undefined)
-    )
-      unsupported('纹理材质；请保留原文件，纹理资产映射尚待接入');
     const rgba = pbr?.baseColorFactor || [1, 1, 1, 1],
       linear = rgba.slice(0, 3) as Vec3;
     const result: Project['materials'][number] = {
@@ -460,6 +624,23 @@ export function importGLTF(bytes: Uint8Array, files: ExchangeFile[] = []): GLTFI
       doubleSided: m?.doubleSided ?? false,
       flatShading: false,
     };
+    const textures = {
+      baseColor: binding(pbr?.baseColorTexture),
+      metallicRoughness: binding(pbr?.metallicRoughnessTexture),
+      normal: binding(m?.normalTexture),
+      occlusion: binding(m?.occlusionTexture),
+      emissive: binding(m?.emissiveTexture),
+    };
+    for (const slot of textureSlots) if (!textures[slot]) delete textures[slot];
+    if (Object.keys(textures).length) result.textures = textures;
+    if (m?.normalTexture !== undefined)
+      result.normalScale = z
+        .object({ scale: z.number().finite().default(1) })
+        .parse(m.normalTexture).scale;
+    if (m?.occlusionTexture !== undefined)
+      result.occlusionStrength = z
+        .object({ strength: z.number().min(0).max(1).default(1) })
+        .parse(m.occlusionTexture).strength;
     materials.set(index, result.id);
     command.materials.push(result);
     return result.id;
@@ -472,7 +653,7 @@ export function importGLTF(bytes: Uint8Array, files: ExchangeFile[] = []): GLTFI
       p = at(mesh.primitives, primitiveIndex, 'primitive');
     if (![4, 5, 6].includes(p.mode)) unsupported('点或线图元');
     for (const attribute of Object.keys(p.attributes))
-      if (!['POSITION', 'NORMAL', 'TEXCOORD_0'].includes(attribute))
+      if (!['POSITION', 'NORMAL', 'TEXCOORD_0', 'TEXCOORD_1', 'TANGENT'].includes(attribute))
         unsupported(`顶点属性 ${attribute}`);
     const positions = read(p.attributes.POSITION, 'POSITION').map((r) => [...r] as Vec3);
     vertices += positions.length;
@@ -517,6 +698,12 @@ export function importGLTF(bytes: Uint8Array, files: ExchangeFile[] = []): GLTFI
     else notes.add('缺少法线的图元按平面着色显示。');
     if (p.attributes.TEXCOORD_0 !== undefined)
       g.uv = read(p.attributes.TEXCOORD_0, 'TEXCOORD_0').map((r) => [...r] as [number, number]);
+    if (p.attributes.TEXCOORD_1 !== undefined)
+      g.uv1 = read(p.attributes.TEXCOORD_1, 'TEXCOORD_1').map((r) => [...r] as [number, number]);
+    if (p.attributes.TANGENT !== undefined)
+      g.tangents = read(p.attributes.TANGENT, 'TANGENT').map(
+        (r) => [...r] as [number, number, number, 1 | -1],
+      );
     // A missing NORMAL is flat shading in glTF. Split material identity for this shading variant.
     let materialId = material(p.material);
     if (!g.normals) {
@@ -642,13 +829,18 @@ export function importGLTF(bytes: Uint8Array, files: ExchangeFile[] = []): GLTFI
   if (visitedAll.size < doc.nodes.length) notes.add('未被任何场景引用的节点未导入。');
   if (
     primitives.size < doc.meshes.reduce((n, m) => n + m.primitives.length, 0) ||
-    materials.size < doc.materials.length
+    materials.size < doc.materials.length ||
+    imageEntries.size < doc.images.length
   )
     notes.add('未被场景使用的网格、材质及图像资源未导入。');
   notes.add('导入场景使用本平台背景与环境光；glTF 不包含这两项场景设置。');
-  notes.add('UV0 保留；编辑网格后重算法线，挤出复制 UV、合并保留目标顶点 UV，尚无 UV 展开编辑器。');
+  notes.add(
+    'UV0/UV1 保留；编辑网格后重算法线并重新推导切线，挤出复制 UV、合并保留目标顶点 UV，尚无 UV 展开编辑器。',
+  );
   if (doc.asset.copyright) notes.add(`来源版权：${doc.asset.copyright}`);
   const sceneIndex = doc.scene ?? 0;
+  for (const entry of imageEntries.values()) entry.asset.blobId = await sha256(entry.bytes);
+  if (imageEntries.size) command.assets = [...imageEntries.values()].map((e) => e.asset);
   CommandSchema.parse(command);
   for (const g of command.geometries) {
     if (
@@ -657,18 +849,25 @@ export function importGLTF(bytes: Uint8Array, files: ExchangeFile[] = []): GLTFI
         g.normals.some((n) => Math.abs(Math.hypot(...n) - 1) > 0.001))
     )
       throw new Error('glTF 法线长度或归一化无效');
-    if (g.uv && g.uv.length !== g.positions.length) throw new Error('glTF UV 数量与顶点数量不匹配');
+    for (const attr of [g.uv, g.uv1, g.tangents])
+      if (attr && attr.length !== g.positions.length) throw new Error('glTF 顶点属性数量不匹配');
   }
   return {
     command,
     defaultSceneId: at(command.scenes, sceneIndex, 'scene').id,
     notes: [...notes],
     copyright: doc.asset.copyright,
+    images: [...imageEntries.values()],
   };
 }
 
 /** Static snapshot at the exact evaluated frame; never presented as animation export. */
-export function exportGLB(project: Project, sceneId: string, frame: number) {
+export function exportGLB(
+  project: Project,
+  sceneId: string,
+  frame: number,
+  imageBytes: ReadonlyMap<string, Uint8Array> = new Map(),
+) {
   if (!Number.isFinite(frame) || frame < 0) throw new Error('导出帧无效');
   const scene = project.scenes.find((s) => s.id === sceneId);
   if (!scene) throw new Error('场景不存在');
@@ -684,6 +883,14 @@ export function exportGLB(project: Project, sceneId: string, frame: number) {
   ];
   if (included.length !== entities.length) notes.push('隐藏对象及其子对象未导出。');
   type JSONRecord = Record<string, unknown>;
+  const images: JSONRecord[] = [],
+    textures: JSONRecord[] = [],
+    samplers: JSONRecord[] = [];
+  const imageMap = new Map<string, number>(),
+    textureMap = new Map<string, number>(),
+    samplerMap = new Map<string, number>();
+  const extensionsUsed = new Set<string>(),
+    extensionsRequired = new Set<string>();
   const nodes: JSONRecord[] = [],
     meshes: JSONRecord[] = [],
     materials: JSONRecord[] = [],
@@ -693,6 +900,68 @@ export function exportGLB(project: Project, sceneId: string, frame: number) {
     outputAccessors: JSONRecord[] = [];
   const chunks: Uint8Array[] = [];
   let byteLength = 0;
+  function textureInfo(binding: TextureBinding | undefined): JSONRecord | undefined {
+    if (!binding) return;
+    const asset = project.assets.find((a) => a.id === binding.assetId)!;
+    if (!asset || asset.kind !== 'image') throw new Error('导出纹理引用无效');
+    if (!imageMap.has(asset.blobId)) {
+      const bytes = imageBytes.get(asset.id);
+      if (!bytes) throw new Error(`导出前必须读取纹理原始字节：${asset.name}`);
+      const info = imageInfo(bytes);
+      if (info.mime !== asset.mime || bytes.length !== asset.bytes)
+        throw new Error('导出纹理与素材元数据不匹配');
+      const padded = new Uint8Array(Math.ceil(bytes.length / 4) * 4);
+      padded.set(bytes);
+      views.push({ buffer: 0, byteOffset: byteLength, byteLength: bytes.length });
+      chunks.push(padded);
+      byteLength += padded.length;
+      if (byteLength > LIMIT) throw new Error('GLB 纹理与几何合计超过 50 MB');
+      imageMap.set(asset.blobId, images.length);
+      images.push({ name: asset.name, bufferView: views.length - 1, mimeType: asset.mime });
+    }
+    const sampler = {
+        wrapS: wrapValues[binding.wrapS],
+        wrapT: wrapValues[binding.wrapT],
+        magFilter: filterValues[binding.magFilter],
+        minFilter: filterValues[binding.minFilter],
+      },
+      sKey = JSON.stringify(sampler);
+    if (!samplerMap.has(sKey)) {
+      samplerMap.set(sKey, samplers.length);
+      samplers.push(sampler);
+    }
+    const index = imageMap.get(asset.blobId)!,
+      sampleIndex = samplerMap.get(sKey)!,
+      key = `${index}:${sampleIndex}`;
+    if (!textureMap.has(key)) {
+      textureMap.set(key, textures.length);
+      if (asset.mime === 'image/webp') {
+        extensionsUsed.add('EXT_texture_webp');
+        extensionsRequired.add('EXT_texture_webp');
+        textures.push({
+          sampler: sampleIndex,
+          extensions: { EXT_texture_webp: { source: index } },
+        });
+      } else textures.push({ source: index, sampler: sampleIndex });
+    }
+    const info: JSONRecord = { index: textureMap.get(key), texCoord: binding.texCoord };
+    if (
+      binding.rotation ||
+      binding.offset.some((n) => n !== 0) ||
+      binding.scale.some((n) => n !== 1)
+    ) {
+      extensionsUsed.add('KHR_texture_transform');
+      extensionsRequired.add('KHR_texture_transform');
+      info.extensions = {
+        KHR_texture_transform: {
+          offset: binding.offset,
+          scale: binding.scale,
+          rotation: binding.rotation,
+        },
+      };
+    }
+    return info;
+  }
   function attribute(values: number[], width: number, type: 'FLOAT' | 'INDEX', bounds = false) {
     const bytes = new Uint8Array(values.length * 4),
       view = new DataView(bytes.buffer);
@@ -781,11 +1050,29 @@ export function exportGLB(project: Project, sceneId: string, frame: number) {
               baseColorFactor: [...linearColor(m.color, m.linearColor).toArray(), m.opacity ?? 1],
               metallicFactor: m.metalness,
               roughnessFactor: m.roughness,
+              ...(m.textures?.baseColor
+                ? { baseColorTexture: textureInfo(m.textures.baseColor) }
+                : {}),
+              ...(m.textures?.metallicRoughness
+                ? { metallicRoughnessTexture: textureInfo(m.textures.metallicRoughness) }
+                : {}),
             },
             emissiveFactor: m.emissive || [0, 0, 0],
             alphaMode: m.alphaMode || 'OPAQUE',
             ...(m.alphaMode === 'MASK' ? { alphaCutoff: m.alphaCutoff ?? 0.5 } : {}),
             doubleSided: m.doubleSided ?? true,
+            ...(m.textures?.normal
+              ? { normalTexture: { ...textureInfo(m.textures.normal), scale: m.normalScale ?? 1 } }
+              : {}),
+            ...(m.textures?.occlusion
+              ? {
+                  occlusionTexture: {
+                    ...textureInfo(m.textures.occlusion),
+                    strength: m.occlusionStrength ?? 1,
+                  },
+                }
+              : {}),
+            ...(m.textures?.emissive ? { emissiveTexture: textureInfo(m.textures.emissive) } : {}),
           });
         }
         const gKey = `${g.id}:${m.flatShading ?? true}`;
@@ -800,6 +1087,8 @@ export function exportGLB(project: Project, sceneId: string, frame: number) {
             ),
             ...(g.normals ? { normals: used.map((i) => g.normals![i]) } : {}),
             ...(g.uv ? { uv: used.map((i) => g.uv![i]) } : {}),
+            ...(g.uv1 ? { uv1: used.map((i) => g.uv1![i]) } : {}),
+            ...(g.tangents ? { tangents: used.map((i) => g.tangents![i]) } : {}),
           };
           let geometry = surfaceGeometry(compact);
           if (m.flatShading ?? true) {
@@ -807,6 +1096,7 @@ export function exportGLB(project: Project, sceneId: string, frame: number) {
             geometry.dispose();
             geometry = flat;
             geometry.deleteAttribute('normal');
+            geometry.deleteAttribute('tangent');
             geometry.computeVertexNormals();
           }
           const normal = geometry.getAttribute('normal');
@@ -826,6 +1116,18 @@ export function exportGLB(project: Project, sceneId: string, frame: number) {
           };
           if (g.uv)
             attrs.TEXCOORD_0 = attribute(Array.from(geometry.getAttribute('uv').array), 2, 'FLOAT');
+          if (g.uv1)
+            attrs.TEXCOORD_1 = attribute(
+              Array.from(geometry.getAttribute('uv1').array),
+              2,
+              'FLOAT',
+            );
+          if (geometry.hasAttribute('tangent'))
+            attrs.TANGENT = attribute(
+              Array.from(geometry.getAttribute('tangent').array),
+              4,
+              'FLOAT',
+            );
           const data: JSONRecord = { attributes: attrs, mode: 4 };
           if (geometry.index)
             data.indices = attribute(Array.from(geometry.index.array), 1, 'INDEX');
@@ -882,10 +1184,11 @@ export function exportGLB(project: Project, sceneId: string, frame: number) {
     nodes[i].children = [...((nodes[i].children as number[]) || []), nodes.length];
     nodes.push(child);
   });
+  if (lights.length) extensionsUsed.add('KHR_lights_punctual');
   const json: JSONRecord = {
     asset: {
       version: '2.0',
-      generator: 'Frameforge Studio 0.6 static scene exchange',
+      generator: 'Frameforge Studio 0.7 scene exchange',
       ...(scene.source?.copyright ? { copyright: scene.source.copyright } : {}),
     },
     scene: 0,
@@ -906,9 +1209,10 @@ export function exportGLB(project: Project, sceneId: string, frame: number) {
         }
       : {}),
     ...(cameras.length ? { cameras } : {}),
-    ...(lights.length
-      ? { extensionsUsed: ['KHR_lights_punctual'], extensions: { KHR_lights_punctual: { lights } } }
-      : {}),
+    ...(images.length ? { images, textures, samplers } : {}),
+    ...(extensionsUsed.size ? { extensionsUsed: [...extensionsUsed] } : {}),
+    ...(extensionsRequired.size ? { extensionsRequired: [...extensionsRequired] } : {}),
+    ...(lights.length ? { extensions: { KHR_lights_punctual: { lights } } } : {}),
   };
   const encoded = new TextEncoder().encode(JSON.stringify(json)),
     jsonLength = Math.ceil(encoded.length / 4) * 4;
@@ -932,4 +1236,37 @@ export function exportGLB(project: Project, sceneId: string, frame: number) {
     }
   }
   return { bytes: result, notes: [...new Set(notes)], frame, sceneName: scene.name };
+}
+
+export async function exportGLBWithAssets(
+  project: Project,
+  sceneId: string,
+  frame: number,
+  load: (asset: Asset) => Promise<Uint8Array>,
+) {
+  const images = new Map<string, Uint8Array>();
+  const entities = project.entities.filter((e) => e.sceneId === sceneId),
+    byId = new Map(entities.map((e) => [e.id, e]));
+  const visible = (e: Entity): boolean =>
+    e.visible && (!e.parentId || visible(byId.get(e.parentId)!));
+  const materials = new Set(
+    entities
+      .filter(
+        (e) =>
+          e.kind === 'mesh' &&
+          visible(e) &&
+          project.geometries.find((g) => g.id === e.geometryId)!.triangles.length,
+      )
+      .map((e) => e.materialId),
+  );
+  for (const m of project.materials.filter((m) => materials.has(m.id)))
+    for (const binding of Object.values(m.textures || {})) {
+      if (images.has(binding.assetId)) continue;
+      const asset = project.assets.find((a) => a.id === binding.assetId)!;
+      if (!asset) throw new Error('导出纹理图片不存在');
+      const bytes = await load(asset);
+      await checkedImage(bytes, asset);
+      images.set(asset.id, bytes);
+    }
+  return exportGLB(project, sceneId, frame, images);
 }

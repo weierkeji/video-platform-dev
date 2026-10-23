@@ -19,7 +19,7 @@ import {
   parseProject,
   type Project,
 } from './model';
-import { extrudeFace, primitive, subdivide } from './geometry';
+import { extrudeFace, primitive, subdivide, projectUV } from './geometry';
 import { editTrack } from './animation';
 import { displayColor } from './surface';
 import { deleteElements, extrudeRegion, mergeVertices, transformVertices } from './mesh';
@@ -36,6 +36,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
       entities: z.array(EntitySchema).max(2000),
       geometries: z.array(GeometrySchema).max(2000),
       materials: z.array(MaterialSchema).max(2000),
+      assets: z.array(AssetSchema).max(1000).optional(),
     })
     .strict(),
   z
@@ -71,6 +72,13 @@ export const CommandSchema = z.discriminatedUnion('type', [
     })
     .strict(),
   z.object({ type: z.literal('geometry.subdivide'), id: ID }).strict(),
+  z
+    .object({
+      type: z.literal('geometry.uvProject'),
+      id: ID,
+      channel: z.union([z.literal(0), z.literal(1)]),
+    })
+    .strict(),
   z
     .object({
       type: z.literal('geometry.transform'),
@@ -211,6 +219,7 @@ function apply(p: Project, c: Command) {
       p.entities.push(...c.entities);
       p.geometries.push(...c.geometries);
       p.materials.push(...c.materials);
+      p.assets.push(...(c.assets || []));
       break;
     case 'scene.update':
       Object.assign(get(p.scenes, c.id), c.patch);
@@ -325,10 +334,14 @@ function apply(p: Project, c: Command) {
       if (!g.positions[c.index]) throw new Error('顶点索引不存在');
       g.positions[c.index] = c.position;
       delete g.normals;
+      delete g.tangents;
       break;
     }
     case 'geometry.subdivide':
       subdivide(get(p.geometries, c.id));
+      break;
+    case 'geometry.uvProject':
+      projectUV(get(p.geometries, c.id), c.channel);
       break;
     case 'geometry.transform':
       transformVertices(get(p.geometries, c.id), c.indices, c.matrix);
@@ -423,6 +436,8 @@ function apply(p: Project, c: Command) {
       break;
     case 'asset.delete':
       if (p.timeline.clips.some((x) => x.sourceId === c.id)) throw new Error('素材仍被时间轴引用');
+      if (p.materials.some((m) => Object.values(m.textures || {}).some((b) => b.assetId === c.id)))
+        throw new Error('素材仍被材质贴图引用；请先解除贴图');
       get(p.assets, c.id);
       p.assets = p.assets.filter((x) => x.id !== c.id);
       break;

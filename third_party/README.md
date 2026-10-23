@@ -28,3 +28,5 @@
 默认几何/材质由本项目生成；检查音频是脚本合成正弦波，视频由本平台渲染。未使用 LibTV 社区素材或 Blender 示例。研究截图仅保留本地，不作为产品素材分发。
 
 glTF 解析/序列化由本仓库按公开格式独立实现；Three.js 负责基础数学/渲染，其 GLTFLoader 仅用于独立读取检查。glTF 规范与商标属于 Khronos，未作完整合规或认证声明。`scene-exchange` 的几何和材质由原创脚本生成，MIT；导入资产的 copyright 元数据随 Scene 保存和重新导出，不能把该字符串视为自动获得资产许可。
+
+0.7 没有新增依赖或修改第三方源码。图片解码来自浏览器，GPU 采样/着色来自 Three.js；贴图资源生命周期、UV 投影和格式映射为本仓库实现。`pbr-textures` 的几何、PNG 像素与生成脚本为原创 MIT 资源，未复制 Blender/LibTV 或其他第三方图片。KHR_texture_transform / EXT_texture_webp 语义来自 Khronos 公开格式，不代表完整合规或认证。

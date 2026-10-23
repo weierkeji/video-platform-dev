@@ -21,6 +21,9 @@ export function surfaceGeometry(g: Geometry) {
   if (g.normals) geometry.setAttribute('normal', new Float32BufferAttribute(g.normals.flat(), 3));
   else geometry.computeVertexNormals();
   if (g.uv) geometry.setAttribute('uv', new Float32BufferAttribute(g.uv.flat(), 2));
+  if (g.uv1) geometry.setAttribute('uv1', new Float32BufferAttribute(g.uv1.flat(), 2));
+  if (g.tangents)
+    geometry.setAttribute('tangent', new Float32BufferAttribute(g.tangents.flat(), 4));
   return geometry;
 }
 export function surfaceMaterial(m: Project['materials'][number]) {

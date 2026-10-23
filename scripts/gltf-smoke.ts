@@ -54,20 +54,18 @@ try {
     throw new Error('操作未保存：' + (await page.locator('body').innerText()));
   }
   await page.getByRole('button', { name: 'glTF', exact: true }).click();
-  await page
-    .getByLabel('选择 glTF 文件')
-    .setInputFiles({
-      name: 'animated.gltf',
-      mimeType: 'model/gltf+json',
-      buffer: Buffer.from(JSON.stringify({ ...gltfFixture(), animations: [{}] })),
-    });
+  await page.getByLabel('选择 glTF 文件', { exact: true }).setInputFiles({
+    name: 'animated.gltf',
+    mimeType: 'model/gltf+json',
+    buffer: Buffer.from(JSON.stringify({ ...gltfFixture(), animations: [{}] })),
+  });
   await page.getByRole('alert').filter({ hasText: '动画导入' }).waitFor();
   assert.equal((await api<{ project: Project }>(`/projects/${p.id}`)).project.revision, 0);
   // Companion-file resolution exercises real file chooser handling rather than the exporter itself.
   const fixture = gltfFixture(),
     binary = Buffer.from(fixture.buffers[0].uri.split(',')[1], 'base64');
   fixture.buffers[0].uri = 'octahedron.bin';
-  await page.getByLabel('选择 glTF 文件').setInputFiles([
+  await page.getByLabel('选择 glTF 文件', { exact: true }).setInputFiles([
     {
       name: 'scene.gltf',
       mimeType: 'model/gltf+json',
@@ -130,7 +128,7 @@ try {
   await writeFile(join(output, 'validator.json'), JSON.stringify(validation, null, 2));
   assert.equal(validation.issues.numErrors, 0, JSON.stringify(validation.issues));
   assert.equal(validation.issues.numWarnings, 0, JSON.stringify(validation.issues));
-  const roundtrip = importGLTF(glb);
+  const roundtrip = await importGLTF(glb);
   assert.equal(roundtrip.command.geometries.length, 1);
   assert.deepEqual(
     roundtrip.command.geometries[0].positions,
@@ -138,7 +136,7 @@ try {
       .find((g) => g.id === importedGeometry.id)!
       .positions.map((v) => v.map(Math.fround)),
   );
-  await page.getByLabel('选择 glTF 文件').setInputFiles(glbPath);
+  await page.getByLabel('选择 glTF 文件', { exact: true }).setInputFiles(glbPath);
   await page.getByRole('button', { name: '导入这些场景', exact: true }).click();
   await saved();
   assert.equal(p.scenes.length, 4);

@@ -15,13 +15,13 @@ import { surfaceGeometry, surfaceMaterial } from '../src/core/surface';
 import { MeshOverlay } from '../src/render/mesh-edit';
 import { Store } from '../server/store';
 const encode = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
-const imported = () => {
-  const result = importGLTF(encode(gltfFixture()));
+const imported = async () => {
+  const result = await importGLTF(encode(gltfFixture()));
   return { ...result, project: applyCommands(newProject(), [result.command]).project };
 };
 
-test('glTF import preserves instancing, hierarchy, interleaved attributes, linear material and lights', () => {
-  const { command, project, defaultSceneId } = imported();
+test('glTF import preserves instancing, hierarchy, interleaved attributes, linear material and lights', async () => {
+  const { command, project, defaultSceneId } = await imported();
   assert.equal(command.scenes.length, 2);
   assert.equal(command.geometries.length, 1);
   const meshes = command.entities.filter((e) => e.kind === 'mesh');
@@ -40,7 +40,7 @@ test('glTF import preserves instancing, hierarchy, interleaved attributes, linea
   parseProject(project);
 });
 test('GLB static snapshot is readable by independent Three loader and round-trips shared geometry', async () => {
-  const { project, defaultSceneId, command } = imported();
+  const { project, defaultSceneId, command } = await imported();
   const glb = exportGLB(project, defaultSceneId, 0);
   const validation = await validateBytes(glb.bytes);
   assert.equal(validation.issues.numErrors, 0, JSON.stringify(validation.issues));
@@ -49,7 +49,7 @@ test('GLB static snapshot is readable by independent Three loader and round-trip
   const mesh = loaded.scene.getObjectByName('First_instance') as Mesh;
   assert.ok(mesh?.isMesh);
   assert.equal(mesh.geometry.getAttribute('position').count, 6);
-  const result = importGLTF(glb.bytes);
+  const result = await importGLTF(glb.bytes);
   assert.deepEqual(result.command.geometries[0].positions, command.geometries[0].positions);
   assert.deepEqual(result.command.geometries[0].normals, command.geometries[0].normals);
   assert.deepEqual(result.command.geometries[0].uv, command.geometries[0].uv);
@@ -63,7 +63,7 @@ test('GLB static snapshot is readable by independent Three loader and round-trip
     }
   });
 });
-test('glTF sparse positions, matrix TRS, unindexed fans and normalized UV accessors are decoded', () => {
+test('glTF sparse positions, matrix TRS, unindexed fans and normalized UV accessors are decoded', async () => {
   const bytes = new Uint8Array(64),
     view = new DataView(bytes.buffer);
   bytes.set([0, 1, 2], 0);
@@ -99,7 +99,7 @@ test('glTF sparse positions, matrix TRS, unindexed fans and normalized UV access
       { componentType: 5123, normalized: true, count: 3, type: 'VEC2', bufferView: 2 },
     ],
   };
-  const result = importGLTF(encode(data), [{ name: 'sparse.bin', bytes }]);
+  const result = await importGLTF(encode(data), [{ name: 'sparse.bin', bytes }]);
   assert.deepEqual(result.command.geometries[0].triangles, [[0, 1, 2]]);
   assert.deepEqual(result.command.geometries[0].uv, [
     [0, 0],
@@ -114,7 +114,7 @@ test('glTF sparse positions, matrix TRS, unindexed fans and normalized UV access
   );
   matrix.elements.forEach((v, i) => assert.ok(Math.abs(v - reconstructed.elements[i]) < 1e-6));
 });
-test('malformed buffers, hierarchy, unsupported content and external URLs fail before mutations', () => {
+test('malformed buffers, hierarchy, unsupported content and external URLs fail before mutations', async () => {
   const original = newProject();
   for (const change of [
     (d: any) => (d.bufferViews[0].byteLength = 16),
@@ -131,20 +131,20 @@ test('malformed buffers, hierarchy, unsupported content and external URLs fail b
   ]) {
     const d = gltfFixture();
     change(d);
-    assert.throws(() => importGLTF(encode(d)));
+    await assert.rejects(() => importGLTF(encode(d)));
   }
-  const result = imported();
+  const result = await imported();
   const corrupt = structuredClone(result.command);
   corrupt.entities[1].parentId = original.entities[0].id;
   assert.throws(() => applyCommands(original, [corrupt]));
   assert.equal(original.scenes.length, 1);
   const glb = exportGLB(result.project, result.defaultSceneId, 0).bytes;
-  assert.throws(() => importGLTF(glb.subarray(0, glb.length - 1)), /长度/);
+  await assert.rejects(() => importGLTF(glb.subarray(0, glb.length - 1)), /长度/);
   new DataView(glb.buffer).setUint32(12, 0xfffffffc, true);
   assert.throws(() => unpackGLTF(glb), /块长度/);
 });
-test('geometry edits preserve UV mappings, invalidate normals and undo restores original attributes', () => {
-  const { project, command } = imported(),
+test('geometry edits preserve UV mappings, invalidate normals and undo restores original attributes', async () => {
+  const { project, command } = await imported(),
     g = command.geometries[0];
   const moved = applyCommands(project, [
     { type: 'geometry.vertex', id: g.id, index: 0, position: [1.2, 0, 0] },
@@ -185,13 +185,13 @@ test('geometry edits preserve UV mappings, invalidate normals and undo restores 
   mesh.geometry.dispose();
   mesh.material.dispose();
 });
-test('scene import is one persisted undo unit and v5 migration preserves optional-field defaults', () => {
+test('scene import is one persisted undo unit and v5 migration preserves optional-field defaults', async () => {
   const root = resolve(tmpdir()),
     dir = mkdtempSync(join(root, 'frameforge-gltf-'));
   let store = new Store(dir);
   try {
     const p = newProject(),
-      command = imported().command;
+      command = (await imported()).command;
     assert.deepEqual(migrateProject({ ...p, schemaVersion: 5 }), p);
     assert.equal(p.schemaVersion, PROJECT_VERSION);
     store.create(p);
@@ -217,7 +217,7 @@ test('export evaluates animation at the requested frame and preserves legacy fla
     { type: 'key.set', entityId: e.id, property: 'position', key: { frame: 0, value: [0, 1, 0] } },
     { type: 'key.set', entityId: e.id, property: 'position', key: { frame: 20, value: [4, 1, 0] } },
   ]).project;
-  const result = importGLTF(exportGLB(p, e.sceneId, 5).bytes);
+  const result = await importGLTF(exportGLB(p, e.sceneId, 5).bytes);
   const out = result.command.entities.find((x) => x.name === e.name)!;
   assert.deepEqual(out.transform.position, [1, 1, 0]);
   assert.equal(result.command.geometries[0].positions.length, 36);

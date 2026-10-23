@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { GenerationOptionsSchema, GenerationRequestSchema } from './generation';
 import { validateTrack } from './animation';
 
-export const PROJECT_VERSION = 6;
+export const PROJECT_VERSION = 7;
 
 export const id = () => crypto.randomUUID();
 const ID = z
@@ -14,6 +14,49 @@ const Name = z.string().min(1).max(160);
 const NumberValue = z.number().finite().min(-1e7).max(1e7);
 export const Vec3Schema = z.tuple([NumberValue, NumberValue, NumberValue]);
 export type Vec3 = z.infer<typeof Vec3Schema>;
+export const Vec2Schema = z.tuple([NumberValue, NumberValue]);
+export const TextureBindingSchema = z
+  .object({
+    assetId: ID,
+    texCoord: z.union([z.literal(0), z.literal(1)]),
+    wrapS: z.enum(['repeat', 'clamp', 'mirror']),
+    wrapT: z.enum(['repeat', 'clamp', 'mirror']),
+    magFilter: z.enum(['nearest', 'linear']),
+    minFilter: z.enum([
+      'nearest',
+      'linear',
+      'nearest-mipmap-nearest',
+      'linear-mipmap-nearest',
+      'nearest-mipmap-linear',
+      'linear-mipmap-linear',
+    ]),
+    offset: Vec2Schema,
+    scale: Vec2Schema,
+    rotation: NumberValue,
+  })
+  .strict();
+export type TextureBinding = z.infer<typeof TextureBindingSchema>;
+export const textureSlots = [
+  'baseColor',
+  'metallicRoughness',
+  'normal',
+  'occlusion',
+  'emissive',
+] as const;
+export type TextureSlot = (typeof textureSlots)[number];
+export function textureBinding(assetId: string): TextureBinding {
+  return {
+    assetId,
+    texCoord: 0,
+    wrapS: 'repeat',
+    wrapT: 'repeat',
+    magFilter: 'linear',
+    minFilter: 'linear-mipmap-linear',
+    offset: [0, 0],
+    scale: [1, 1],
+    rotation: 0,
+  };
+}
 export const TransformSchema = z
   .object({ position: Vec3Schema, rotation: Vec3Schema, scale: Vec3Schema })
   .strict();
@@ -28,6 +71,13 @@ export const GeometrySchema = z
     name: Name,
     positions: z.array(Vec3Schema).max(100000),
     normals: z.array(Vec3Schema).max(100000).optional(),
+    tangents: z
+      .array(
+        z.tuple([NumberValue, NumberValue, NumberValue, z.union([z.literal(-1), z.literal(1)])]),
+      )
+      .max(100000)
+      .optional(),
+    uv1: z.array(Vec2Schema).max(100000).optional(),
     uv: z
       .array(z.tuple([NumberValue, NumberValue]))
       .max(100000)
@@ -62,6 +112,18 @@ export const MaterialSchema = z
     alphaCutoff: z.number().min(0).max(1).optional(),
     doubleSided: z.boolean().optional(),
     flatShading: z.boolean().optional(),
+    textures: z
+      .object({
+        baseColor: TextureBindingSchema.optional(),
+        metallicRoughness: TextureBindingSchema.optional(),
+        normal: TextureBindingSchema.optional(),
+        occlusion: TextureBindingSchema.optional(),
+        emissive: TextureBindingSchema.optional(),
+      })
+      .strict()
+      .optional(),
+    normalScale: z.number().finite().min(-100).max(100).optional(),
+    occlusionStrength: z.number().min(0).max(1).optional(),
   })
   .strict();
 export const LightSchema = z
@@ -361,20 +423,43 @@ export function parseProject(input: unknown): Project {
   for (const asset of p.assets)
     if (!asset.mime.startsWith(asset.kind + '/')) throw new Error('素材 MIME 与类型不匹配');
   for (const g of p.geometries) {
-    for (const attr of [g.normals, g.uv])
+    for (const attr of [g.normals, g.tangents, g.uv, g.uv1])
       if (attr && attr.length !== g.positions.length)
         throw new Error(`顶点属性长度不匹配：${g.name}`);
     if (g.normals?.some((n) => Math.abs(Math.hypot(...n) - 1) > 0.001))
       throw new Error(`顶点法线必须归一化：${g.name}`);
+    if (
+      g.tangents &&
+      (!g.normals || g.tangents.some((t) => Math.abs(Math.hypot(t[0], t[1], t[2]) - 1) > 0.001))
+    )
+      throw new Error(`切线须归一化且具有法线：${g.name}`);
     for (const t of g.triangles) {
       if (new Set(t).size !== 3 || t.some((i) => i >= g.positions.length))
         throw new Error(`无效三角面：${g.name}`);
     }
   }
+  for (const m of p.materials)
+    for (const binding of Object.values(m.textures || {})) {
+      const a = p.assets.find((a) => a.id === binding.assetId);
+      if (!a || a.kind !== 'image') throw new Error(`材质贴图必须引用图片素材：${m.name}`);
+      if (
+        a.width &&
+        a.height &&
+        (Math.max(a.width, a.height) > 8192 || a.width * a.height > 16777216)
+      )
+        throw new Error(`贴图超过 8192 边长或 1600 万像素限制：${a.name}`);
+    }
   for (const e of p.entities) {
     if (!scenes.has(e.sceneId)) throw new Error('对象所属场景不存在');
     if (e.kind === 'mesh' && (!geometries.has(e.geometryId!) || !materials.has(e.materialId!)))
       throw new Error('网格缺少几何体或材质');
+    if (e.kind === 'mesh') {
+      const g = p.geometries.find((g) => g.id === e.geometryId)!,
+        m = p.materials.find((m) => m.id === e.materialId)!;
+      for (const b of Object.values(m.textures || {}))
+        if (!(b.texCoord === 0 ? g.uv : g.uv1))
+          throw new Error(`网格“${e.name}”缺少贴图需要的 UV${b.texCoord}`);
+    }
     if (e.kind === 'camera' && (!e.camera || e.camera.far <= e.camera.near))
       throw new Error('摄影机裁剪范围无效');
     if (e.kind === 'light' && !e.light) throw new Error('灯光参数缺失');
@@ -448,7 +533,7 @@ export function migrateProject(input: unknown) {
     typeof input !== 'object' ||
     !input ||
     !('schemaVersion' in input) ||
-    ![1, 2, 3, 4, 5, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
+    ![1, 2, 3, 4, 5, 6, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
     typeof input.schemaVersion !== 'number'
   )
     throw new Error('不支持此项目版本；原文件未修改');

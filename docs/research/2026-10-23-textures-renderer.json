@@ -1,0 +1,118 @@
+{
+  "requests": 2,
+  "success": {
+    "loadingBefore": true,
+    "earlyError": "Error: 纹理尚未就绪",
+    "elapsed": 385,
+    "maps": [
+      {
+        "key": "map",
+        "channel": 0,
+        "colorSpace": "srgb",
+        "width": 32
+      },
+      {
+        "key": "roughnessMap",
+        "channel": 0,
+        "colorSpace": "",
+        "width": 32
+      },
+      {
+        "key": "metalnessMap",
+        "channel": 0,
+        "colorSpace": "",
+        "width": 32
+      },
+      {
+        "key": "normalMap",
+        "channel": 0,
+        "colorSpace": "",
+        "width": 32
+      },
+      {
+        "key": "aoMap",
+        "channel": 1,
+        "colorSpace": "",
+        "width": 32
+      },
+      {
+        "key": "emissiveMap",
+        "channel": 0,
+        "colorSpace": "srgb",
+        "width": 32
+      }
+    ],
+    "closed": true,
+    "gpuBefore": 4,
+    "gpuAfter": 0
+  },
+  "failed": "Error: 纹理读取失败：Four colors",
+  "cancelled": {
+    "oldResult": "AbortError: signal is aborted without reason",
+    "loading": false,
+    "error": "",
+    "newestProject": true
+  },
+  "lateDecode": {
+    "decoded": 2,
+    "closed": true
+  },
+  "semantics": {
+    "mapped": [
+      206,
+      25,
+      32
+    ],
+    "constantColor": [
+      206,
+      25,
+      32
+    ],
+    "ormMapped": [
+      212,
+      212,
+      212
+    ],
+    "constantORM": [
+      212,
+      212,
+      212
+    ],
+    "rotatedColor": [
+      54,
+      181,
+      71
+    ],
+    "constantGreen": [
+      54,
+      181,
+      71
+    ],
+    "opaqueAlpha": [
+      206,
+      182,
+      62
+    ],
+    "constantYellow": [
+      206,
+      182,
+      62
+    ]
+  },
+  "formats": [
+    {
+      "mime": "image/jpeg",
+      "width": 32,
+      "height": 32,
+      "decodedWidth": 32,
+      "decodedHeight": 32
+    },
+    {
+      "mime": "image/webp",
+      "width": 32,
+      "height": 32,
+      "decodedWidth": 32,
+      "decodedHeight": 32
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { applyCommands, type Command } from '../core/commands';
-import { exportGLB, importGLTF, type GLTFImport } from '../core/gltf';
+import { exportGLBWithAssets, importGLTF, type GLTFImport } from '../core/gltf';
 import type { Project } from '../core/model';
 import { download } from './Inspector';
 
@@ -9,6 +9,7 @@ export function SceneExchange({
   sceneId,
   frame,
   busy,
+  saveError,
   send,
   onImported,
   onClose,
@@ -17,6 +18,7 @@ export function SceneExchange({
   sceneId: string;
   frame: number;
   busy: boolean;
+  saveError: string;
   send: (commands: Command[], label: string) => Promise<Project | undefined>;
   onImported: (sceneId: string) => void;
   onClose: () => void;
@@ -26,6 +28,44 @@ export function SceneExchange({
     [reading, setReading] = useState(false),
     [exportNotes, setExportNotes] = useState<string[]>([]);
   const input = useRef<HTMLInputElement>(null);
+  const folder = useRef<HTMLInputElement>(null);
+  const prepare = async (files: File[]) => {
+    if (!files.length) return;
+    setReading(true);
+    setResult(null);
+    setError('');
+    try {
+      if (files.reduce((n, f) => n + f.size, 0) > 50 * 1024 * 1024)
+        throw new Error('所选文件合计超过 50 MB');
+      const mains = files.filter((f) => /\.(glb|gltf)$/i.test(f.name));
+      if (mains.length !== 1)
+        throw new Error('每次选择一个 glTF/GLB 及其资源，或只含一个 glTF/GLB 的文件夹');
+      const mainPath = mains[0].webkitRelativePath || mains[0].name,
+        prefix = mainPath.slice(0, mainPath.lastIndexOf('/') + 1);
+      const data = await Promise.all(
+        files
+          .filter((f) => !prefix || f.webkitRelativePath.startsWith(prefix))
+          .map(async (f) => ({
+            name: (f.webkitRelativePath || f.name).slice(prefix.length),
+            bytes: new Uint8Array(await f.arrayBuffer()),
+          })),
+      );
+      const next = await importGLTF(data.find((f) => f.name === mains[0].name)!.bytes, data);
+      for (const entry of next.images) {
+        const bitmap = await createImageBitmap(
+          new Blob([Uint8Array.from(entry.bytes)], { type: entry.asset.mime }),
+          { imageOrientation: 'none', premultiplyAlpha: 'none', colorSpaceConversion: 'none' },
+        );
+        bitmap.close();
+      }
+      applyCommands(project, [next.command]);
+      setResult(next);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setReading(false);
+    }
+  };
   return (
     <div className="modal-backdrop">
       <section
@@ -36,12 +76,13 @@ export function SceneExchange({
       >
         <h2>glTF 场景交换</h2>
         <p>
-          导入 GLB 或 glTF 2.0 静态场景，保留层级、三角网格、法线、UV0、基础 PBR
-          材质、有限远透视摄影机与点光源/平行光。
+          导入 GLB 或 glTF 2.0 静态场景，保留层级、三角网格、法线/切线、UV0/UV1、PBR
+          贴图与采样设置、 材质、有限远透视摄影机与点光源/平行光。
         </p>
         <p className="muted">
-          动画、纹理、顶点色、骨骼、形态键、聚光灯及其他扩展尚未接入，遇到这些内容会说明原因。外部
-          .bin 须与 .gltf 同目录并一起选择；导入合计上限 50 MB。
+          支持 PNG/JPEG/WebP 图片、五类基础贴图和 UV
+          变换。动画、顶点色、骨骼、形态键、聚光灯等仍未接入。
+          选择文件时需包含同目录资源；资源在子目录时请选择整个文件夹。合计上限 50 MB。
         </p>
         <input
           ref={input}
@@ -52,40 +93,33 @@ export function SceneExchange({
           onChange={(event) => {
             const files = Array.from(event.target.files || []);
             event.target.value = '';
-            if (!files.length) return;
-            setReading(true);
-            setResult(null);
-            setError('');
-            void (async () => {
-              try {
-                if (files.reduce((n, f) => n + f.size, 0) > 50 * 1024 * 1024)
-                  throw new Error('所选文件合计超过 50 MB');
-                const mains = files.filter((f) => /\.(glb|gltf)$/i.test(f.name));
-                if (mains.length !== 1)
-                  throw new Error('每次请选择一个 .gltf 或 .glb，以及它引用的 .bin 文件');
-                const data = await Promise.all(
-                  files.map(async (f) => ({
-                    name: f.name,
-                    bytes: new Uint8Array(await f.arrayBuffer()),
-                  })),
-                );
-                const next = importGLTF(data.find((f) => f.name === mains[0].name)!.bytes, data);
-                applyCommands(project, [next.command]);
-                setResult(next);
-              } catch (e) {
-                setError(e instanceof Error ? e.message : String(e));
-              } finally {
-                setReading(false);
-              }
-            })();
+            void prepare(files);
+          }}
+        />
+        <input
+          type="file"
+          multiple
+          hidden
+          aria-label="选择 glTF 文件夹"
+          ref={(el) => {
+            folder.current = el;
+            el?.setAttribute('webkitdirectory', '');
+          }}
+          onChange={(event) => {
+            const files = Array.from(event.target.files || []);
+            event.target.value = '';
+            void prepare(files);
           }}
         />
         <button disabled={reading || busy} onClick={() => input.current?.click()}>
           {reading ? '正在读取…' : '选择 glTF / GLB 文件'}
         </button>
-        {error && (
+        <button disabled={reading || busy} onClick={() => folder.current?.click()}>
+          选择资源文件夹
+        </button>
+        {(error || saveError) && (
           <p role="alert" className="error-banner">
-            {error}
+            {error || saveError}
           </p>
         )}
         {result && (
@@ -97,6 +131,7 @@ export function SceneExchange({
               {result.command.geometries.length} 个几何体 · {result.command.materials.length}{' '}
               个材质。现有场景保留；导入作为一次可撤销操作保存。
             </p>
+            <p>{result.images.length} 张图片将加入同一素材库；材质引用这些图片。</p>
             <ul>
               {result.notes.map((note) => (
                 <li key={note}>{note}</li>
@@ -107,10 +142,40 @@ export function SceneExchange({
               disabled={busy || reading}
               onClick={() => {
                 void (async () => {
-                  const saved = await send([result.command], '导入 glTF 场景');
-                  if (saved) {
-                    onImported(result.defaultSceneId);
-                    onClose();
+                  setReading(true);
+                  setError('');
+                  try {
+                    const uploaded = new Set<string>();
+                    for (const entry of result.images) {
+                      if (uploaded.has(entry.asset.blobId)) continue;
+                      const response = await fetch('/api/blobs', {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': entry.asset.mime,
+                          'X-Studio-Client': 'frameforge',
+                          'X-File-Name': encodeURIComponent(entry.asset.name),
+                        },
+                        body: new Blob([Uint8Array.from(entry.bytes)], { type: entry.asset.mime }),
+                      });
+                      const savedAsset = await response.json();
+                      if (!response.ok) throw new Error(savedAsset.error || '纹理上传失败');
+                      if (
+                        savedAsset.blobId !== entry.asset.blobId ||
+                        savedAsset.bytes !== entry.asset.bytes ||
+                        savedAsset.mime !== entry.asset.mime
+                      )
+                        throw new Error('上传纹理与导入内容不匹配');
+                      uploaded.add(entry.asset.blobId);
+                    }
+                    const saved = await send([result.command], '导入 glTF 场景');
+                    if (saved) {
+                      onImported(result.defaultSceneId);
+                      onClose();
+                    }
+                  } catch (e) {
+                    setError(e instanceof Error ? e.message : String(e));
+                  } finally {
+                    setReading(false);
                   }
                 })();
               }}
@@ -126,9 +191,16 @@ export function SceneExchange({
         </p>
         <button
           disabled={busy || reading}
-          onClick={() => {
+          onClick={async () => {
+            setReading(true);
             try {
-              const out = exportGLB(project, sceneId, frame);
+              const out = await exportGLBWithAssets(project, sceneId, frame, async (asset) => {
+                const response = await fetch(`/api/blobs/${asset.blobId}`, {
+                  signal: AbortSignal.timeout(15000),
+                });
+                if (!response.ok) throw new Error(`无法读取纹理：${asset.name}`);
+                return new Uint8Array(await response.arrayBuffer());
+              });
               setError('');
               setExportNotes(out.notes);
               download(
@@ -137,6 +209,8 @@ export function SceneExchange({
               );
             } catch (e) {
               setError(e instanceof Error ? e.message : String(e));
+            } finally {
+              setReading(false);
             }
           }}
         >
@@ -150,7 +224,7 @@ export function SceneExchange({
           </ul>
         )}
         <div className="button-row">
-          <button disabled={busy} onClick={onClose}>
+          <button disabled={busy || reading} onClick={onClose}>
             关闭
           </button>
         </div>

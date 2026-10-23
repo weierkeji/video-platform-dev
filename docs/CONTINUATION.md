@@ -1,8 +1,24 @@
 # 持续开发恢复记录
 
-更新时间：2026-10-22。用户附件要求的完整 Blender + LibTV 功能目标保持 active；此处是 0.6 基础版本检查点，不是目标完成声明。
+更新时间：2026-10-23。用户附件要求的完整 Blender + LibTV 功能目标保持 active；此处是 0.7 基础版本检查点，不是目标完成声明。下方旧版本段落仅保留历史证据。
 
-## 0.6 最新恢复入口
+## 0.7 最新恢复入口
+
+0.6 已推送 `b08a726` 与检查补充 `ba4ca11`。0.7 增加图片材质/UV 数据和真实异步渲染，项目格式 v7；提交号以实际 git log/status 为准。没有新增依赖。新增 `core/image.ts`、`render/textures.ts`、`ui/TexturePanel.tsx`；扩展统一 `scene.import`、`material.update` 与 `geometry.uvProject`。图片仍是同一素材库的 Asset，支持 PNG/JPEG/WebP、五类 PBR、UV0/1、采样/仿射变换、切线、GLB 原图内嵌、资源文件夹和可撤销盒式投影。glTF 导入现在异步计算图片哈希，调用方均已 await。
+
+45 项核心检查、类型检查、正式构建通过；主 bundle 929.69 KB，有体积提示，无性能达标声明。正式入口 `smoke:textures`、`smoke:gltf`、`smoke:mesh`、`smoke` 通过；贴图场景的实际 GLB 校验 0 错误/0 警告/0 信息，480×270、12 帧 MP4 与 PNG 平均差约 0.569/255，图片方向和 alpha MASK 正确。资源文件夹含嵌套图片/几何目录，项目包重导入保留材质/UV/图片。开发渲染检查确认 sRGB/金属粗糙通道与等效常量相同，UV 非等比缩放+旋转正确；请求延迟、404、换场景、迟到解码与 GPU 资源释放通过。入口 `npm.cmd run smoke:textures -- --renderer` 需要开发服务，普通命令可用正式服务。
+
+证据见 `research/2026-10-23-textures.md` 与 `*-textures-runtime.json`、`*-textures-renderer.json`、`*-v07-*-runtime.json` 和 `*-v07-runtime.json`；实际产物 `examples/pbr-textures.*`。`.local/checks/textures/` 保留截图、原始报告、PNG/GLB/MP4。本次没有重跑每个历史专项脚本，没有外部模型调用。
+
+v7 实际迁移：44 个项目、225 个撤销历史快照、226 条版本、32 个任务快照，除格式号外逐项相同，历史游标不变；备份 `before-schema-v7-1792736391264.sqlite`。摘要 `research/2026-10-23-v07-migration.json`；保留 `.local/data`。
+
+限制：基础静态 PBR，尚无 UV 岛编辑、绘制/烘焙、UDIM、环境贴图、视频/压缩纹理或完整材质扩展。每图 8192 边长/16,777,216 像素，另受 GPU 上限；场景可见网格图片合计 50 MB，解码像素和 GPU 纹素各 67,108,864。每次项目对象变化重建缓存。没有 ICC/EXIF 定向流程；混合透明有排序限制。网格修改清除旧法线/切线，UV 随拓扑传播；盒式投影覆盖通道并拆分接缝，可撤销。没有 MikkTSpace 或其他引擎完整法线匹配证明。
+
+下一单元：**四元数与非整帧时间动画模型/求值，接入 glTF 动画交换**，仍需共享撤销、镜头时间轴与后台输出。后续继续 UV 岛/材质/环境照明、多边形拓扑与工作流产物协议；不缩减完整目标。Seedance 缺少凭据/预算不阻塞本地功能开发，不能返回假生成结果。
+
+本版服务在版本保存前停止；恢复时先核查实际端口/进程，再按 README 启动。受限环境 ffprobe 曾无错误文字而退出，提升权限后正常；不要因该环境问题放宽产品超时。一次服务句柄消失后确认 4173 无监听再重启，不能仅据本文推断服务还在运行。
+
+## 0.6 历史恢复记录
 
 0.5 已提交推送 `e7a2d8f`。0.6 加入静态 glTF/GLB 场景交换、法线/UV0、基础 PBR 透明/自发光及来源字段，项目格式 v6。恢复时先看实际 git log/status。本次新增 `core/gltf.ts`、`core/surface.ts`、`ui/SceneExchange.tsx`、统一 `scene.import` 命令；产品格式解析/序列化自研，Three.js 提供数学/渲染。开发校验器 `gltf-validator@2.0.0-dev.3.10`（Apache-2.0）新增到锁文件和第三方声明，未进入前端。
 

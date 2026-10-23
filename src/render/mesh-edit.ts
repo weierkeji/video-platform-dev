@@ -118,6 +118,20 @@ export class MeshOverlay {
         new THREE.Float32BufferAttribute(this.geometry.normals.flat(), 3),
       );
     else this.mesh.geometry.computeVertexNormals();
+    if (
+      (restoreNormals || positions === this.geometry.positions) &&
+      this.geometry.tangents &&
+      !(this.mesh.material as THREE.MeshStandardMaterial).flatShading
+    )
+      this.mesh.geometry.setAttribute(
+        'tangent',
+        new THREE.Float32BufferAttribute(this.geometry.tangents.flat(), 4),
+      );
+    else this.mesh.geometry.deleteAttribute('tangent');
+    for (const material of Array.isArray(this.mesh.material)
+      ? this.mesh.material
+      : [this.mesh.material])
+      material.needsUpdate = true;
     this.mesh.geometry.computeBoundingSphere();
     this.mesh.geometry.computeBoundingBox();
     this.redraw(positions);

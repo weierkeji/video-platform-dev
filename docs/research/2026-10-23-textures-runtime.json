@@ -1,0 +1,60 @@
+{
+  "checkedAt": "2026-10-23T07:00:54.755Z",
+  "projectId": "55327c01-4c8c-4d27-9766-e76a5003f707",
+  "importedProjectId": "9e7e0d76-9b14-4b37-8f25-1f90e3623c57",
+  "jobId": "4cceb224-e998-4842-8184-096975165701",
+  "browser": "155.0.8059.82",
+  "format": 7,
+  "validator": {
+    "version": "2.0.0-dev.3.10",
+    "issues": {
+      "numErrors": 0,
+      "numWarnings": 0,
+      "numInfos": 0,
+      "numHints": 0,
+      "messages": [],
+      "truncated": false
+    }
+  },
+  "frames": 12,
+  "pixels": {
+    "topLeft": [
+      221,
+      65,
+      60
+    ],
+    "topRight": [
+      101,
+      113,
+      220
+    ],
+    "bottomLeft": [
+      29,
+      171,
+      59
+    ],
+    "bottomRight": [
+      25,
+      33,
+      46
+    ],
+    "background": [
+      25,
+      33,
+      46
+    ]
+  },
+  "previewExportMeanAbsoluteDifference": 0.5690432098765432,
+  "pageErrors": [],
+  "checks": [
+    "nested folder five-map image import in one undo transaction",
+    "sampler and rotation UI edits with undo",
+    "UV1 projection and tangent undo restoration",
+    "referenced texture deletion rejected atomically",
+    "reload and texture inspector",
+    "GLB download with original embedded image hashes",
+    "GLB reimport",
+    "PNG and MP4 use imported camera with image orientation and alpha MASK",
+    "portable project preserves textures, geometry and assets"
+  ]
+}

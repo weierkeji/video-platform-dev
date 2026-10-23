@@ -88,7 +88,8 @@ export function subdivide(g: Geometry) {
         pb = g.positions[b];
       edges.set(key, g.positions.length);
       g.positions.push(pa.map((v, i) => (v + pb[i]) / 2) as Vec3);
-      if (g.uv) g.uv.push(g.uv[a].map((v, i) => (v + g.uv![b][i]) / 2) as [number, number]);
+      for (const uv of [g.uv, g.uv1])
+        if (uv) uv.push(uv[a].map((v, i) => (v + uv[b][i]) / 2) as [number, number]);
     }
     return edges.get(key)!;
   };
@@ -104,6 +105,7 @@ export function subdivide(g: Geometry) {
     ] as [number, number, number][];
   });
   delete g.normals;
+  delete g.tangents;
 }
 
 export function extrudeFace(g: Geometry, face: number, distance: number) {
@@ -117,7 +119,7 @@ export function extrudeFace(g: Geometry, face: number, distance: number) {
   if (length < 1e-9) throw new Error('退化三角面无法挤出');
   const next = t.map((i) => {
     g.positions.push(g.positions[i].map((v, j) => v + (normal[j] / length) * distance) as Vec3);
-    if (g.uv) g.uv.push([...g.uv[i]]);
+    for (const uv of [g.uv, g.uv1]) if (uv) uv.push([...uv[i]]);
     return g.positions.length - 1;
   });
   g.triangles[face] = next as [number, number, number];
@@ -126,6 +128,7 @@ export function extrudeFace(g: Geometry, face: number, distance: number) {
     g.triangles.push([t[i], t[j], next[j]], [t[i], next[j], next[i]]);
   }
   delete g.normals;
+  delete g.tangents;
 }
 
 export function exportOBJ(geometry: Geometry) {
@@ -157,4 +160,56 @@ export function importOBJ(text: string): Geometry {
     }
   }
   return g;
+}
+
+/** Box projection in local space, splitting only vertices at UV seams; shape is unchanged. */
+export function projectUV(g: Geometry, channel: 0 | 1) {
+  if (!g.triangles.length) throw new Error('生成 UV 需要有三角面的网格');
+  const min = [Infinity, Infinity, Infinity],
+    max = [-Infinity, -Infinity, -Infinity];
+  for (const p of g.positions)
+    for (let a = 0; a < 3; a++) {
+      min[a] = Math.min(min[a], p[a]);
+      max[a] = Math.max(max[a], p[a]);
+    }
+  const norm = (i: number, a: number) => (g.positions[i][a] - min[a]) / (max[a] - min[a] || 1);
+  const positions: Vec3[] = [],
+    uv: [number, number][] = [],
+    originals: number[] = [],
+    used = new Set<number>(),
+    cache = new Map<string, number>();
+  const vertex = (index: number, mapped: [number, number]) => {
+    const key = `${index}:${mapped[0]}:${mapped[1]}`;
+    if (!cache.has(key)) {
+      if (positions.length >= 100000) throw new Error('UV 接缝拆分超过 10 万顶点限制');
+      cache.set(key, positions.length);
+      positions.push([...g.positions[index]]);
+      uv.push(mapped);
+      originals.push(index);
+      used.add(index);
+    }
+    return cache.get(key)!;
+  };
+  const triangles = g.triangles.map((t) => {
+    const [a, b, c] = t.map((i) => g.positions[i]),
+      u = b.map((n, i) => n - a[i]),
+      v = c.map((n, i) => n - a[i]);
+    const n = [u[1] * v[2] - u[2] * v[1], u[2] * v[0] - u[0] * v[2], u[0] * v[1] - u[1] * v[0]];
+    const axis = n.reduce((best, value, i) => (Math.abs(value) > Math.abs(n[best]) ? i : best), 0);
+    return t.map((i) => {
+      const axes = axis === 0 ? [2, 1] : axis === 1 ? [0, 2] : [0, 1];
+      const x = norm(i, axes[0]);
+      return vertex(i, [n[axis] < 0 ? 1 - x : x, 1 - norm(i, axes[1])]);
+    }) as [number, number, number];
+  });
+  g.positions.forEach((_, i) => {
+    if (!used.has(i)) vertex(i, [norm(i, 0), 1 - norm(i, 1)]);
+  });
+  if (g.normals) g.normals = originals.map((i) => g.normals![i]);
+  if (g.uv) g.uv = originals.map((i) => g.uv![i]);
+  if (g.uv1) g.uv1 = originals.map((i) => g.uv1![i]);
+  g.positions = positions;
+  g.triangles = triangles;
+  g[channel === 0 ? 'uv' : 'uv1'] = uv;
+  delete g.tangents;
 }

@@ -34,6 +34,7 @@ export function Viewport(props: ViewportProps) {
     controls = useRef<TransformControls | null>(null),
     camera = useRef<THREE.PerspectiveCamera | null>(null);
   const [error, setError] = useState(''),
+    [loadingTextures, setLoadingTextures] = useState(false),
     [boxTool, setBoxTool] = useState(false),
     [box, setBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const boxToolRef = useRef(boxTool);
@@ -59,6 +60,8 @@ export function Viewport(props: ViewportProps) {
       gizmo = new TransformControls(cam, canvas.current!);
       controls.current = gizmo;
       let overlay: MeshOverlay | undefined, picker: MeshPicker | undefined;
+      let previousLoading = false,
+        previousTextureError = '';
       let lastSelection: MeshSelection | null | undefined,
         lastXray = false;
       const proxy = new THREE.Object3D();
@@ -358,15 +361,30 @@ export function Viewport(props: ViewportProps) {
           : selected;
         if (target && gizmo.object !== target) gizmo.attach(target);
         else if (!target) gizmo.detach();
-        gizmo.enabled = !p.busy && !p.playing && !(p.meshSelection && boxToolRef.current);
+        gizmo.enabled =
+          !p.busy &&
+          !p.playing &&
+          !renderer.loading &&
+          !renderer.textureError &&
+          !(p.meshSelection && boxToolRef.current);
         gizmo.setSpace('world');
         gizmo.setMode(p.mode);
         orbit.update();
-        renderer.render(
-          cam,
-          renderer.renderer.domElement.width,
-          renderer.renderer.domElement.height,
-        );
+        if (renderer.loading !== previousLoading) {
+          previousLoading = renderer.loading;
+          setLoadingTextures(renderer.loading);
+        }
+        if (renderer.textureError !== previousTextureError) {
+          previousTextureError = renderer.textureError;
+          setError(renderer.textureError);
+        }
+        if (!renderer.loading && !renderer.textureError)
+          renderer.render(
+            cam,
+            renderer.renderer.domElement.width,
+            renderer.renderer.domElement.height,
+          );
+        else renderer.renderer.clear();
         animation = requestAnimationFrame(loop);
       };
       loop();
@@ -394,6 +412,8 @@ export function Viewport(props: ViewportProps) {
   }, [props.view]);
   useEffect(() => {
     if (props.view !== 'sequence') return;
+    setLoadingTextures(false);
+    setError('');
     let renderer: TimelineRenderer;
     const audio = new TimelineAudio();
     let cancelled = false,
@@ -489,6 +509,11 @@ export function Viewport(props: ViewportProps) {
       {error && (
         <div className="viewport-error" role="alert">
           {error}
+        </div>
+      )}
+      {loadingTextures && props.view === 'scene' && (
+        <div className="viewport-error" role="status">
+          正在加载材质贴图…
         </div>
       )}
     </div>

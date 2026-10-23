@@ -119,9 +119,12 @@ function commandAssets(input: unknown) {
   if (Array.isArray(input))
     for (const c of input) {
       if (c?.type === 'artifact.add') throw new Error('导出产物仅由后台任务登记');
-      if (c?.type === 'asset.add') {
-        const b = store.blob(c.asset?.blobId);
-        if (!b || b.bytes !== c.asset.bytes || b.mime !== c.asset.mime)
+      const assets =
+        c?.type === 'asset.add' ? [c.asset] : c?.type === 'scene.import' ? c.assets || [] : [];
+      if (!Array.isArray(assets)) throw new Error('导入素材列表无效');
+      for (const asset of assets) {
+        const b = store.blob(asset?.blobId);
+        if (!b || b.bytes !== asset.bytes || b.mime !== asset.mime)
           throw new Error('素材必须先上传');
       }
     }
@@ -230,7 +233,7 @@ const server = createServer(async (req, res) => {
       } catch {}
       json(res, {
         status: 'ok',
-        version: '0.6.0',
+        version: '0.7.0',
         browser: !!browser,
         providers: [providerStatus()],
       });

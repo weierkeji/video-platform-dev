@@ -6,7 +6,7 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 
 | 模块 | 职责 |
 | --- | --- |
-| `src/core/model.ts` | v5 模型、v1–v4 迁移、引用/层级/时间轴约束、工作流拓扑检查 |
+| `src/core/model.ts` | v7 模型、v1–v6 迁移、引用/层级/时间轴约束、工作流拓扑检查 |
 | `src/core/generation.ts` | 生成参数、模型系列限制、不可变请求规格 |
 | `src/core/commands.ts` | 有限结构化命令，复制状态、整批应用并校验 |
 | `src/core/geometry.ts` | 自主基本几何、共享边中点细分、三角面法向挤出、OBJ 交换 |
@@ -15,6 +15,8 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 | `src/core/animation.ts` | 关键帧编辑、手柄约束、自动切线、Bézier 时间反求与轨道取样 |
 | `src/core/evaluate.ts` | 组合变换动画、片段激活区间与源帧映射 |
 | `src/core/media.ts` | 居中画幅矩形、音频源入点与采样边界 |
+| `src/core/image.ts` / `gltf.ts` | 图片头/哈希检查、有界静态场景交换及图片资源映射 |
+| `src/render/textures.ts` | 图片解码、颜色空间/采样矩阵、并发加载缓存、取消和资源释放 |
 | `src/render/` | Three.js 数据桥接、时间轴合成/媒体定位；导出复用同一模块 |
 | `src/ui/` | 选择、属性、手柄、镜头、时间轴、素材、任务和审计入口 |
 | `server/store.ts` | SQLite WAL、版本比较、原子快照/审计、跨重启历史、升级备份与迁移记录 |
@@ -35,11 +37,11 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 - 空间：右手系、Y 向上、米；本地位置、XYZ Euler 弧度、非零缩放；父子关系限制同场景。UI 显示度数。子对象继承父变换/可见性。重设父对象保留本地变换，不保留世界姿态。
 - 时间：零起点整数帧，区间 `[start, start + duration)`；1–120 整数帧率，尚无 24000/1001。源帧=`sourceIn + timelineFrame - start`。改帧率保留帧位置，秒数变化。
 - 摄影机：透视垂直 FOV、有限 near/far；镜头引用摄影机实体。v6 可选 aspect 固定投影比例，缺省随输出尺寸调整；无自动信箱边框。
-- 颜色：sRGB 输入、Three.js 线性着色、ACES 映射、sRGB 输出；v6 材质可选 linearColor 保存原始线性 RGB，优先于 color 的 8 位显示值；修改颜色选择器会移除旧 linearColor。支持 opacity、OPAQUE/MASK/BLEND、alphaCutoff、emissive、doubleSided、flatShading，缺省仍为平面双面不透明。无纹理、OCIO 或专业校色保证。
+- 颜色：sRGB 输入、Three.js 线性着色、ACES 映射、sRGB 输出；v6 材质可选 linearColor 保存原始线性 RGB，优先于 color 的 8 位显示值；修改颜色选择器会移除旧 linearColor。支持 opacity、OPAQUE/MASK/BLEND、alphaCutoff、emissive、doubleSided、flatShading，缺省仍为平面双面不透明。v7 基础色/自发光贴图按 sRGB，其他贴图按线性数据；alpha 为线性值。无 OCIO 或专业校色保证。
 - 几何：本地顶点/三角面，v5 允许无面、孤立顶点及空网格。边是三角面的规范化索引对；没有独立线段或多边形数据。修改几何后，预览和导出读取相同数据。线性四分三角形不是平滑曲面细分。
 - 素材：SHA-256 内容寻址，ffprobe 读取真实流信息；便携包 base64 嵌入素材并校验哈希。没有压缩包或缺失媒体重定位流程。
 - 画幅：Clip.fit 为 contain/cover/stretch。默认 contain 保持完整画面、空白处显示低轨；cover 居中裁切源画面；stretch 拉伸。预览和导出共用矩形计算。
-- 数据版本：schemaVersion=6；显式拒绝未知格式。v1 在副本上升级，每个旧片段设为 stretch，保留音量；v2–v5 保留已有设置。v1–v3 关键帧按轨道内原时间派生 `legacy-key-<frame>`，在历史/任务快照间保持一致；v4/v5 的键 ID 原样保留。v6 新字段均可选，v5 快照只改格式号。新关键帧为 UUID，ID 在轨道内唯一，复制轨道后键 ID 可相同。完整身份是 `(trackId,keyId)`。不改原项目文件。数据库启动时先校验全部待迁移数据，`VACUUM INTO` 备份完整库，再在事务内升级项目、撤销历史、版本与任务快照，并写入 `schema_migrations` 的版本、备份名和计数；不增加用户编辑修订。夹具覆盖升级、原库备份和历史恢复。
+- 数据版本：schemaVersion=7；显式拒绝未知格式。v1 在副本上升级，每个旧片段设为 stretch，保留音量；v2–v6 保留已有设置。v1–v3 关键帧按轨道内原时间派生 `legacy-key-<frame>`，在历史/任务快照间保持一致；v4 及以上的键 ID 原样保留。v6/v7 新字段均可选，v6→v7 快照只改格式号。新关键帧为 UUID，ID 在轨道内唯一，复制轨道后键 ID 可相同。完整身份是 `(trackId,keyId)`。不改原项目文件。数据库启动时先校验全部待迁移数据，`VACUUM INTO` 备份完整库，再在事务内升级项目、撤销历史、版本与任务快照，并写入 `schema_migrations` 的版本、备份名和计数；不增加用户编辑修订。夹具覆盖升级、原库备份和历史恢复。
 - 生成：工作流节点保存参数和首尾帧 Asset ID，通过统一命令编辑并验证引用；被引用图片不可删除。提交时保存解析后的 GenerationRequest、Project 快照、工作流/输出节点和 requestKey；后续编辑不影响已提交请求。
 
 ## 编辑、审计与任务
@@ -50,7 +52,13 @@ v6 Geometry 可选 normals/uv，与位置等长；法线须近似单位长度。
 
 `exportGLB` 对指定帧求值可见场景，保留层级，按几何/着色复用 accessor，生成静态 GLB。来源 copyright/generator 保存在 Scene.source，重导出保留 copyright。背景、环境光、阴影和生产工作流不进入 GLB，界面提示。导入平行光沿局部 −Z；旧平行光仍朝世界原点，导出时用子节点表达方向而不改变其他子对象姿态。点光源保留可选范围及线性颜色。透明仍受 Three.js 实时排序限制。
 
-当前交换不支持纹理、顶点色、动画、蒙皮、形态键、正交/无限远摄影机、聚光灯、压缩与其他扩展。未引用资源和 extras 的丢弃会列明，资产版权声明保留。这是基础交换，不是完整规范实现或 Khronos 认证。`gltf-validator` 和 Three.js 独立加载器仅用于开发检查，产品解析/序列化由本仓库实现。
+v7 Material.textures 记录基础色、金属粗糙度、法线、遮蔽、自发光的 Asset ID、UV0/UV1、边界/过滤、offset/scale/rotation。金属度 B、粗糙度 G、遮蔽 R 与材质因子相乘。图片可由 URI、Data URI、bufferView 输入，只有调用者选择的相对路径允许解析；异步计算 SHA-256。界面先实际解码并上传资源，再一次提交含 assets 的 scene.import；服务端核对已登记 blob。上传后事务失败可留下未引用文件，当前无垃圾回收。GLB 异步包装先校验可见对象原图，再内嵌 PNG/JPEG 或 EXT_texture_webp，KHR_texture_transform 保留仿射参数。
+
+TextureBank 以内容哈希复用图片、按完整绑定/颜色空间复用纹理。加载器先校验编码、尺寸与哈希，再以无翻转/预乘/颜色转换选项创建 ImageBitmap；按贴图类别设置 GPU 颜色空间。UV 左上原点，矩阵为 offset + rotation × scale × uv。每图 8192 边长/16,777,216 像素，场景可见非空网格图片文件合计 50 MB；解码像素与 GPU 纹素各限 67,108,864。请求 15 秒超时，渲染共享 ready 屏障，失败阻止输出；换项目/场景取消旧请求，迟到位图关闭，纹理释放。编辑器显示加载/错误状态，刷新项目可重试。当前每次项目对象变化重建缓存，不宣称交互性能达标。
+
+Geometry 增加 uv1 和 Vec4 tangents（xyz 单位向量、w 为 ±1，需有 normals）。网格形状修改清除旧法线/切线，缺切线时由 Three.js 的 UV 导数求法线贴图基底；平面着色忽略导入切线。盒式 UV 投影选择各面主轴，按局部包围盒归一化并拆接缝，复制其他顶点属性、保留三角几何，清除旧切线；命令可撤销。尚无 UV 岛编辑、绘制、烘焙或 MikkTSpace 切线生成。
+
+当前交换不支持顶点色、动画、蒙皮、形态键、正交/无限远摄影机、聚光灯、压缩与其他扩展。未引用资源和 extras 的丢弃会列明，资产版权声明保留。这是基础交换，不是完整规范实现或 Khronos 认证。`gltf-validator` 和 Three.js 独立加载器仅用于开发检查，产品解析/序列化由本仓库实现。
 
 网格编辑以实体/几何 ID、模式和索引集维护临时选择；模式转换按完整包含关系处理，位置变化保留选择，拓扑变化清空，挤出可重新选择原槽位上的顶面。选择不写项目或历史，组件索引不保证跨拓扑稳定。组件变换先把选区解析成唯一顶点集，使用列主序 4×4 局部仿射矩阵；有限值、范围和索引校验经统一事务执行。
 

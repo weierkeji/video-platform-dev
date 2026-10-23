@@ -71,6 +71,7 @@ export class TimelineRenderer {
       if (clip.kind === 'shot') {
         const shot = p.shots.find((s) => s.id === clip.sourceId)!;
         this.scene.setProject(p, shot.sceneId);
+        await this.scene.ready();
         this.scene.evaluate(sourceFrame(clip, frame));
         this.scene.render(this.scene.objects.get(shot.cameraId) as THREE.Camera, width, height);
         source = this.scene.renderer.domElement;

@@ -4,6 +4,7 @@ import { type Command } from '../core/commands';
 import { type Clip, type Entity, type Project, type Vec3 } from '../core/model';
 import { exportOBJ } from '../core/geometry';
 import { displayColor } from '../core/surface';
+import { TexturePanel } from './TexturePanel';
 
 export function download(name: string, body: Blob | string, type = 'application/json') {
   const url = URL.createObjectURL(body instanceof Blob ? body : new Blob([body], { type }));
@@ -535,6 +536,7 @@ export function Inspector({
             />
           </>
         )}
+        {m && g && <TexturePanel project={p} material={m} geometry={g} send={send} />}
         {e.camera && (
           <>
             <h3>摄影机</h3>

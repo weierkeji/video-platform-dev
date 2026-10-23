@@ -489,7 +489,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.6</small>
+            FRAMEFORGE<small>创作工作台 · 0.7</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -1160,6 +1160,7 @@ export function App() {
           sceneId={sceneId}
           frame={frame}
           busy={busy}
+          saveError={error}
           send={send}
           onClose={() => setExchangeOpen(false)}
           onImported={(s) => {
