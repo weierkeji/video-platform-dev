@@ -1,6 +1,6 @@
 {
   "name": "frameforge-studio",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -26,7 +26,8 @@
     "smoke:bake": "tsx scripts/bake-smoke.ts",
     "smoke:skin": "tsx scripts/skin-smoke.ts",
     "smoke:constraints": "tsx scripts/constraints-smoke.ts",
-    "format": "prettier --write src server scripts tests index.html vite.config.ts tsconfig.json package.json .prettierrc.json"
+    "format": "prettier --write src server scripts tests index.html vite.config.ts tsconfig.json package.json .prettierrc.json",
+    "smoke:ik": "tsx scripts/ik-smoke.ts"
   },
   "dependencies": {
     "react": "19.1.1",

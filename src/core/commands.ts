@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Vector3 } from 'three';
 import {
   ArtifactSchema,
   AnimationActionSchema,
@@ -19,6 +20,7 @@ import {
   WorkflowSchema,
   VertexInfluencesSchema,
   ConstraintSchema,
+  IKChainSchema,
   id,
   identity,
   parseProject,
@@ -30,6 +32,8 @@ import { unwrappedSourceFrame } from './playback';
 import { bakeAnimation, BakeOptionsSchema } from './bake';
 import { displayColor } from './surface';
 import { bindSkin, normalizedInfluences } from './skin';
+import { ikPath, suggestedPole } from './ik';
+import { sceneEvaluator } from './constraints';
 import { deleteElements, extrudeRegion, mergeVertices, transformVertices } from './mesh';
 
 const ID = z.string().min(1).max(80);
@@ -63,6 +67,16 @@ export const CommandSchema = z.discriminatedUnion('type', [
     })
     .strict(),
   z.object({ type: z.literal('layer.delete'), id: ID }).strict(),
+  z.object({ type: z.literal('ik.put'), chain: IKChainSchema }).strict(),
+  z.object({ type: z.literal('ik.delete'), id: ID }).strict(),
+  z
+    .object({
+      type: z.literal('ik.create'),
+      rootId: ID,
+      tipId: ID,
+      frame: z.number().finite().min(0).max(1e6),
+    })
+    .strict(),
   z
     .object({
       type: z.literal('layer.move'),
@@ -80,6 +94,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
       assets: z.array(AssetSchema).max(1000).optional(),
       animationActions: z.array(AnimationActionSchema).max(1000).optional(),
       animationTracks: z.array(AnimationTrackSchema).max(6000).optional(),
+      ikChains: z.array(IKChainSchema).max(128).optional(),
     })
     .strict(),
   z
@@ -301,6 +316,7 @@ function apply(p: Project, c: Command) {
       p.entities.push(...c.entities);
       p.geometries.push(...c.geometries);
       p.materials.push(...c.materials);
+      if (c.ikChains) (p.ikChains ||= []).push(...c.ikChains);
       p.assets.push(...(c.assets || []));
       if (c.animationActions?.length) (p.animationActions ||= []).push(...c.animationActions);
       p.animationTracks.push(...(c.animationTracks || []));
@@ -344,6 +360,8 @@ function apply(p: Project, c: Command) {
         for (const entity of p.entities)
           if (targets.has(entity.id))
             for (const constraint of entity.constraints || []) constraint.enabled = false;
+        for (const chain of p.ikChains || [])
+          if (chain.sceneId === c.action.sceneId) chain.enabled = false;
       }
       break;
     }
@@ -366,6 +384,56 @@ function apply(p: Project, c: Command) {
     case 'layer.add':
       (p.animationLayers ||= []).push(c.layer);
       break;
+    case 'ik.put': {
+      const chains = (p.ikChains ||= []),
+        index = chains.findIndex((chain) => chain.id === c.chain.id);
+      if (index < 0) chains.push(c.chain);
+      else chains[index] = c.chain;
+      break;
+    }
+    case 'ik.delete':
+      get(p.ikChains || [], c.id);
+      p.ikChains = p.ikChains!.filter((chain) => chain.id !== c.id);
+      break;
+    case 'ik.create': {
+      const root = get(p.entities, c.rootId),
+        joints = ikPath(p.entities, root.id, c.tipId);
+      const pose = sceneEvaluator(p, root.sceneId)(c.frame),
+        points = joints.map((id) => new Vector3().setFromMatrixPosition(pose.world.get(id)!));
+      if (points.slice(1).some((v, i) => v.distanceTo(points[i]) < 1e-8))
+        throw new Error('请先设置非零骨段，再创建 IK 控制器');
+      const targetId = id(),
+        poleId = id(),
+        name = root.name.slice(0, 140);
+      p.entities.push(
+        ...[
+          { id: targetId, name: `${name} · IK 目标`, position: points.at(-1)!.toArray() },
+          { id: poleId, name: `${name} · IK 极向`, position: suggestedPole(points).toArray() },
+        ].map((control) => ({
+          id: control.id,
+          name: control.name,
+          kind: 'group' as const,
+          sceneId: root.sceneId,
+          parentId: null,
+          visible: true,
+          transform: { ...identity(), position: control.position as [number, number, number] },
+        })),
+      );
+      (p.ikChains ||= []).push({
+        id: id(),
+        name: `${name} IK`,
+        sceneId: root.sceneId,
+        joints,
+        targetId,
+        poleId,
+        enabled: true,
+        influence: 1,
+        iterations: 32,
+        tolerance: 0.0001,
+        poleAngle: 0,
+      });
+      break;
+    }
     case 'layer.update':
       Object.assign(get(p.animationLayers || [], c.id), c.patch);
       break;
@@ -445,6 +513,15 @@ function apply(p: Project, c: Command) {
       }
       if (p.shots.some((s) => removing.has(s.cameraId)))
         throw new Error('摄影机被镜头引用，请先为镜头选择其他摄影机');
+      for (const chain of p.ikChains || [])
+        if (
+          !chain.joints.every((id) => removing.has(id)) &&
+          (chain.joints.some((id) => removing.has(id)) ||
+            removing.has(chain.targetId) ||
+            (chain.poleId && removing.has(chain.poleId)))
+        )
+          throw new Error('对象仍被 IK 链引用，请先移除 IK 或一起删除整条链');
+      p.ikChains = p.ikChains?.filter((chain) => !chain.joints.every((id) => removing.has(id)));
       if (
         p.entities.some(
           (e) => !removing.has(e.id) && e.constraints?.some((c) => removing.has(c.targetId)),

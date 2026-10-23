@@ -1,0 +1,20 @@
+{
+  "checkedAt": "2026-10-23T19:58:27.218Z",
+  "migration": {
+    "id": "07ff4692-abad-499a-804d-a98598a918e8",
+    "from_version": 12,
+    "to_version": 13,
+    "created_at": "2026-10-23T19:58:15.703Z",
+    "backup_name": "before-schema-v13-1792785493484.sqlite",
+    "details": "{\"projects\":135,\"revisions\":1026,\"jobs\":89,\"previousVersions\":[12]}"
+  },
+  "counts": {
+    "revisions": 1026,
+    "jobs": 89,
+    "projects": 135,
+    "histories": 817
+  },
+  "normalizedMatrices": 0,
+  "maxDelta": 0,
+  "result": "Snapshots unchanged except schema version and previously documented machine-precision bind-row normalization; cursors unchanged; audit is read-only; original database backup retained."
+}

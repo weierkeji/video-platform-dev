@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { evaluatedTransform } from '../core/evaluate';
-import { activeConstraints, sceneEvaluator } from '../core/constraints';
+import { sceneEvaluator } from '../core/constraints';
 import { type Entity, type Geometry, type Project } from '../core/model';
 import { deformGeometry } from '../core/skin';
 import { linearColor, surfaceGeometry, surfaceMaterial } from '../core/surface';
@@ -163,7 +163,7 @@ export class SceneRenderer {
       if (t.quaternion) o.quaternion.fromArray(t.quaternion);
       else o.rotation.set(...t.rotation, 'XYZ');
       o.scale.fromArray(t.scale);
-      o.matrixAutoUpdate = !activeConstraints(e).length;
+      o.matrixAutoUpdate = !pose.driven.has(e.id);
       if (!o.matrixAutoUpdate) {
         o.matrix.copy(pose.local.get(e.id)!);
         o.matrix.decompose(o.position, o.quaternion, o.scale);

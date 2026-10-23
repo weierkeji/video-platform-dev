@@ -1242,3 +1242,23 @@ pre {
   padding: 10px;
   min-width: 0;
 }
+.ik-panel {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.ik-panel summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.ik-card {
+  margin: 12px 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  min-width: 0;
+}
+.ik-status {
+  color: #a8c7d7;
+  font-variant-numeric: tabular-nums;
+}

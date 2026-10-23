@@ -1,0 +1,100 @@
+{
+  "checkedAt": "2026-10-23T20:14:02.069Z",
+  "projectId": "7cd41a94-0ec7-4210-8429-e40369c33e83",
+  "importedProjectId": "a8f2f061-3ff7-446a-a43a-3a2c74edfb73",
+  "jobId": "dbff5b37-540f-4a12-bfe3-087da4b1dd23",
+  "browser": "155.0.8059.82",
+  "format": 13,
+  "frames": 48,
+  "validator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 1,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/7"
+      }
+    ],
+    "truncated": false
+  },
+  "staticValidator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 2,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/6"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/7"
+      }
+    ],
+    "truncated": false
+  },
+  "staticDifference": 0.0010853909465020576,
+  "measurements": [
+    {
+      "frame": 0,
+      "difference": 0
+    },
+    {
+      "frame": 6.25,
+      "difference": 0.00000771604938271605
+    },
+    {
+      "frame": 12,
+      "difference": 0.0005787037037037037
+    },
+    {
+      "frame": 24,
+      "difference": 0.0011059670781893003
+    },
+    {
+      "frame": 36.5,
+      "difference": 0.000023148148148148147
+    },
+    {
+      "frame": 47,
+      "difference": 0
+    }
+  ],
+  "videoMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0.3950385802469136
+    },
+    {
+      "frame": 12,
+      "difference": 0.39516203703703706
+    },
+    {
+      "frame": 24,
+      "difference": 0.3997299382716049
+    },
+    {
+      "frame": 47,
+      "difference": 0.4194212962962963
+    }
+  ],
+  "pageErrors": [],
+  "checks": [
+    "joint creation hierarchy and animated posing",
+    "bind unbind and undo restore exact source",
+    "vertex weight edit normalization undo redo reload",
+    "editor joints and rest mesh helpers",
+    "animated GLB validation and UI reimport",
+    "fixed render snapshot while editing weights",
+    "portable project preserves skin and weights"
+  ]
+}

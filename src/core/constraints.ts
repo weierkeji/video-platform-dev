@@ -1,15 +1,63 @@
 import { Euler, Matrix4, Quaternion, Vector3 } from 'three';
-import type { Constraint, Entity, Project, Vec3, Vec4 } from './model';
+import type { Constraint, Entity, IKChain, Project, Vec3, Vec4 } from './model';
 import { evaluatedTransform } from './evaluate';
+import { solveIK } from './ik';
 
 export const activeConstraints = (e: Entity) =>
   (e.constraints || []).filter((c) => c.enabled && c.influence > 0);
 
-/** Object-level dependency graph. Geometry deformation never feeds transforms. */
-export function dependencyOrder(entities: Entity[]) {
+export const activeIK = (chains: IKChain[] = []) =>
+  chains.filter((c) => c.enabled && c.influence > 0);
+export function drivenEntities(p: Project, sceneId?: string) {
+  return new Set([
+    ...p.entities
+      .filter((e) => (!sceneId || e.sceneId === sceneId) && activeConstraints(e).length)
+      .map((e) => e.id),
+    ...activeIK(p.ikChains)
+      .filter((c) => !sceneId || c.sceneId === sceneId)
+      .flatMap((c) => c.joints),
+  ]);
+}
+type EvaluationUnit = { id: string; name: string; entities: Entity[]; chain?: IKChain };
+function sortedUnits(units: EvaluationUnit[], input: Map<string, Set<string>>) {
+  const byId = new Map(units.map((u) => [u.id, u]));
+  const dependencies = new Map([...input].map(([id, deps]) => [id, new Set(deps)]));
+  const followers = new Map<string, string[]>();
+  for (const [id, deps] of dependencies)
+    for (const target of deps) {
+      if (!byId.has(target)) throw new Error('对象依赖不存在');
+      const list = followers.get(target) || [];
+      list.push(id);
+      followers.set(target, list);
+    }
+  const ready = units.filter((u) => !dependencies.get(u.id)!.size).map((u) => u.id);
+  const order: EvaluationUnit[] = [];
+  for (let i = 0; i < ready.length; i++) {
+    const id = ready[i];
+    order.push(byId.get(id)!);
+    for (const child of followers.get(id) || []) {
+      const deps = dependencies.get(child)!;
+      deps.delete(id);
+      if (!deps.size) ready.push(child);
+    }
+  }
+  if (order.length !== units.length) {
+    let next = units.find((u) => dependencies.get(u.id)!.size)!.id;
+    const path: string[] = [];
+    while (!path.includes(next)) {
+      path.push(next);
+      next = [...dependencies.get(next)!][0];
+    }
+    const cycle = [...path.slice(path.indexOf(next)), next].map((id) => byId.get(id)!.name);
+    throw new Error(`对象约束/父级/IK 依赖存在循环：${cycle.join(' → ')}`);
+  }
+  return order;
+}
+
+/** Chain members are one write group. Every outside reader waits for its final pose. */
+export function dependencyOrder(entities: Entity[], chains: IKChain[] = []) {
   const byId = new Map(entities.map((e) => [e.id, e]));
   const dependencies = new Map<string, Set<string>>();
-  const followers = new Map<string, string[]>();
   for (const e of entities) {
     for (const c of e.constraints || []) {
       const target = byId.get(c.targetId);
@@ -26,33 +74,55 @@ export function dependencyOrder(entities: Entity[]) {
       ...activeConstraints(e).map((c) => c.targetId),
     ]);
     dependencies.set(e.id, deps);
-    for (const target of deps) {
-      if (!byId.has(target)) throw new Error('对象依赖不存在');
-      followers.set(target, [...(followers.get(target) || []), e.id]);
-    }
   }
-  const ready = entities.filter((e) => !dependencies.get(e.id)!.size).map((e) => e.id);
-  const order: Entity[] = [];
-  for (let i = 0; i < ready.length; i++) {
-    const id = ready[i];
-    order.push(byId.get(id)!);
-    for (const child of followers.get(id) || []) {
-      const deps = dependencies.get(child)!;
-      deps.delete(id);
-      if (!deps.size) ready.push(child);
-    }
+  const plain = entities.map((e) => ({ id: e.id, name: e.name, entities: [e] }));
+  const order = sortedUnits(plain, dependencies);
+  for (const chain of chains) {
+    if (new Set(chain.joints).size !== chain.joints.length) throw new Error('IK 链节点不能重复');
+    for (const id of [...chain.joints, chain.targetId, ...(chain.poleId ? [chain.poleId] : [])])
+      if (byId.get(id)?.sceneId !== chain.sceneId)
+        throw new Error('IK 链、目标与极向对象必须属于同一场景');
+    for (let i = 1; i < chain.joints.length; i++)
+      if (byId.get(chain.joints[i])!.parentId !== chain.joints[i - 1])
+        throw new Error('IK 链必须沿直接父子关系连续排列');
   }
-  if (order.length !== entities.length) {
-    let next = entities.find((e) => dependencies.get(e.id)!.size)!.id;
-    const path: string[] = [];
-    while (!path.includes(next)) {
-      path.push(next);
-      next = [...dependencies.get(next)!][0];
+  const active = activeIK(chains);
+  if (!active.length) return order;
+  const membership = new Map<string, IKChain>();
+  for (const chain of active)
+    for (const id of chain.joints) {
+      if (membership.has(id)) throw new Error('启用的 IK 链不能共享节点；请停用重叠链');
+      membership.set(id, chain);
     }
-    const cycle = [...path.slice(path.indexOf(next)), next].map((id) => byId.get(id)!.name);
-    throw new Error(`对象约束/父级依赖存在循环：${cycle.join(' → ')}`);
+  const units = new Map<string, EvaluationUnit>(),
+    grouped = new Map<string, Set<string>>();
+  const unitId = (id: string) => membership.get(id)?.id || id;
+  for (const e of entities) {
+    const chain = membership.get(e.id),
+      id = unitId(e.id);
+    if (!units.has(id)) {
+      units.set(
+        id,
+        chain
+          ? {
+              id,
+              name: `IK ${chain.name}`,
+              entities: chain.joints.map((id) => byId.get(id)!),
+              chain,
+            }
+          : { id, name: e.name, entities: [e] },
+      );
+      grouped.set(id, new Set());
+    }
+    for (const dep of dependencies.get(e.id)!)
+      if (unitId(dep) !== id) grouped.get(id)!.add(unitId(dep));
   }
-  return order;
+  for (const chain of active) {
+    const deps = grouped.get(chain.id)!;
+    deps.add(unitId(chain.targetId));
+    if (chain.poleId) deps.add(unitId(chain.poleId));
+  }
+  return sortedUnits([...units.values()], grouped);
 }
 
 export function transformMatrix(t: Entity['transform']) {
@@ -169,52 +239,115 @@ export function matrixTransform(m: Matrix4, label: string): Entity['transform'] 
 
 /** One compiler per immutable project/scene, one deterministic evaluation per frame. */
 export function sceneEvaluator(p: Project, sceneId: string) {
-  const order = dependencyOrder(p.entities.filter((e) => e.sceneId === sceneId));
+  const entities = p.entities.filter((e) => e.sceneId === sceneId),
+    byId = new Map(entities.map((e) => [e.id, e]));
+  const order = dependencyOrder(
+    entities,
+    p.ikChains?.filter((c) => c.sceneId === sceneId),
+  );
+  const driven = drivenEntities(p, sceneId);
   return (frame?: number, actionId?: string | null, layers = true) => {
     const local = new Map<string, Matrix4>(),
       world = new Map<string, Matrix4>();
     const warnings: { entityId: string; constraintId: string; message: string }[] = [];
-    for (const e of order) {
-      const parent = e.parentId ? world.get(e.parentId)! : new Matrix4();
-      let matrix = transformMatrix(
-        frame === undefined ? e.transform : evaluatedTransform(p, e, frame, actionId, layers),
-      );
-      for (const c of activeConstraints(e)) {
-        try {
-          const worldSpace = c.type === 'aim' || c.ownerSpace === 'world';
-          if (worldSpace && Math.abs(parent.determinant()) < 1e-12)
-            throw new Error('父级矩阵不可逆；世界空间约束本帧未应用');
-          const input = worldSpace ? parent.clone().multiply(matrix) : matrix;
-          let output: Matrix4;
-          if (c.type === 'aim') output = aim(input, world.get(c.targetId)!, c);
-          else {
-            const target = (c.targetSpace === 'world' ? world : local).get(c.targetId)!;
-            output =
-              c.type === 'copy-position'
-                ? input
-                    .clone()
-                    .setPosition(
-                      new Vector3()
-                        .setFromMatrixPosition(input)
-                        .lerp(new Vector3().setFromMatrixPosition(target), c.influence),
-                    )
-                : blendAffine(input, target, c.influence);
+    const ik: {
+      chainId: string;
+      residual: number;
+      appliedResidual: number;
+      iterations: number;
+      reachable: boolean;
+      converged: boolean;
+    }[] = [];
+    for (const unit of order) {
+      for (const e of unit.entities) {
+        const parent = e.parentId ? world.get(e.parentId)! : new Matrix4();
+        let matrix = transformMatrix(
+          frame === undefined ? e.transform : evaluatedTransform(p, e, frame, actionId, layers),
+        );
+        for (const c of activeConstraints(e)) {
+          try {
+            const worldSpace = c.type === 'aim' || c.ownerSpace === 'world';
+            if (worldSpace && Math.abs(parent.determinant()) < 1e-12)
+              throw new Error('父级矩阵不可逆；世界空间约束本帧未应用');
+            const input = worldSpace ? parent.clone().multiply(matrix) : matrix;
+            let output: Matrix4;
+            if (c.type === 'aim') output = aim(input, world.get(c.targetId)!, c);
+            else {
+              const target = (c.targetSpace === 'world' ? world : local).get(c.targetId)!;
+              output =
+                c.type === 'copy-position'
+                  ? input
+                      .clone()
+                      .setPosition(
+                        new Vector3()
+                          .setFromMatrixPosition(input)
+                          .lerp(new Vector3().setFromMatrixPosition(target), c.influence),
+                      )
+                  : blendAffine(input, target, c.influence);
+            }
+            const candidate = worldSpace ? parent.clone().invert().multiply(output) : output;
+            if (candidate.elements.some((v) => !Number.isFinite(v)))
+              throw new Error('约束产生非有限矩阵；该约束本帧未应用');
+            matrix = candidate;
+          } catch (error) {
+            warnings.push({
+              entityId: e.id,
+              constraintId: c.id,
+              message: error instanceof Error ? error.message : String(error),
+            });
           }
-          const candidate = worldSpace ? parent.clone().invert().multiply(output) : output;
-          if (candidate.elements.some((v) => !Number.isFinite(v)))
-            throw new Error('约束产生非有限矩阵；该约束本帧未应用');
-          matrix = candidate;
+        }
+        local.set(e.id, matrix);
+        world.set(e.id, parent.clone().multiply(matrix));
+      }
+      if (unit.chain) {
+        const chain = unit.chain;
+        try {
+          const solution = solveIK(chain, byId, local, world);
+          const changedLocal = new Map<string, Matrix4>(),
+            changedWorld = new Map<string, Matrix4>();
+          for (const e of unit.entities) {
+            const matrix = blendAffine(
+              local.get(e.id)!,
+              solution.matrices.get(e.id)!,
+              chain.influence,
+            );
+            const parent = e.parentId
+              ? changedWorld.get(e.parentId) || world.get(e.parentId)!
+              : new Matrix4();
+            if (matrix.elements.some((v) => !Number.isFinite(v)))
+              throw new Error('IK 混合产生非有限矩阵；本帧保留输入姿态');
+            changedLocal.set(e.id, matrix);
+            changedWorld.set(e.id, parent.clone().multiply(matrix));
+          }
+          changedLocal.forEach((m, id) => local.set(id, m));
+          changedWorld.forEach((m, id) => world.set(id, m));
+          const appliedResidual = new Vector3()
+            .setFromMatrixPosition(world.get(chain.joints.at(-1)!)!)
+            .distanceTo(new Vector3().setFromMatrixPosition(world.get(chain.targetId)!));
+          ik.push({
+            chainId: chain.id,
+            residual: solution.residual,
+            appliedResidual,
+            iterations: solution.iterations,
+            reachable: solution.reachable,
+            converged: solution.converged,
+          });
+          if (!solution.converged)
+            warnings.push({
+              entityId: chain.joints[0],
+              constraintId: chain.id,
+              message: `IK“${chain.name}”${solution.reachable ? '已达迭代上限' : '目标超出可达范围'}，求解末端误差 ${solution.residual.toPrecision(4)} 米`,
+            });
         } catch (error) {
           warnings.push({
-            entityId: e.id,
-            constraintId: c.id,
+            entityId: chain.joints[0],
+            constraintId: chain.id,
             message: error instanceof Error ? error.message : String(error),
           });
         }
       }
-      local.set(e.id, matrix);
-      world.set(e.id, parent.clone().multiply(matrix));
     }
-    return { local, world, warnings };
+    return { local, world, warnings, driven, ik };
   };
 }

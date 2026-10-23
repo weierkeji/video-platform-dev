@@ -13,6 +13,16 @@ export class JointOverlay {
     depthTest: false,
     depthWrite: false,
   });
+  private targetMaterial = new THREE.MeshBasicMaterial({
+    color: '#f5a35e',
+    depthTest: false,
+    depthWrite: false,
+  });
+  private poleMaterial = new THREE.MeshBasicMaterial({
+    color: '#c68dea',
+    depthTest: false,
+    depthWrite: false,
+  });
   private lineMaterial = new THREE.LineBasicMaterial({
     color: '#8db6d2',
     depthTest: false,
@@ -27,9 +37,24 @@ export class JointOverlay {
     );
     for (const e of p.entities)
       if (e.sceneId === renderer.sceneId) e.skin?.joints.forEach((id) => ids.add(id));
+    const targets = new Set<string>(),
+      poles = new Set<string>();
+    for (const chain of p.ikChains || [])
+      if (chain.sceneId === renderer.sceneId) {
+        chain.joints.forEach((id) => ids.add(id));
+        targets.add(chain.targetId);
+        ids.add(chain.targetId);
+        if (chain.poleId) {
+          poles.add(chain.poleId);
+          ids.add(chain.poleId);
+        }
+      }
     const entities = new Map(p.entities.map((e) => [e.id, e]));
     for (const id of ids) {
-      const dot = new THREE.Mesh(this.geometry, this.material);
+      const dot = new THREE.Mesh(
+        this.geometry,
+        targets.has(id) ? this.targetMaterial : poles.has(id) ? this.poleMaterial : this.material,
+      );
       dot.userData.entityId = id;
       dot.renderOrder = 10;
       this.dots.set(id, dot);
@@ -72,6 +97,8 @@ export class JointOverlay {
     this.root.removeFromParent();
     this.geometry.dispose();
     this.material.dispose();
+    this.targetMaterial.dispose();
+    this.poleMaterial.dispose();
     this.lineMaterial.dispose();
     this.links.forEach(({ line }) => line.geometry.dispose());
   }

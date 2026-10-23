@@ -41,3 +41,5 @@ glTF 解析/序列化由本仓库按公开格式独立实现；Three.js 负责�
 
 0.12 没有新增依赖或修改第三方源码。蒙皮数据、命令、权重/拓扑传播、CPU 线性混合与编辑辅助为本仓库实现；矩阵/向量运算和最终显示仍来自 Three.js。Khronos glTF 2.0 规范/Skins 教程、Blender 4.5 Armature 文档仅提供公开行为依据，未复制其资源、角色、动画或求解实现。使用已安装 Three.js GLTFLoader 源码核对缺法线时的平面着色行为，并以其 SkinnedMesh/AnimationMixer 独立核对顶点；其实现不属于自研。`scripts/skin-fixture.ts` 自行生成分段柱体、关节、权重和运动，`skin-sculpture` / `skin-pose` 由本平台输出，无外部素材或模型调用。
 0.13 没有新增依赖或修改第三方源码。约束模型/命令、依赖拓扑排序、空间转换、朝向差值、QR 仿射混合和烘焙整合为本仓库根据公开数学独立实现；Matrix4/Quaternion/Vector3 基础运算与 WebGL 显示仍来自 Three.js。Blender 4.5 的公开约束文档只作为行为参照，不执行其程序或复制求解代码；glTF 格式规则来自 Khronos。`target-study` 的目标运动/摄影机控制由本仓库编写，沿用原创分段柱体和关节，无外部角色、素材或模型生成。
+
+0.14 没有新增依赖或修改第三方源码。双段几何解、IK 链数据/命令、分组依赖、极向控制、矩阵重建和编辑整合由本仓库编写；多段求解采用 Aristidou / Lasenby 的公开 FABRIK 算法（Graphical Models 73，2011，243–260，[作者论文](https://andreasaristidou.com/publications/papers/FABRIK.pdf)），算法不归为本项目发明，没有复制第三方求解代码。Three.js 仍提供基础数学/显示；Blender 手册仅为公开行为参照。ik-reach 的控制器、曲线和摄影机沿用本仓库原创分段柱体/蒙皮，无外部素材或模型调用。

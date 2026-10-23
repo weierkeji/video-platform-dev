@@ -3,7 +3,7 @@ import { GenerationOptionsSchema, GenerationRequestSchema } from './generation';
 import { validateTrack } from './animation';
 import { dependencyOrder } from './constraints';
 
-export const PROJECT_VERSION = 12;
+export const PROJECT_VERSION = 13;
 
 export const id = () => crypto.randomUUID();
 const ID = z
@@ -216,6 +216,22 @@ export const ConstraintSchema = z.discriminatedUnion('type', [
     .strict(),
 ]);
 export type Constraint = z.infer<typeof ConstraintSchema>;
+export const IKChainSchema = z
+  .object({
+    id: ID,
+    name: Name,
+    sceneId: ID,
+    joints: z.array(ID).min(3).max(33),
+    targetId: ID,
+    poleId: ID.nullable(),
+    enabled: z.boolean(),
+    influence: z.number().finite().min(0).max(1),
+    iterations: z.number().int().min(1).max(64),
+    tolerance: z.number().finite().min(1e-6).max(1),
+    poleAngle: NumberValue,
+  })
+  .strict();
+export type IKChain = z.infer<typeof IKChainSchema>;
 export const EntitySchema = z
   .object({
     id: ID,
@@ -480,6 +496,7 @@ export const ProjectSchema = z
     animationTracks: z.array(AnimationTrackSchema).max(6000),
     animationActions: z.array(AnimationActionSchema).max(1000).optional(),
     animationLayers: z.array(AnimationLayerSchema).max(512).optional(),
+    ikChains: z.array(IKChainSchema).max(128).optional(),
     assets: z.array(AssetSchema).max(10000),
     shots: z.array(ShotSchema).max(10000),
     timeline: TimelineSchema,
@@ -536,6 +553,7 @@ export function parseProject(input: unknown): Project {
     ...p.animationTracks,
     ...(p.animationActions || []),
     ...(p.animationLayers || []),
+    ...(p.ikChains || []),
     ...p.assets,
     ...p.shots,
     p.timeline,
@@ -613,7 +631,7 @@ export function parseProject(input: unknown): Project {
       parentId = parent.parentId;
     }
   }
-  dependencyOrder(p.entities);
+  dependencyOrder(p.entities, p.ikChains);
   const paths = new Set<string>();
   for (const e of p.entities)
     if (e.skin) {
@@ -748,7 +766,9 @@ export function migrateProject(input: unknown) {
     typeof input !== 'object' ||
     !input ||
     !('schemaVersion' in input) ||
-    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
+    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, PROJECT_VERSION].includes(
+      Number(input.schemaVersion),
+    ) ||
     typeof input.schemaVersion !== 'number'
   )
     throw new Error('不支持此项目版本；原文件未修改');

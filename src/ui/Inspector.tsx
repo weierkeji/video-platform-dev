@@ -3,6 +3,7 @@ import { evaluatedBaseTransform } from '../core/evaluate';
 import { LayerPanel } from './LayerPanel';
 import { SkinPanel } from './SkinPanel';
 import { ConstraintPanel } from './ConstraintPanel';
+import { IKPanel } from './IKPanel';
 import { activeTracks, rotationProperty, quaternionFromEuler } from '../core/animation';
 import { type Command } from '../core/commands';
 import { type Clip, type Entity, type Project, type Vec3 } from '../core/model';
@@ -386,6 +387,7 @@ export function Inspector({
         </button>
         <LayerPanel project={p} entity={e} frame={frame} send={send} />
         <ConstraintPanel key={`constraints-${e.id}`} project={p} entity={e} send={send} />
+        <IKPanel key={`ik-${e.id}`} project={p} entity={e} frame={frame} send={send} />
         <SkinPanel key={e.id} project={p} entity={e} send={send} />
         {activeTracks(p, e.id).length > 0 && (
           <p className="muted">已有动画属性的修改会更新当前帧关键帧。</p>

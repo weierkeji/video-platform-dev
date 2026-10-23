@@ -16,7 +16,7 @@ import {
   validateTrack,
 } from './animation';
 import { evaluatedTransform } from './evaluate';
-import { activeConstraints, matrixTransform, sceneEvaluator } from './constraints';
+import { drivenEntities, matrixTransform, sceneEvaluator } from './constraints';
 
 export const BakeOptionsSchema = z
   .object({
@@ -214,6 +214,7 @@ export function bakeAnimation(
   )
     throw new Error('烘焙基础动作必须属于当前场景');
   const { grid, guarded, offset } = samplingGrid(p, sceneId, options);
+  const driven = drivenEntities(p, sceneId);
   const tracks: AnimationTrack[] = [];
   const errors = { position: 0, rotationDegrees: 0, scale: 0 };
   const smoothErrors = { ...errors },
@@ -239,7 +240,7 @@ export function bakeAnimation(
           layer.channels.includes(t.property === 'quaternion' ? 'rotation' : t.property),
         )
         .forEach(include);
-    if (activeConstraints(entity).length) {
+    if (driven.has(entity.id)) {
       channels.add('position');
       channels.add('quaternion');
       channels.add('scale');
@@ -277,7 +278,7 @@ export function bakeAnimation(
     channel === 'quaternion'
       ? normalizeQuaternion(t.quaternion || quaternionFromEuler(t.rotation))
       : t[channel];
-  const hasConstraints = plans.some(({ entity }) => activeConstraints(entity).length);
+  const hasConstraints = driven.size > 0;
   const evaluateScene = hasConstraints ? sceneEvaluator(p, sceneId) : undefined;
   const warnings = new Set<string>();
   const sample = (frame: number) => {
@@ -288,7 +289,7 @@ export function bakeAnimation(
           `${p.entities.find((e) => e.id === warning.entityId)!.name}：${warning.message}`,
         );
     return plans.map(({ entity, scope }) =>
-      activeConstraints(entity).length
+      driven.has(entity.id)
         ? matrixTransform(pose!.local.get(entity.id)!, `${entity.name}（帧 ${frame}）`)
         : evaluatedTransform(scope, entity, frame, options.actionId),
     );
@@ -366,7 +367,7 @@ export function bakeAnimation(
     `每段 1/4、1/2、3/4 位置共 ${probes} 次探测：最大位置分量差 ${errors.position.toPrecision(4)} 米、旋转差 ${errors.rotationDegrees.toPrecision(4)}°、缩放分量差 ${errors.scale.toPrecision(4)}。这是局部变换探测值，不是全区间误差上界；GLB 数值另有 Float32 量化。`,
     `边界细分段以外的探测最大差：位置 ${smoothErrors.position.toPrecision(4)} 米、旋转 ${smoothErrors.rotationDegrees.toPrecision(4)}°、缩放 ${smoothErrors.scale.toPrecision(4)}。边界细分段最长 ${maxBoundarySpanFrames.toPrecision(4)} 帧；其中最大差：位置 ${boundaryErrors.position.toPrecision(4)} 米、旋转 ${boundaryErrors.rotationDegrees.toPrecision(4)}°、缩放 ${boundaryErrors.scale.toPrecision(4)}。`,
     `${guarded} 个可能跳变的边界加入 Float32 两侧时刻，并留出源时间浮点运算的舍入间隔。时间按秒量化；边界位置与两侧过渡为近似，不能精确表达瞬时跳变。`,
-    '烘焙采样所选基础动作、当前启用的对象层与约束；保留父子局部变换。无法由 TRS 表达的局部剪切会拒绝烘焙。镜头/片段调度、层/约束设置和原始曲线不写入该动作；完整作品保存项目包。',
+    '烘焙采样所选基础动作、当前启用的对象层、约束与 IK；保留父子局部变换。无法由 TRS 表达的局部剪切会拒绝烘焙。镜头/片段调度、层/约束/IK 设置和原始曲线不写入该动作；完整作品保存项目包。',
     ...warnings,
   ];
   return { action, tracks, stats, notes, options };
@@ -383,6 +384,9 @@ export function bakedProject(p: Project, sceneId: string, options: BakeOptions) 
         targets.has(e.id) && e.constraints
           ? { ...e, constraints: e.constraints.map((c) => ({ ...c, enabled: false })) }
           : e,
+      ),
+      ikChains: p.ikChains?.map((chain) =>
+        chain.sceneId === sceneId ? { ...chain, enabled: false } : chain,
       ),
       animationActions: [
         ...(p.animationActions || []).filter((a) => a.sceneId !== sceneId),

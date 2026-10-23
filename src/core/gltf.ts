@@ -18,7 +18,7 @@ import {
 import { checkedImage, imageInfo, sha256 } from './image';
 import { CommandSchema, type Command } from './commands';
 import { evaluatedTransform } from './evaluate';
-import { activeConstraints, matrixTransform, sceneEvaluator } from './constraints';
+import { activeConstraints, activeIK, matrixTransform, sceneEvaluator } from './constraints';
 import { animationSampler } from './animation-exchange';
 import { bakedProject, type BakeOptions } from './bake';
 import { normalizeQuaternion, validateTrack } from './animation';
@@ -1126,6 +1126,10 @@ export function exportGLB(
     throw new Error(
       '原始动画 GLB 无法保存约束；请使用“烘焙动画 GLB”采样约束结果，项目包保留可编辑约束',
     );
+  if (animated && activeIK(project.ikChains).some((chain) => chain.sceneId === sceneId))
+    throw new Error(
+      '原始动画 GLB 无法保存 IK；请使用“烘焙动画 GLB”采样链结果，项目包保留可编辑 IK',
+    );
   const pose = animated ? undefined : sceneEvaluator(project, sceneId)(frame);
   if (animated && project.animationLayers?.some((l) => l.enabled && byId.has(l.entityId)))
     throw new Error(
@@ -1317,7 +1321,7 @@ export function exportGLB(
   included.forEach((e) => {
     const t = animated
         ? e.transform
-        : activeConstraints(e).length
+        : pose!.driven.has(e.id)
           ? matrixTransform(pose!.local.get(e.id)!, e.name)
           : evaluatedTransform(project, e, frame),
       node: JSONRecord = {
@@ -1602,7 +1606,7 @@ export function exportGLB(
   const json: JSONRecord = {
     asset: {
       version: '2.0',
-      generator: 'Frameforge Studio 0.13 scene exchange',
+      generator: 'Frameforge Studio 0.14 scene exchange',
       ...(scene.source?.copyright ? { copyright: scene.source.copyright } : {}),
     },
     scene: 0,
