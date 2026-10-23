@@ -19,6 +19,7 @@ import { checkedImage, imageInfo, sha256 } from './image';
 import { CommandSchema, type Command } from './commands';
 import { evaluatedTransform } from './evaluate';
 import { animationSampler } from './animation-exchange';
+import { bakedProject, type BakeOptions } from './bake';
 import { normalizeQuaternion, validateTrack } from './animation';
 import { displayColor, linearColor, surfaceGeometry } from './surface';
 
@@ -1024,23 +1025,34 @@ export function exportGLB(
   frame: number,
   imageBytes: ReadonlyMap<string, Uint8Array> = new Map(),
   animated = false,
+  bake?: BakeOptions,
 ) {
   if (!Number.isFinite(frame) || frame < 0) throw new Error('导出帧无效');
+  let bakeNotes: string[] = [];
+  if (bake) {
+    const result = bakedProject(project, sceneId, bake);
+    project = result.project;
+    animated = true;
+    bakeNotes = result.notes;
+  }
   const scene = project.scenes.find((s) => s.id === sceneId);
   if (!scene) throw new Error('场景不存在');
   const entities = project.entities.filter((e) => e.sceneId === sceneId),
     byId = new Map(entities.map((e) => [e.id, e]));
   if (animated && project.animationLayers?.some((l) => l.enabled && byId.has(l.entityId)))
     throw new Error(
-      '动画 GLB 尚不支持动作层烘焙；请保存项目包、导出成片或当前帧 GLB，或先禁用本场景动作层以导出原始动作',
+      '原始动画 GLB 不包含动作层；请使用“烘焙动画 GLB”导出混合结果，或禁用层后导出原始动作（动作层烘焙需指定区间）',
     );
   const visible = (e: Entity): boolean =>
     e.visible && (!e.parentId || visible(byId.get(e.parentId)!));
   const included = entities.filter(visible),
     nodeIndex = new Map(included.map((e, i) => [e.id, i]));
   const notes = [
-    '仅导出当前帧的可见场景；动画曲线、时间轴、背景、环境光、阴影设置和工作流不属于此 GLB。',
+    animated
+      ? '导出可见场景的变换动画；镜头时间轴、背景、环境光、阴影设置和工作流不属于此 GLB。'
+      : '仅导出当前帧的可见场景；动画曲线、时间轴、背景、环境光、阴影设置和工作流不属于此 GLB。',
     '位置、法线和 UV 以 Float32 编码。',
+    ...bakeNotes,
   ];
   if (included.length !== entities.length) notes.push('隐藏对象及其子对象未导出。');
   type JSONRecord = Record<string, unknown>;
@@ -1410,7 +1422,7 @@ export function exportGLB(
   const json: JSONRecord = {
     asset: {
       version: '2.0',
-      generator: 'Frameforge Studio 0.10 scene exchange',
+      generator: 'Frameforge Studio 0.11 scene exchange',
       ...(scene.source?.copyright ? { copyright: scene.source.copyright } : {}),
     },
     scene: 0,
@@ -1466,6 +1478,7 @@ export async function exportGLBWithAssets(
   frame: number,
   load: (asset: Asset) => Promise<Uint8Array>,
   animated = false,
+  bake?: BakeOptions,
 ) {
   const images = new Map<string, Uint8Array>();
   const entities = project.entities.filter((e) => e.sceneId === sceneId),
@@ -1491,5 +1504,5 @@ export async function exportGLBWithAssets(
       await checkedImage(bytes, asset);
       images.set(asset.id, bytes);
     }
-  return exportGLB(project, sceneId, frame, images, animated);
+  return exportGLB(project, sceneId, frame, images, animated, bake);
 }

@@ -3,6 +3,7 @@ import { applyCommands, type Command } from '../core/commands';
 import { exportGLBWithAssets, importGLTF, type GLTFImport } from '../core/gltf';
 import type { Project } from '../core/model';
 import { download } from './Inspector';
+import { BakePanel } from './BakePanel';
 
 export function SceneExchange({
   project,
@@ -196,7 +197,7 @@ export function SceneExchange({
         <h3>导出当前场景 · 帧 {frame}</h3>
         <p className="muted">
           当前帧 GLB 保存可见对象的静态姿态和材质；动画 GLB 另外保存变换动作。
-          当前帧包含动作层结果；启用动作层的场景暂不支持动画 GLB 烘焙。
+          当前帧包含动作层结果；原始动画 GLB 需禁用层，混合动画可在下方指定范围烘焙。
           时间轴、背景、环境光、阴影和工作流不包含在内；完整作品请使用项目包。
         </p>
         {[false, true].map((animated) => (
@@ -246,6 +247,15 @@ export function SceneExchange({
             ))}
           </ul>
         )}
+        <BakePanel
+          project={project}
+          sceneId={sceneId}
+          frame={frame}
+          disabled={busy || reading}
+          setReading={setReading}
+          onError={setError}
+          send={send}
+        />
         <div className="button-row">
           <button disabled={busy || reading} onClick={onClose}>
             关闭

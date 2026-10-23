@@ -25,6 +25,7 @@ import {
 import { extrudeFace, primitive, subdivide, projectUV } from './geometry';
 import { editTrack, normalizeQuaternion, prepareCubic, activeTracks } from './animation';
 import { unwrappedSourceFrame } from './playback';
+import { bakeAnimation, BakeOptionsSchema } from './bake';
 import { displayColor } from './surface';
 import { deleteElements, extrudeRegion, mergeVertices, transformVertices } from './mesh';
 
@@ -42,6 +43,14 @@ export const CommandSchema = z.discriminatedUnion('type', [
     .strict(),
   z.object({ type: z.literal('action.rename'), id: ID, name: z.string().min(1).max(160) }).strict(),
   z.object({ type: z.literal('action.delete'), id: ID }).strict(),
+  z
+    .object({
+      type: z.literal('action.bake'),
+      action: AnimationActionSchema,
+      options: BakeOptionsSchema,
+      activate: z.boolean(),
+    })
+    .strict(),
   z.object({ type: z.literal('layer.add'), layer: AnimationLayerSchema }).strict(),
   z
     .object({
@@ -289,6 +298,20 @@ function apply(p: Project, c: Command) {
     case 'action.rename':
       get(p.animationActions || [], c.id).name = c.name;
       break;
+    case 'action.bake': {
+      const result = bakeAnimation(p, c.action.sceneId, c.options, c.action);
+      (p.animationActions ||= []).push(result.action);
+      p.animationTracks.push(...result.tracks);
+      if (c.activate) {
+        get(p.scenes, c.action.sceneId).activeActionId = c.action.id;
+        const targets = new Set(
+          p.entities.filter((e) => e.sceneId === c.action.sceneId).map((e) => e.id),
+        );
+        for (const layer of p.animationLayers || [])
+          if (targets.has(layer.entityId)) layer.enabled = false;
+      }
+      break;
+    }
     case 'action.delete': {
       get(p.animationActions || [], c.id);
       if (p.animationLayers?.some((layer) => layer.actionId === c.id))

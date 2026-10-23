@@ -1,0 +1,179 @@
+{
+  "checkedAt": "2026-10-23T10:56:56.374Z",
+  "projectId": "7f3e1155-2fdd-4020-b0be-6c408783a668",
+  "importedProjectId": "b5be28bd-bd55-4ddb-be12-9068dc3cebb7",
+  "jobId": "ac52631b-8bb6-4965-ab45-f63153854070",
+  "browser": "155.0.8059.82",
+  "format": 10,
+  "frames": 48,
+  "stats": {
+    "samples": 101,
+    "tracks": 4,
+    "keys": 404,
+    "entities": 3,
+    "guardedBoundaries": 3,
+    "probes": 900,
+    "errors": {
+      "position": 0.1249999925494194,
+      "rotationDegrees": 7.874999999999966,
+      "scale": 2.1457672083613488e-8
+    }
+  },
+  "validator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 0,
+    "numHints": 0,
+    "messages": [],
+    "truncated": false
+  },
+  "measurements": [
+    {
+      "frame": 0,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 6,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 12,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 16,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 17,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 23,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 24,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 31,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 32,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 35,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 47,
+      "bakeDifference": 0
+    }
+  ],
+  "videoMeasurements": [
+    {
+      "frame": 0,
+      "videoDifference": 0.43210133744855966
+    },
+    {
+      "frame": 6,
+      "videoDifference": 0.420298353909465
+    },
+    {
+      "frame": 12,
+      "videoDifference": 0.41778034979423867
+    },
+    {
+      "frame": 16,
+      "videoDifference": 0.42102880658436215
+    },
+    {
+      "frame": 17,
+      "videoDifference": 0.41760802469135805
+    },
+    {
+      "frame": 23,
+      "videoDifference": 0.4282510288065844
+    },
+    {
+      "frame": 24,
+      "videoDifference": 0.42258487654320986
+    },
+    {
+      "frame": 31,
+      "videoDifference": 0.4251105967078189
+    },
+    {
+      "frame": 32,
+      "videoDifference": 0.4145061728395062
+    },
+    {
+      "frame": 35,
+      "videoDifference": 0.4220601851851852
+    },
+    {
+      "frame": 47,
+      "videoDifference": 0.42648148148148146
+    }
+  ],
+  "roundtrip": [
+    {
+      "frame": 0,
+      "differenceAfterImport": 0.0000051440329218107
+    },
+    {
+      "frame": 6,
+      "differenceAfterImport": 0.000012860082304526749
+    },
+    {
+      "frame": 12,
+      "differenceAfterImport": 0.00000257201646090535
+    },
+    {
+      "frame": 16,
+      "differenceAfterImport": 0.00000771604938271605
+    },
+    {
+      "frame": 17,
+      "differenceAfterImport": 0.00000257201646090535
+    },
+    {
+      "frame": 23,
+      "differenceAfterImport": 0.0000051440329218107
+    },
+    {
+      "frame": 24,
+      "differenceAfterImport": 0.0000102880658436214
+    },
+    {
+      "frame": 31,
+      "differenceAfterImport": 0.0000102880658436214
+    },
+    {
+      "frame": 32,
+      "differenceAfterImport": 0.0000102880658436214
+    },
+    {
+      "frame": 35,
+      "differenceAfterImport": 0.0000051440329218107
+    },
+    {
+      "frame": 47,
+      "differenceAfterImport": 0.0000051440329218107
+    }
+  ],
+  "pageErrors": [],
+  "checks": [
+    "worker cancellation and invalid range leave project unchanged",
+    "UI sampling range step interpolation and rebase",
+    "baked GLB validated and reimported through UI",
+    "save new action retains originals; activation disables layers atomically",
+    "undo redo and reload retain baked keys",
+    "original vs baked vs reimported images",
+    "fixed render snapshot while editing source layers",
+    "portable project retains source and baked actions"
+  ]
+}
