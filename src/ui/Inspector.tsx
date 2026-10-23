@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { evaluatedBaseTransform } from '../core/evaluate';
 import { LayerPanel } from './LayerPanel';
+import { SkinPanel } from './SkinPanel';
 import { activeTracks, rotationProperty, quaternionFromEuler } from '../core/animation';
 import { type Command } from '../core/commands';
 import { type Clip, type Entity, type Project, type Vec3 } from '../core/model';
@@ -300,6 +301,7 @@ export function Inspector({
         <label className="field">
           父对象
           <select
+            aria-label="父对象"
             value={e.parentId || ''}
             onChange={(event) =>
               send(
@@ -382,6 +384,7 @@ export function Inspector({
           ◇ 记录当前变换关键帧
         </button>
         <LayerPanel project={p} entity={e} frame={frame} send={send} />
+        <SkinPanel key={e.id} project={p} entity={e} send={send} />
         {activeTracks(p, e.id).length > 0 && (
           <p className="muted">已有动画属性的修改会更新当前帧关键帧。</p>
         )}

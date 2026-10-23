@@ -17,6 +17,7 @@ import {
   TimelineSchema,
   TransformSchema,
   WorkflowSchema,
+  VertexInfluencesSchema,
   id,
   identity,
   parseProject,
@@ -27,6 +28,7 @@ import { editTrack, normalizeQuaternion, prepareCubic, activeTracks } from './an
 import { unwrappedSourceFrame } from './playback';
 import { bakeAnimation, BakeOptionsSchema } from './bake';
 import { displayColor } from './surface';
+import { bindSkin, normalizedInfluences } from './skin';
 import { deleteElements, extrudeRegion, mergeVertices, transformVertices } from './mesh';
 
 const ID = z.string().min(1).max(80);
@@ -89,7 +91,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z
     .object({
       type: z.literal('entity.create'),
-      kind: z.enum(['box', 'sphere', 'plane', 'cylinder', 'camera', 'light', 'group']),
+      kind: z.enum(['box', 'sphere', 'plane', 'cylinder', 'camera', 'light', 'group', 'joint']),
       sceneId: ID,
     })
     .strict(),
@@ -102,6 +104,23 @@ export const CommandSchema = z.discriminatedUnion('type', [
     .strict(),
   z.object({ type: z.literal('entity.delete'), id: ID }).strict(),
   z.object({ type: z.literal('entity.duplicate'), id: ID }).strict(),
+  z
+    .object({
+      type: z.literal('skin.bind'),
+      entityId: ID,
+      joints: z.array(ID).min(1).max(512),
+      method: z.enum(['nearest', 'first']),
+    })
+    .strict(),
+  z.object({ type: z.literal('skin.unbind'), entityId: ID }).strict(),
+  z
+    .object({
+      type: z.literal('skin.weights'),
+      entityId: ID,
+      indices: MeshIndices,
+      weights: VertexInfluencesSchema,
+    })
+    .strict(),
   z.object({ type: z.literal('geometry.import'), sceneId: ID, geometry: GeometrySchema }).strict(),
   z
     .object({
@@ -366,8 +385,10 @@ function apply(p: Project, c: Command) {
           camera: '摄影机',
           light: '灯光',
           group: '集合',
+          joint: '关节',
         }[c.kind],
-        kind: mesh ? 'mesh' : c.kind,
+        kind: mesh ? 'mesh' : c.kind === 'joint' ? 'group' : c.kind,
+        ...(c.kind === 'joint' ? { joint: true } : {}),
         sceneId: c.sceneId,
         parentId: null,
         visible: true,
@@ -408,6 +429,16 @@ function apply(p: Project, c: Command) {
       }
       if (p.shots.some((s) => removing.has(s.cameraId)))
         throw new Error('摄影机被镜头引用，请先为镜头选择其他摄影机');
+      if (
+        p.entities.some(
+          (e) =>
+            !removing.has(e.id) &&
+            e.skin &&
+            (e.skin.joints.some((id) => removing.has(id)) ||
+              (e.skin.skeletonId && removing.has(e.skin.skeletonId))),
+        )
+      )
+        throw new Error('关节仍被蒙皮引用，请先解绑相关网格或一起删除');
       p.entities = p.entities.filter((e) => !removing.has(e.id));
       p.animationTracks = p.animationTracks.filter((t) => !removing.has(t.entityId));
       p.animationLayers = p.animationLayers?.filter((l) => !removing.has(l.entityId));
@@ -420,7 +451,7 @@ function apply(p: Project, c: Command) {
         e = structuredClone(source);
       e.id = id();
       e.name += ' 副本';
-      e.transform.position[0] += 2.5;
+      if (!e.skin) e.transform.position[0] += 2.5;
       if (e.geometryId) {
         const g = structuredClone(get(p.geometries, e.geometryId));
         g.id = id();
@@ -459,6 +490,34 @@ function apply(p: Project, c: Command) {
         visible: true,
         transform: identity(),
       });
+      break;
+    }
+    case 'skin.bind': {
+      const e = get(p.entities, c.entityId);
+      if (e.kind !== 'mesh') throw new Error('只能绑定网格对象');
+      if (p.entities.some((other) => other.id !== e.id && other.geometryId === e.geometryId)) {
+        const copy = structuredClone(get(p.geometries, e.geometryId!));
+        copy.id = id();
+        p.geometries.push(copy);
+        e.geometryId = copy.id;
+      }
+      e.skin = bindSkin(p, e, c.joints, c.method);
+      break;
+    }
+    case 'skin.unbind':
+      delete get(p.entities, c.entityId).skin;
+      break;
+    case 'skin.weights': {
+      const e = get(p.entities, c.entityId);
+      if (!e.skin) throw new Error('网格尚未绑定骨架');
+      const g = get(p.geometries, e.geometryId!);
+      if (
+        new Set(c.indices).size !== c.indices.length ||
+        c.indices.some((i) => i >= g.positions.length)
+      )
+        throw new Error('顶点选择无效');
+      const weights = normalizedInfluences([c.weights]);
+      for (const i of c.indices) g.influences![i] = structuredClone(weights);
       break;
     }
     case 'geometry.vertex': {

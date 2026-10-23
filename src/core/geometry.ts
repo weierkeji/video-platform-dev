@@ -1,4 +1,5 @@
 import { id, type Geometry, type Vec3 } from './model';
+import { normalizedInfluences } from './skin';
 
 export function primitive(kind: 'box' | 'plane' | 'sphere' | 'cylinder'): Geometry {
   const g: Geometry = { id: id(), name: kind, positions: [], triangles: [] };
@@ -88,6 +89,7 @@ export function subdivide(g: Geometry) {
         pb = g.positions[b];
       edges.set(key, g.positions.length);
       g.positions.push(pa.map((v, i) => (v + pb[i]) / 2) as Vec3);
+      if (g.influences) g.influences.push(normalizedInfluences([g.influences[a], g.influences[b]]));
       for (const uv of [g.uv, g.uv1])
         if (uv) uv.push(uv[a].map((v, i) => (v + uv[b][i]) / 2) as [number, number]);
     }
@@ -120,6 +122,7 @@ export function extrudeFace(g: Geometry, face: number, distance: number) {
   const next = t.map((i) => {
     g.positions.push(g.positions[i].map((v, j) => v + (normal[j] / length) * distance) as Vec3);
     for (const uv of [g.uv, g.uv1]) if (uv) uv.push([...uv[i]]);
+    if (g.influences) g.influences.push(structuredClone(g.influences[i]));
     return g.positions.length - 1;
   });
   g.triangles[face] = next as [number, number, number];
@@ -208,6 +211,7 @@ export function projectUV(g: Geometry, channel: 0 | 1) {
   if (g.normals) g.normals = originals.map((i) => g.normals![i]);
   if (g.uv) g.uv = originals.map((i) => g.uv![i]);
   if (g.uv1) g.uv1 = originals.map((i) => g.uv1![i]);
+  if (g.influences) g.influences = originals.map((i) => structuredClone(g.influences![i]));
   g.positions = positions;
   g.triangles = triangles;
   g[channel === 0 ? 'uv' : 'uv1'] = uv;

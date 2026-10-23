@@ -1,0 +1,78 @@
+{
+  "checkedAt": "2026-10-23T11:46:59.578Z",
+  "projectId": "e62b7754-9ee0-414d-94dc-473b4df112bd",
+  "importedProjectId": "1d1af2de-bfdc-446a-a069-b159ee1a046f",
+  "jobId": "3733fca6-35b8-4546-aff2-bbeb6d15e0aa",
+  "browser": "155.0.8059.82",
+  "format": 11,
+  "frames": 48,
+  "validator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 1,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/7"
+      }
+    ],
+    "truncated": false
+  },
+  "measurements": [
+    {
+      "frame": 0,
+      "difference": 0.0000205761316872428
+    },
+    {
+      "frame": 6.25,
+      "difference": 0.0210570987654321
+    },
+    {
+      "frame": 12,
+      "difference": 0.03792181069958848
+    },
+    {
+      "frame": 24,
+      "difference": 0.050902777777777776
+    },
+    {
+      "frame": 36.5,
+      "difference": 0.02852366255144033
+    },
+    {
+      "frame": 47,
+      "difference": 0.012217078189300411
+    }
+  ],
+  "videoMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0.3950385802469136
+    },
+    {
+      "frame": 12,
+      "difference": 0.39516203703703706
+    },
+    {
+      "frame": 24,
+      "difference": 0.3997299382716049
+    },
+    {
+      "frame": 47,
+      "difference": 0.4194212962962963
+    }
+  ],
+  "pageErrors": [],
+  "checks": [
+    "joint creation hierarchy and animated posing",
+    "bind unbind and undo restore exact source",
+    "vertex weight edit normalization undo redo reload",
+    "editor joints and rest mesh helpers",
+    "animated GLB validation and UI reimport",
+    "fixed render snapshot while editing weights",
+    "portable project preserves skin and weights"
+  ]
+}

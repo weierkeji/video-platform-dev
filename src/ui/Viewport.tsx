@@ -7,6 +7,7 @@ import { TimelineRenderer, TimelineAudio } from '../render/timeline';
 import { type Entity, type Project } from '../core/model';
 import { transformVertices, type MeshSelection } from '../core/mesh';
 import { MeshOverlay, MeshPicker } from '../render/mesh-edit';
+import { JointOverlay } from '../render/joints';
 
 export type ViewportProps = {
   project: Project;
@@ -37,8 +38,11 @@ export function Viewport(props: ViewportProps) {
   const [error, setError] = useState(''),
     [loadingTextures, setLoadingTextures] = useState(false),
     [boxTool, setBoxTool] = useState(false),
+    [showJoints, setShowJoints] = useState(true),
     [box, setBox] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const boxToolRef = useRef(boxTool);
+  const jointsRef = useRef(showJoints);
+  jointsRef.current = showJoints;
   boxToolRef.current = boxTool;
   current.current = props;
   useEffect(() => {
@@ -61,6 +65,7 @@ export function Viewport(props: ViewportProps) {
       gizmo = new TransformControls(cam, canvas.current!);
       controls.current = gizmo;
       let overlay: MeshOverlay | undefined, picker: MeshPicker | undefined;
+      let joints: JointOverlay | undefined;
       let previousLoading = false,
         previousTextureError = '';
       let lastSelection: MeshSelection | null | undefined,
@@ -165,12 +170,14 @@ export function Viewport(props: ViewportProps) {
       const sync = () => {
         if (drag) cancel();
         overlay?.dispose();
+        joints?.dispose();
         overlay = undefined;
         gizmo.detach();
         renderer.setProject(current.current.project, current.current.sceneId);
         renderer.scene.add(grid);
         renderer.scene.add(gizmo.getHelper());
         renderer.scene.add(proxy);
+        joints = new JointOverlay(current.current.project, renderer);
         picker = new MeshPicker(current.current.project, renderer);
         lastSelection = undefined;
       };
@@ -178,16 +185,21 @@ export function Viewport(props: ViewportProps) {
       const syncSelection = () => {
         const p = current.current;
         if (renderer.project !== p.project || renderer.sceneId !== p.sceneId) sync();
-        if (!gizmo.dragging) renderer.evaluate(p.frame, undefined, p.layersPreview);
+        if (!gizmo.dragging)
+          renderer.evaluate(p.frame, undefined, p.layersPreview, p.meshSelection?.entityId);
+        joints?.update(jointsRef.current && !p.meshSelection, p.selected);
         const selected = p.selected ? renderer.objects.get(p.selected) : undefined;
         if (p.meshSelection !== lastSelection || p.meshXray !== lastXray) {
           overlay?.dispose();
           overlay = undefined;
           gizmo.detach();
-          if (p.meshSelection && selected instanceof THREE.Mesh) {
+          const editMesh = p.meshSelection
+            ? renderer.meshObject(p.meshSelection.entityId)
+            : undefined;
+          if (p.meshSelection && editMesh) {
             const geometry = p.project.geometries.find((g) => g.id === p.meshSelection!.geometryId);
             if (geometry)
-              overlay = new MeshOverlay(geometry, selected, p.meshSelection, p.meshXray);
+              overlay = new MeshOverlay(geometry, editMesh, p.meshSelection, p.meshXray);
           }
           lastSelection = p.meshSelection;
           lastXray = p.meshXray;
@@ -301,8 +313,13 @@ export function Viewport(props: ViewportProps) {
           ),
           cam,
         );
+        const jointHits = ray.intersectObjects(joints?.pickables() || [], false);
+        if (jointHits[0]) {
+          current.current.select(jointHits[0].object.userData.entityId);
+          return;
+        }
         const hits = ray.intersectObjects(
-          [...renderer.objects.values()].filter((o) => {
+          renderer.meshes().filter((o) => {
             let current: THREE.Object3D | null = o;
             while (current) {
               if (!current.visible) return false;
@@ -363,8 +380,9 @@ export function Viewport(props: ViewportProps) {
           ? overlay?.vertices.length && Math.abs(overlay.mesh.matrixWorld.determinant()) > 1e-12
             ? proxy
             : undefined
-          : p.layersPreview &&
-              p.project.animationLayers?.some((l) => l.entityId === p.selected && l.enabled)
+          : p.project.entities.find((e) => e.id === p.selected)?.skin ||
+              (p.layersPreview &&
+                p.project.animationLayers?.some((l) => l.entityId === p.selected && l.enabled))
             ? undefined
             : selected;
         if (target && gizmo.object !== target) gizmo.attach(target);
@@ -406,6 +424,7 @@ export function Viewport(props: ViewportProps) {
         canvas.current?.removeEventListener('pointercancel', cancel, true);
         canvas.current?.removeEventListener('pointerup', pick);
         overlay?.dispose();
+        joints?.dispose();
         gizmo.detach();
         gizmo.dispose();
         orbit.dispose();
@@ -482,6 +501,15 @@ export function Viewport(props: ViewportProps) {
       </div>
       {props.view === 'scene' && (
         <div className="view-actions">
+          <label>
+            <input
+              type="checkbox"
+              aria-label="显示关节"
+              checked={showJoints}
+              onChange={(e) => setShowJoints(e.target.checked)}
+            />
+            显示关节
+          </label>
           {props.meshSelection && (
             <>
               <button className={boxTool ? 'active' : ''} onClick={() => setBoxTool(!boxTool)}>

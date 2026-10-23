@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { GenerationOptionsSchema, GenerationRequestSchema } from './generation';
 import { validateTrack } from './animation';
 
-export const PROJECT_VERSION = 10;
+export const PROJECT_VERSION = 11;
 
 export const id = () => crypto.randomUUID();
 const ID = z
@@ -74,11 +74,46 @@ export const identity = () => ({
   rotation: [0, 0, 0] as Vec3,
   scale: [1, 1, 1] as Vec3,
 });
+export const InfluenceSchema = z
+  .object({
+    joint: z.number().int().min(0).max(511),
+    weight: z.number().finite().positive().max(1),
+  })
+  .strict();
+export const VertexInfluencesSchema = z.array(InfluenceSchema).min(1).max(32);
+export type VertexInfluences = z.infer<typeof VertexInfluencesSchema>;
+const BindMatrixSchema = z
+  .array(NumberValue)
+  .length(16)
+  .transform((m, ctx) => {
+    // Old native inversions can leave a few ulps in the homogeneous row. Keep
+    // those saved projects readable, but do not accept projective matrices.
+    if (
+      Math.max(Math.abs(m[3]), Math.abs(m[7]), Math.abs(m[11]), Math.abs(m[15] - 1)) >
+      Number.EPSILON * 32
+    ) {
+      ctx.addIssue({ code: 'custom', message: '逆绑定矩阵必须为仿射矩阵' });
+      return z.NEVER;
+    }
+    const affine = [...m];
+    affine[3] = affine[7] = affine[11] = 0;
+    affine[15] = 1;
+    return affine;
+  });
+export const SkinSchema = z
+  .object({
+    joints: z.array(ID).min(1).max(512),
+    inverseBindMatrices: z.array(BindMatrixSchema).min(1).max(512),
+    skeletonId: ID.optional(),
+  })
+  .strict();
+export type Skin = z.infer<typeof SkinSchema>;
 export const GeometrySchema = z
   .object({
     id: ID,
     name: Name,
     positions: z.array(Vec3Schema).max(100000),
+    influences: z.array(VertexInfluencesSchema).max(100000).optional(),
     normals: z.array(Vec3Schema).max(100000).optional(),
     tangents: z
       .array(
@@ -166,6 +201,8 @@ export const EntitySchema = z
     materialId: ID.optional(),
     camera: CameraSchema.optional(),
     light: LightSchema.optional(),
+    joint: z.boolean().optional(),
+    skin: SkinSchema.optional(),
   })
   .strict();
 export type Entity = z.infer<typeof EntitySchema>;
@@ -487,9 +524,15 @@ export function parseProject(input: unknown): Project {
   for (const asset of p.assets)
     if (!asset.mime.startsWith(asset.kind + '/')) throw new Error('素材 MIME 与类型不匹配');
   for (const g of p.geometries) {
-    for (const attr of [g.normals, g.tangents, g.uv, g.uv1])
+    for (const attr of [g.normals, g.tangents, g.uv, g.uv1, g.influences])
       if (attr && attr.length !== g.positions.length)
         throw new Error(`顶点属性长度不匹配：${g.name}`);
+    for (const row of g.influences || []) {
+      if (new Set(row.map((v) => v.joint)).size !== row.length)
+        throw new Error(`同一顶点不能重复引用关节：${g.name}`);
+      if (Math.abs(row.reduce((sum, v) => sum + v.weight, 0) - 1) > 1e-6)
+        throw new Error(`顶点权重必须归一化：${g.name}`);
+    }
     if (g.normals?.some((n) => Math.abs(Math.hypot(...n) - 1) > 0.001))
       throw new Error(`顶点法线必须归一化：${g.name}`);
     if (
@@ -541,6 +584,37 @@ export function parseProject(input: unknown): Project {
     }
   }
   const paths = new Set<string>();
+  for (const e of p.entities)
+    if (e.skin) {
+      const skin = e.skin,
+        g = p.geometries.find((g) => g.id === e.geometryId);
+      if (e.kind !== 'mesh' || !g?.influences) throw new Error('蒙皮绑定必须引用具有权重的网格');
+      if (
+        new Set(skin.joints).size !== skin.joints.length ||
+        skin.inverseBindMatrices.length !== skin.joints.length
+      )
+        throw new Error('蒙皮关节重复或逆绑定矩阵数量不匹配');
+      const chain = (jointId: string) => {
+        const result = new Set<string>();
+        let joint = entities.get(jointId);
+        if (!joint || joint.sceneId !== e.sceneId) throw new Error('蒙皮关节必须属于同一场景');
+        while (joint) {
+          result.add(joint.id);
+          joint = joint.parentId ? entities.get(joint.parentId) : undefined;
+        }
+        return result;
+      };
+      const chains = skin.joints.map(chain);
+      if (![...chains[0]].some((a) => chains.every((c) => c.has(a))))
+        throw new Error('蒙皮关节必须具有公共根节点');
+      if (skin.skeletonId && !chains.every((c) => c.has(skin.skeletonId!)))
+        throw new Error('骨架根必须是所有关节的祖先或关节本身');
+      for (const m of skin.inverseBindMatrices)
+        if (m[3] !== 0 || m[7] !== 0 || m[11] !== 0 || m[15] !== 1)
+          throw new Error('逆绑定矩阵必须为仿射矩阵');
+      if (g.influences.some((row) => row.some((v) => v.joint >= skin.joints.length)))
+        throw new Error('顶点权重的关节索引超出绑定范围');
+    }
   const actions = new Map((p.animationActions || []).map((a) => [a.id, a]));
   for (const a of actions.values())
     if (!scenes.has(a.sceneId)) throw new Error('动画动作所属场景不存在');
@@ -643,7 +717,7 @@ export function migrateProject(input: unknown) {
     typeof input !== 'object' ||
     !input ||
     !('schemaVersion' in input) ||
-    ![1, 2, 3, 4, 5, 6, 7, 8, 9, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
+    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
     typeof input.schemaVersion !== 'number'
   )
     throw new Error('不支持此项目版本；原文件未修改');

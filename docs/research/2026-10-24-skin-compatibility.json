@@ -1,0 +1,9 @@
+{
+  "checkedAt": "2026-10-23T18:16:33.527Z",
+  "snapshots": 1865,
+  "matrices": 372,
+  "rounded": 210,
+  "maxDelta": 1.1102230246251565e-16,
+  "databaseAccess": "read-only",
+  "result": "All snapshots parse; only machine-precision homogeneous-row roundoff canonicalized in memory; no database writes."
+}

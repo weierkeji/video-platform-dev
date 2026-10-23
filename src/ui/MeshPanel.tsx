@@ -11,6 +11,7 @@ import {
 import type { Geometry, Project, Vec3 } from '../core/model';
 import { exportOBJ } from '../core/geometry';
 import { download, VectorInput } from './Inspector';
+import { SkinWeights } from './SkinPanel';
 
 export function MeshPanel({
   project,
@@ -50,6 +51,12 @@ export function MeshPanel({
         网格组件 <button onClick={() => onMode('object')}>完成编辑</button>
       </div>
       <div className="inspector-body mesh-panel">
+        <SkinWeights
+          project={project}
+          entity={project.entities.find((e) => e.id === selection.entityId)!}
+          vertices={vertices}
+          send={send}
+        />
         {g.normals && <p className="muted">修改网格会重算导入法线；撤销可恢复。</p>}
         {g.uv && (
           <p className="muted">

@@ -38,3 +38,5 @@ glTF 解析/序列化由本仓库按公开格式独立实现；Three.js 负责�
 0.10 没有新增依赖或修改第三方源码。对象动作层、权重包络、顺序/通道和增量规格为自主实现；基础四元数相乘/求逆使用 Three.js，球面插值复用本项目求值。Blender 4.5 NLA 手册与 4.4 API 文档仅作公开行为参照，不执行 bpy；缩放增量规格不同于 Blender Combine。`object-layers` 使用已有原创长方体和新编写的动作、层与摄影机数据，自身渲染输出；检查参考使用手算姿态和 Three.js 数学，无外部人物/动画素材。
 
 0.11 没有新增依赖或修改第三方源码。采样事件映射、精度拒绝、边界保护、探测误差和新动作命令为本仓库实现；GUI Worker 来自浏览器基础能力。Blender 4.5 Bake Action 文档仅作行为参照，glTF 2.0 语义来自 Khronos；Three.js 加载器/AnimationMixer 和 gltf-validator 用作独立读取/格式检查，不是自研。`baked-layers` 源自已有原创作品，新写保持段/往返调度，经本平台烘焙、重导入及渲染，无外部素材或模型调用。
+
+0.12 没有新增依赖或修改第三方源码。蒙皮数据、命令、权重/拓扑传播、CPU 线性混合与编辑辅助为本仓库实现；矩阵/向量运算和最终显示仍来自 Three.js。Khronos glTF 2.0 规范/Skins 教程、Blender 4.5 Armature 文档仅提供公开行为依据，未复制其资源、角色、动画或求解实现。使用已安装 Three.js GLTFLoader 源码核对缺法线时的平面着色行为，并以其 SkinnedMesh/AnimationMixer 独立核对顶点；其实现不属于自研。`scripts/skin-fixture.ts` 自行生成分段柱体、关节、权重和运动，`skin-sculpture` / `skin-pose` 由本平台输出，无外部素材或模型调用。

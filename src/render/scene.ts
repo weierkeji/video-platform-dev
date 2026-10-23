@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { evaluatedTransform } from '../core/evaluate';
-import { type Entity, type Project } from '../core/model';
+import { type Entity, type Geometry, type Project } from '../core/model';
+import { deformGeometry } from '../core/skin';
 import { linearColor, surfaceGeometry, surfaceMaterial } from '../core/surface';
 import { TextureBank } from './textures';
 
@@ -8,6 +9,17 @@ export class SceneRenderer {
   renderer: THREE.WebGLRenderer;
   scene = new THREE.Scene();
   objects = new Map<string, THREE.Object3D>();
+  private skins = new Map<string, { mesh: THREE.Mesh; source: Geometry; key: string }>();
+  meshObject(id: string) {
+    const object = this.skins.get(id)?.mesh || this.objects.get(id);
+    return object instanceof THREE.Mesh ? object : undefined;
+  }
+  meshes() {
+    return [...this.objects.keys()].flatMap((id) => {
+      const m = this.meshObject(id);
+      return m ? [m] : [];
+    });
+  }
   project: Project | null = null;
   sceneId = '';
   loading = false;
@@ -60,6 +72,27 @@ export class SceneRenderer {
           tasks.push(textures.apply(material, m));
         object.castShadow = true;
         object.receiveShadow = true;
+        if (e.skin) {
+          const mesh = object as THREE.Mesh;
+          mesh.name = e.name;
+          mesh.userData.entityId = e.id;
+          mesh.userData.deformed = true;
+          mesh.matrixAutoUpdate = false;
+          const normal = geometry.getAttribute('normal');
+          const source = {
+            ...g,
+            normals:
+              g.normals ||
+              Array.from(
+                { length: normal.count },
+                (_, i) =>
+                  [normal.getX(i), normal.getY(i), normal.getZ(i)] as [number, number, number],
+              ),
+          };
+          this.skins.set(e.id, { mesh, source, key: '' });
+          this.scene.add(mesh);
+          object = new THREE.Group();
+        }
       } else if (e.kind === 'camera')
         object = new THREE.PerspectiveCamera(
           e.camera!.fov,
@@ -113,7 +146,7 @@ export class SceneRenderer {
       });
     void this.pending.catch(() => {});
   }
-  evaluate(frame: number, actionId?: string | null, layers = true) {
+  evaluate(frame: number, actionId?: string | null, layers = true, restEntityId?: string) {
     if (!this.project) return;
     for (const e of this.project.entities.filter((e) => e.sceneId === this.sceneId)) {
       const t = evaluatedTransform(this.project, e, frame, actionId, layers),
@@ -124,6 +157,41 @@ export class SceneRenderer {
       o.scale.fromArray(t.scale);
     }
     this.scene.updateMatrixWorld(true);
+    const world = new Map([...this.objects].map(([id, o]) => [id, o.matrixWorld]));
+    for (const [id, entry] of this.skins) {
+      const entity = this.project.entities.find((e) => e.id === id)!,
+        node = this.objects.get(id)!;
+      const rest = restEntityId === id;
+      let visible = true;
+      for (let o: THREE.Object3D | null = node; o; o = o.parent) visible &&= o.visible;
+      entry.mesh.visible = visible;
+      entry.mesh.userData.deformed = !rest;
+      if (rest) entry.mesh.matrix.copy(node.matrixWorld);
+      else entry.mesh.matrix.identity();
+      entry.mesh.updateMatrixWorld(true);
+      const key = rest
+        ? 'rest'
+        : entity.skin!.joints.map((id) => world.get(id)!.elements.join(',')).join(';');
+      if (key === entry.key) continue;
+      entry.key = key;
+      const g = rest ? entry.source : deformGeometry(entry.source, entity.skin!, world);
+      const geometry = entry.mesh.geometry;
+      const positions = geometry.getAttribute('position') as THREE.BufferAttribute;
+      g.positions.forEach((v, i) => positions.setXYZ(i, ...v));
+      positions.needsUpdate = true;
+      if (g.normals) {
+        const normals = geometry.getAttribute('normal') as THREE.BufferAttribute;
+        g.normals.forEach((v, i) => normals.setXYZ(i, ...v));
+        normals.needsUpdate = true;
+      }
+      if (g.tangents && geometry.hasAttribute('tangent')) {
+        const tangents = geometry.getAttribute('tangent') as THREE.BufferAttribute;
+        g.tangents.forEach((v, i) => tangents.setXYZW(i, ...v));
+        tangents.needsUpdate = true;
+      }
+      geometry.computeBoundingSphere();
+      geometry.computeBoundingBox();
+    }
   }
   render(camera: THREE.Camera, width: number, height: number) {
     if (this.textureError) throw new Error(this.textureError);
@@ -151,6 +219,11 @@ export class SceneRenderer {
       if (o instanceof THREE.Light) o.dispose();
     }
     this.scene.clear();
+    for (const { mesh } of this.skins.values()) {
+      mesh.geometry.dispose();
+      for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) m.dispose();
+    }
+    this.skins.clear();
     this.objects.clear();
     this.project = null;
     this.sceneId = '';

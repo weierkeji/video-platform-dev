@@ -1,6 +1,6 @@
 {
   "name": "frameforge-studio",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -24,6 +24,7 @@
     "smoke:playback": "tsx scripts/playback-smoke.ts",
     "smoke:layers": "tsx scripts/layers-smoke.ts",
     "smoke:bake": "tsx scripts/bake-smoke.ts",
+    "smoke:skin": "tsx scripts/skin-smoke.ts",
     "format": "prettier --write src server scripts tests index.html vite.config.ts tsconfig.json package.json .prettierrc.json"
   },
   "dependencies": {

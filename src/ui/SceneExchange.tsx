@@ -86,7 +86,8 @@ export function SceneExchange({
         </p>
         <p className="muted">
           支持 PNG/JPEG/WebP 图片、五类基础贴图和 UV
-          变换。动画保留非整帧时间、四元数、STEP/LINEAR/CUBICSPLINE；顶点色、骨骼、形态键、聚光灯等仍未接入。
+          变换。动画保留非整帧时间、四元数、STEP/LINEAR/CUBICSPLINE；支持关节、逆绑定矩阵及每顶点最多
+          32 个线性混合影响。顶点色、形态键、聚光灯等仍未接入。
           选择文件时需包含同目录资源；资源在子目录时请选择整个文件夹。合计上限 50 MB。
         </p>
         <input
@@ -141,6 +142,10 @@ export function SceneExchange({
               {result.command.animationActions?.length || 0} 个动作 ·{' '}
               {result.command.animationTracks?.length || 0}{' '}
               条动画轨道，可在场景的动画动作菜单中选择。
+            </p>
+            <p>
+              {result.command.entities.filter((e) => e.skin).length}{' '}
+              个蒙皮网格，导入后可继续编辑关节和顶点权重。
             </p>
             <ul>
               {result.notes.map((note) => (

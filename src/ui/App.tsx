@@ -513,7 +513,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.11</small>
+            FRAMEFORGE<small>创作工作台 · 0.12</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -668,6 +668,7 @@ export function App() {
               <option value="camera">摄影机</option>
               <option value="light">灯光</option>
               <option value="group">集合</option>
+              <option value="joint">关节</option>
             </select>
             <button onClick={() => objInput.current?.click()}>OBJ</button>
             <button
@@ -691,7 +692,7 @@ export function App() {
                   style={{ paddingLeft: x.parentId ? 28 : 12 }}
                 >
                   <span className={'kind-icon ' + x.kind}>
-                    {{ mesh: '◇', camera: '▣', light: '☼', group: '▧' }[x.kind]}
+                    {x.joint ? '●' : { mesh: '◇', camera: '▣', light: '☼', group: '▧' }[x.kind]}
                   </span>
                   <span>{x.name}</span>
                   <small>{x.visible ? '' : '隐藏'}</small>

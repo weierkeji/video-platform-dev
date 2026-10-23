@@ -1158,6 +1158,44 @@ pre {
   margin: 0;
   padding: 0;
 }
+.skin-panel,
+.skin-weights {
+  margin: 12px 0;
+  font-size: 12px;
+}
+.skin-joints {
+  max-height: 180px;
+  overflow: auto;
+  margin: 8px 0;
+}
+.skin-joints .check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+.skin-weight-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0;
+}
+.skin-weight-row select {
+  min-width: 0;
+  flex: 1;
+}
+.skin-weight-row .field {
+  margin: 0;
+}
+.skin-weight-row .field span {
+  display: none;
+}
+.skin-weight-row input {
+  width: 60px;
+}
+.skin-weights .button-row {
+  flex-wrap: wrap;
+}
 .bake-range {
   display: flex;
   flex-wrap: wrap;

@@ -1,0 +1,38 @@
+{
+  "checkedAt": "2026-10-23T18:36:21.110Z",
+  "projectId": "ec76ece5-ba0b-402b-ae59-a089bbeb3a30",
+  "schemaVersion": 11,
+  "storedLastElements": [
+    0.9999999999999999,
+    0.9999999999999999,
+    1,
+    1
+  ],
+  "exports": [
+    {
+      "sceneId": "3acfbf2c-f40c-4948-9b83-9bfb8f0548b0",
+      "animated": false,
+      "errors": 0,
+      "warnings": 0
+    },
+    {
+      "sceneId": "3acfbf2c-f40c-4948-9b83-9bfb8f0548b0",
+      "animated": true,
+      "errors": 0,
+      "warnings": 0
+    },
+    {
+      "sceneId": "6ec70557-913a-4053-8edf-39e3a1e191b0",
+      "animated": false,
+      "errors": 0,
+      "warnings": 0
+    },
+    {
+      "sceneId": "6ec70557-913a-4053-8edf-39e3a1e191b0",
+      "animated": true,
+      "errors": 0,
+      "warnings": 0
+    }
+  ],
+  "result": "Read-only API GET retains stored values; project parse and command on a copy canonicalize roundoff; raw project exports validate; no API writes or source mutation."
+}

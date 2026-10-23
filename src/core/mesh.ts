@@ -1,4 +1,5 @@
 import type { Geometry, Vec3 } from './model';
+import { normalizedInfluences } from './skin';
 
 export type MeshMode = 'vertex' | 'edge' | 'face';
 export type MeshSelection = {
@@ -117,6 +118,7 @@ function removeVertices(g: Geometry, removing: Set<number>) {
   const remap = new Map<number, number>();
   if (g.uv) g.uv = g.uv.filter((_, i) => !removing.has(i));
   if (g.uv1) g.uv1 = g.uv1.filter((_, i) => !removing.has(i));
+  if (g.influences) g.influences = g.influences.filter((_, i) => !removing.has(i));
   delete g.normals;
   delete g.tangents;
   g.positions = g.positions.filter((_, i) => {
@@ -152,6 +154,8 @@ export function mergeVertices(g: Geometry, indices: number[]) {
     target = indices.reduce((a, b) => Math.min(a, b)),
     center = vertexCenter(g, indices);
   g.positions[target] = center;
+  if (g.influences)
+    g.influences[target] = normalizedInfluences(indices.map((i) => g.influences![i]));
   const seen = new Set<string>();
   g.triangles = g.triangles
     .map((t) => t.map((i) => (selected.has(i) ? target : i)) as [number, number, number])
@@ -215,6 +219,7 @@ export function extrudeRegion(g: Geometry, faces: number[], offset: Vec3) {
     remap.set(i, g.positions.length);
     g.positions.push(g.positions[i].map((v, a) => v + offset[a]) as Vec3);
     for (const uv of [g.uv, g.uv1]) if (uv) uv.push([...uv[i]]);
+    if (g.influences) g.influences.push(structuredClone(g.influences[i]));
   }
   for (const face of faces)
     g.triangles[face] = g.triangles[face].map((i) => remap.get(i)!) as [number, number, number];

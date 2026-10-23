@@ -154,9 +154,14 @@ export class MeshPicker {
   private trees = new Map<string, MeshTree>();
   constructor(
     private project: Project,
-    private renderer: Pick<SceneRenderer, 'objects'>,
+    private renderer: Pick<SceneRenderer, 'objects'> & Partial<Pick<SceneRenderer, 'meshes'>>,
   ) {}
   private hit(ray: THREE.Ray, mesh: THREE.Mesh) {
+    if (mesh.userData.deformed) {
+      const caster = new THREE.Raycaster(ray.origin, ray.direction);
+      const hit = caster.intersectObject(mesh, false)[0];
+      return hit ? { distance: hit.distance, point: hit.point, face: hit.faceIndex! } : null;
+    }
     const e = this.project.entities.find((e) => e.id === mesh.userData.entityId)!;
     if (!e?.geometryId) return null;
     let tree = this.trees.get(e.geometryId);
@@ -171,7 +176,7 @@ export class MeshPicker {
     const origin = new THREE.Vector3(ndc.x, ndc.y, -1).unproject(camera),
       distance = point.distanceTo(origin);
     const ray = new THREE.Ray(origin, point.clone().sub(origin).normalize());
-    for (const o of this.renderer.objects.values())
+    for (const o of this.renderer.meshes?.() || this.renderer.objects.values())
       if (o instanceof THREE.Mesh && visible(o)) {
         const hit = this.hit(ray, o);
         if (hit && hit.distance < distance - Math.max(0.0001, distance * 1e-5)) return true;

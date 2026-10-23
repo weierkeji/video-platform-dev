@@ -22,6 +22,7 @@ import { animationSampler } from './animation-exchange';
 import { bakedProject, type BakeOptions } from './bake';
 import { normalizeQuaternion, validateTrack } from './animation';
 import { displayColor, linearColor, surfaceGeometry } from './surface';
+import { deformGeometry, normalizedInfluences, worldMatrices } from './skin';
 
 // Independent bounded format mapping. No external URI requests and no runtime product dependency.
 const integer = z.number().int().nonnegative().max(100000000);
@@ -209,7 +210,16 @@ const documentSchema = base.extend({
     )
     .max(100)
     .default([]),
-  skins: z.array(z.unknown()).default([]),
+  skins: z
+    .array(
+      base.extend({
+        joints: z.array(integer).min(1).max(512),
+        inverseBindMatrices: integer.optional(),
+        skeleton: integer.optional(),
+      }),
+    )
+    .max(2000)
+    .default([]),
   extensionsRequired: z.array(z.string()).default([]),
   extensionsUsed: z.array(z.string()).default([]),
 });
@@ -421,6 +431,9 @@ function accessors(doc: Document, buffers: Uint8Array[]) {
       | 'TEXCOORD_0'
       | 'TEXCOORD_1'
       | 'TANGENT'
+      | 'JOINTS'
+      | 'WEIGHTS'
+      | 'bind'
       | 'indices'
       | 'time'
       | 'translation'
@@ -429,29 +442,33 @@ function accessors(doc: Document, buffers: Uint8Array[]) {
   ) => {
     const a = at(doc.accessors, index, 'accessor'),
       width =
-        semantic === 'indices' || semantic === 'time'
-          ? 1
-          : semantic.startsWith('TEXCOORD_')
-            ? 2
-            : semantic === 'TANGENT' || semantic === 'rotation'
-              ? 4
-              : 3;
-    if (a.type !== (width === 1 ? 'SCALAR' : `VEC${width}`) || a.count < 1)
+        semantic === 'bind'
+          ? 16
+          : semantic === 'indices' || semantic === 'time'
+            ? 1
+            : semantic.startsWith('TEXCOORD_')
+              ? 2
+              : ['TANGENT', 'rotation', 'JOINTS', 'WEIGHTS'].includes(semantic)
+                ? 4
+                : 3;
+    if (a.type !== (width === 16 ? 'MAT4' : width === 1 ? 'SCALAR' : `VEC${width}`) || a.count < 1)
       throw new Error(`glTF ${semantic} accessor 形状无效`);
     if (
-      semantic === 'indices'
-        ? ![5121, 5123, 5125].includes(a.componentType) || a.normalized
-        : semantic === 'rotation'
-          ? !(
-              (a.componentType === 5126 && !a.normalized) ||
-              ([5120, 5121, 5122, 5123].includes(a.componentType) && a.normalized)
-            )
-          : semantic.startsWith('TEXCOORD_')
+      semantic === 'JOINTS'
+        ? ![5121, 5123].includes(a.componentType) || a.normalized
+        : semantic === 'indices'
+          ? ![5121, 5123, 5125].includes(a.componentType) || a.normalized
+          : semantic === 'rotation'
             ? !(
                 (a.componentType === 5126 && !a.normalized) ||
-                ([5121, 5123].includes(a.componentType) && a.normalized)
+                ([5120, 5121, 5122, 5123].includes(a.componentType) && a.normalized)
               )
-            : a.componentType !== 5126 || a.normalized
+            : semantic.startsWith('TEXCOORD_') || semantic === 'WEIGHTS'
+              ? !(
+                  (a.componentType === 5126 && !a.normalized) ||
+                  ([5121, 5123].includes(a.componentType) && a.normalized)
+                )
+              : a.componentType !== 5126 || a.normalized
     )
       unsupported(`${semantic} 的分量编码（量化扩展尚未接入）`);
     if (cache.has(index)) return cache.get(index)!;
@@ -538,7 +555,6 @@ export async function importGLTF(
   const unpacked = unpackGLTF(bytes),
     doc = documentSchema.parse(unpacked.json),
     notes = new Set(unpacked.notes);
-  if (doc.skins.length || doc.nodes.some((n) => n.skin !== undefined)) unsupported('骨骼蒙皮');
   if (
     doc.nodes.some((n) => n.weights !== undefined) ||
     doc.meshes.some((m) => m.weights !== undefined || m.primitives.some((p) => p.targets?.length))
@@ -708,7 +724,10 @@ export async function importGLTF(
       p = at(mesh.primitives, primitiveIndex, 'primitive');
     if (![4, 5, 6].includes(p.mode)) unsupported('点或线图元');
     for (const attribute of Object.keys(p.attributes))
-      if (!['POSITION', 'NORMAL', 'TEXCOORD_0', 'TEXCOORD_1', 'TANGENT'].includes(attribute))
+      if (
+        !['POSITION', 'NORMAL', 'TEXCOORD_0', 'TEXCOORD_1', 'TANGENT'].includes(attribute) &&
+        !/^(JOINTS|WEIGHTS)_[0-7]$/.test(attribute)
+      )
         unsupported(`顶点属性 ${attribute}`);
     const positions = read(p.attributes.POSITION, 'POSITION').map((r) => [...r] as Vec3);
     vertices += positions.length;
@@ -748,6 +767,26 @@ export async function importGLTF(
       positions,
       triangles,
     };
+    const sets = Object.keys(p.attributes).filter((a) => a.startsWith('JOINTS_')).length;
+    if (sets !== Object.keys(p.attributes).filter((a) => a.startsWith('WEIGHTS_')).length)
+      throw new Error('glTF JOINTS/WEIGHTS 集合数量不一致');
+    if (sets) {
+      g.influences = positions.map(() => []);
+      for (let set = 0; set < sets; set++) {
+        const joints = read(p.attributes[`JOINTS_${set}`], 'JOINTS'),
+          weights = read(p.attributes[`WEIGHTS_${set}`], 'WEIGHTS');
+        if (joints.length !== positions.length || weights.length !== positions.length)
+          throw new Error('glTF 蒙皮属性顶点数不一致');
+        joints.forEach((row, i) =>
+          row.forEach((joint, j) => {
+            const weight = weights[i][j];
+            if (weight < 0 || weight > 1) throw new Error('glTF 权重超出 0…1');
+            // Preserve zero entries until binding checks their indices as required by glTF.
+            g.influences![i].push({ joint, weight });
+          }),
+        );
+      }
+    }
     if (p.attributes.NORMAL !== undefined)
       g.normals = read(p.attributes.NORMAL, 'NORMAL').map((r) => [...r] as Vec3);
     else notes.add('缺少法线的图元按平面着色显示。');
@@ -792,6 +831,7 @@ export async function importGLTF(
     : [];
   const visitedAll = new Set<number>();
   const sceneNodes: { sceneId: string; nodes: Map<number, string> }[] = [];
+  const jointNodes = new Set(doc.skins.flatMap((s) => s.joints));
   doc.scenes.forEach((source, sceneIndex) => {
     const scene: Project['scenes'][number] = {
       id: id(),
@@ -808,6 +848,7 @@ export async function importGLTF(
     const nodes = new Map<number, string>();
     sceneNodes.push({ sceneId: scene.id, nodes });
     const visited = new Set<number>();
+    const pendingSkins: { entity: Entity; skinIndex: number }[] = [];
     const visit = (index: number, parentId: string | null, depth: number) => {
       if (depth > 128) throw new Error('glTF 对象层级超过 128 层');
       if (visited.has(index)) throw new Error('glTF 场景存在循环或重复父级');
@@ -822,6 +863,7 @@ export async function importGLTF(
         kind: 'group',
         visible: true,
         transform: nodeTransform(node),
+        ...(jointNodes.has(index) ? { joint: true } : {}),
       };
       command.entities.push(e);
       nodes.set(index, e.id);
@@ -843,12 +885,16 @@ export async function importGLTF(
           name: name(`${e.name} · ${suffix}`, suffix),
           transform: identity(),
         };
+        delete c.joint;
         command.entities.push(c);
         return c;
       };
-      mesh?.primitives.forEach((_, i) =>
-        Object.assign(child(`网格 ${i + 1}`), { kind: 'mesh', ...meshPrimitive(node.mesh!, i) }),
-      );
+      if (node.skin !== undefined && !mesh) throw new Error('glTF skin 节点缺少网格');
+      mesh?.primitives.forEach((_, i) => {
+        const entity = child(`网格 ${i + 1}`);
+        Object.assign(entity, { kind: 'mesh', ...meshPrimitive(node.mesh!, i) });
+        if (node.skin !== undefined) pendingSkins.push({ entity, skinIndex: node.skin });
+      });
       if (node.camera !== undefined) {
         const camera = at(doc.cameras, node.camera, 'camera');
         if (camera.type !== 'perspective' || !camera.perspective) unsupported('正交摄影机');
@@ -884,7 +930,43 @@ export async function importGLTF(
       node.children.forEach((c) => visit(c, e.id, depth + 1));
     };
     source.nodes.forEach((i) => visit(i, null, 0));
+    for (const { entity, skinIndex } of pendingSkins) {
+      const skin = at(doc.skins, skinIndex, 'skin');
+      const mapNode = (index: number) => {
+        const id = nodes.get(index);
+        if (!id) throw new Error('glTF 骨架节点必须属于网格所在场景');
+        return id;
+      };
+      const matrices =
+        skin.inverseBindMatrices === undefined
+          ? skin.joints.map(() => new Matrix4().toArray())
+          : read(skin.inverseBindMatrices, 'bind');
+      if (matrices.length < skin.joints.length) throw new Error('glTF 逆绑定矩阵不足');
+      if (matrices.some((m) => m[3] !== 0 || m[7] !== 0 || m[11] !== 0 || m[15] !== 1))
+        throw new Error('glTF 逆绑定矩阵末行必须是 [0, 0, 0, 1]');
+      entity.skin = {
+        joints: skin.joints.map(mapNode),
+        inverseBindMatrices: matrices.slice(0, skin.joints.length).map((m) => [...m]),
+        ...(skin.skeleton !== undefined ? { skeletonId: mapNode(skin.skeleton) } : {}),
+      };
+      const g = command.geometries.find((g) => g.id === entity.geometryId)!;
+      if (!g.influences) throw new Error('glTF 蒙皮网格缺少 JOINTS/WEIGHTS');
+      for (const row of g.influences) {
+        if (row.some((v) => v.joint >= skin.joints.length)) throw new Error('glTF 关节索引越界');
+      }
+    }
   });
+  for (const g of command.geometries)
+    if (g.influences) {
+      g.influences = g.influences.map((row) => {
+        const positive = row.filter((v) => v.weight > 0);
+        if (new Set(positive.map((v) => v.joint)).size !== positive.length)
+          throw new Error('glTF 同一顶点重复引用关节');
+        const sum = positive.reduce((s, v) => s + v.weight, 0);
+        if (Math.abs(sum - 1) > 0.001) throw new Error('glTF 顶点权重未归一化');
+        return normalizedInfluences([positive]);
+      });
+    }
   let animationKeys = 0;
   for (const [animationIndex, animation] of doc.animations.entries()) {
     const used = new Set<string>();
@@ -1045,7 +1127,18 @@ export function exportGLB(
     );
   const visible = (e: Entity): boolean =>
     e.visible && (!e.parentId || visible(byId.get(e.parentId)!));
-  const included = entities.filter(visible),
+  const required = new Set<string>();
+  if (animated)
+    for (const e of entities.filter(visible))
+      if (e.skin)
+        for (const id of [...e.skin.joints, ...(e.skin.skeletonId ? [e.skin.skeletonId] : [])]) {
+          let joint = byId.get(id);
+          while (joint) {
+            required.add(joint.id);
+            joint = joint.parentId ? byId.get(joint.parentId) : undefined;
+          }
+        }
+  const included = entities.filter((e) => visible(e) || required.has(e.id)),
     nodeIndex = new Map(included.map((e, i) => [e.id, i]));
   const notes = [
     animated
@@ -1054,7 +1147,8 @@ export function exportGLB(
     '位置、法线和 UV 以 Float32 编码。',
     ...bakeNotes,
   ];
-  if (included.length !== entities.length) notes.push('隐藏对象及其子对象未导出。');
+  if (entities.some((e) => !visible(e)))
+    notes.push('隐藏对象的内容不导出；蒙皮需要的隐藏关节和祖先仍保留变换节点。');
   type JSONRecord = Record<string, unknown>;
   const images: JSONRecord[] = [],
     textures: JSONRecord[] = [],
@@ -1066,12 +1160,15 @@ export function exportGLB(
     extensionsRequired = new Set<string>();
   const nodes: JSONRecord[] = [],
     meshes: JSONRecord[] = [],
+    skins: JSONRecord[] = [],
     materials: JSONRecord[] = [],
     cameras: JSONRecord[] = [],
     lights: JSONRecord[] = [],
     views: JSONRecord[] = [],
     outputAccessors: JSONRecord[] = [];
   const chunks: Uint8Array[] = [];
+  const frozenRoots: number[] = [];
+  const frozenNodes: JSONRecord[] = [];
   let byteLength = 0;
   function textureInfo(binding: TextureBinding | undefined): JSONRecord | undefined {
     if (!binding) return;
@@ -1138,30 +1235,37 @@ export function exportGLB(
   function attribute(
     values: number[],
     width: number,
-    type: 'FLOAT' | 'INDEX' | 'ANIMATION',
+    type: 'FLOAT' | 'INDEX' | 'ANIMATION' | 'JOINTS' | 'MATRIX',
     bounds = false,
   ) {
     if (type !== 'INDEX' && values.some((v) => !Number.isFinite(Math.fround(v))))
       throw new Error('导出数值超过 Float32 范围，请调整动画间距或切线');
-    const bytes = new Uint8Array(values.length * 4),
+    const size = type === 'JOINTS' ? 2 : 4;
+    const bytes = new Uint8Array(values.length * size),
       view = new DataView(bytes.buffer);
     values.forEach((v, i) =>
-      type !== 'INDEX' ? view.setFloat32(i * 4, v, true) : view.setUint32(i * 4, v, true),
+      type === 'JOINTS'
+        ? view.setUint16(i * size, v, true)
+        : type !== 'INDEX'
+          ? view.setFloat32(i * size, v, true)
+          : view.setUint32(i * size, v, true),
     );
     views.push({
       buffer: 0,
       byteOffset: byteLength,
       byteLength: bytes.length,
-      ...(type !== 'ANIMATION' ? { target: type === 'INDEX' ? 34963 : 34962 } : {}),
+      ...(!['ANIMATION', 'MATRIX'].includes(type)
+        ? { target: type === 'INDEX' ? 34963 : 34962 }
+        : {}),
     });
     chunks.push(bytes);
     byteLength += bytes.length;
     if (byteLength > LIMIT) throw new Error('导出 GLB 超过 50 MB 限制');
     const a: JSONRecord = {
       bufferView: views.length - 1,
-      componentType: type !== 'INDEX' ? 5126 : 5125,
+      componentType: type === 'JOINTS' ? 5123 : type !== 'INDEX' ? 5126 : 5125,
       count: values.length / width,
-      type: width === 1 ? 'SCALAR' : `VEC${width}`,
+      type: width === 16 ? 'MAT4' : width === 1 ? 'SCALAR' : `VEC${width}`,
     };
     if (bounds) {
       const min = Array(width).fill(Infinity),
@@ -1214,16 +1318,35 @@ export function exportGLB(
     const children = included.filter((c) => c.parentId === e.id).map((c) => nodeIndex.get(c.id)!);
     if (children.length) node.children = children;
     nodes.push(node);
+    if (!visible(e)) return;
     if (e.kind === 'mesh') {
-      const g = project.geometries.find((g) => g.id === e.geometryId)!,
-        m = project.materials.find((m) => m.id === e.materialId)!;
+      let g = project.geometries.find((g) => g.id === e.geometryId)!;
+      const m = project.materials.find((m) => m.id === e.materialId)!;
+      if (e.skin && !animated) {
+        if (!g.normals) {
+          const base = surfaceGeometry(g),
+            normal = base.getAttribute('normal');
+          g = {
+            ...g,
+            normals: Array.from(
+              { length: normal.count },
+              (_, i) => [normal.getX(i), normal.getY(i), normal.getZ(i)] as Vec3,
+            ),
+          };
+          base.dispose();
+        }
+        g = {
+          ...deformGeometry(g, e.skin, worldMatrices(project, sceneId, frame)),
+          id: `${g.id}-${e.id}-pose`,
+        };
+      }
       if (!g.triangles.length) {
         notes.push(`空网格“${e.name}”保留为变换节点。`);
         return;
       }
       if (new Set(g.triangles.flat()).size < g.positions.length)
         notes.push(`网格“${e.name}”的孤立顶点未导出。`);
-      const key = `${g.id}:${m.id}`;
+      const key = `${g.id}:${m.id}:${!!e.skin && animated}`;
       if (!meshMap.has(key)) {
         if (!matMap.has(m.id)) {
           matMap.set(m.id, materials.length);
@@ -1258,7 +1381,7 @@ export function exportGLB(
             ...(m.textures?.emissive ? { emissiveTexture: textureInfo(m.textures.emissive) } : {}),
           });
         }
-        const gKey = `${g.id}:${m.flatShading ?? true}`;
+        const gKey = `${g.id}:${m.flatShading ?? true}:${!!e.skin && animated}`;
         if (!geometryMap.has(gKey)) {
           const used = [...new Set(g.triangles.flat())].sort((a, b) => a - b),
             remap = new Map(used.map((v, i) => [v, i]));
@@ -1295,8 +1418,10 @@ export function exportGLB(
               'FLOAT',
               true,
             ),
-            NORMAL: attribute(Array.from(geometry.getAttribute('normal').array), 3, 'FLOAT'),
           };
+          const deformedFlat = animated && e.skin && (m.flatShading ?? true);
+          if (!deformedFlat)
+            attrs.NORMAL = attribute(Array.from(geometry.getAttribute('normal').array), 3, 'FLOAT');
           if (g.uv)
             attrs.TEXCOORD_0 = attribute(Array.from(geometry.getAttribute('uv').array), 2, 'FLOAT');
           if (g.uv1)
@@ -1311,6 +1436,29 @@ export function exportGLB(
               4,
               'FLOAT',
             );
+          if (animated && e.skin) {
+            // Flat normals must be computed after skinning. Exporting fixed bind-pose
+            // face normals would turn a deforming flat surface into smooth shading.
+            const order = (m.flatShading ?? true) ? g.triangles.flat() : used;
+            const rows = order.map((i) => g.influences![i]);
+            const sets = Math.ceil(rows.reduce((max, row) => Math.max(max, row.length), 0) / 4);
+            for (let set = 0; set < sets; set++) {
+              attrs[`JOINTS_${set}`] = attribute(
+                rows.flatMap((row) =>
+                  Array.from({ length: 4 }, (_, j) => row[set * 4 + j]?.joint || 0),
+                ),
+                4,
+                'JOINTS',
+              );
+              attrs[`WEIGHTS_${set}`] = attribute(
+                rows.flatMap((row) =>
+                  Array.from({ length: 4 }, (_, j) => row[set * 4 + j]?.weight || 0),
+                ),
+                4,
+                'FLOAT',
+              );
+            }
+          }
           const data: JSONRecord = { attributes: attrs, mode: 4 };
           if (geometry.index)
             data.indices = attribute(Array.from(geometry.index.array), 1, 'INDEX');
@@ -1324,6 +1472,22 @@ export function exportGLB(
         });
       }
       node.mesh = meshMap.get(key);
+      if (e.skin && animated) {
+        node.skin = skins.length;
+        skins.push({
+          joints: e.skin.joints.map((id) => nodeIndex.get(id)!),
+          inverseBindMatrices: attribute(e.skin.inverseBindMatrices.flat(), 16, 'MATRIX'),
+          ...(e.skin.skeletonId ? { skeleton: nodeIndex.get(e.skin.skeletonId)! } : {}),
+        });
+        frozenNodes.push({ name: `${e.name} · 蒙皮`, mesh: node.mesh, skin: node.skin });
+        delete node.mesh;
+        delete node.skin;
+      } else if (e.skin) {
+        // Pose vertices are in world space; original node remains for its ordinary children.
+        frozenNodes.push({ name: `${e.name} · 当前姿态`, mesh: node.mesh });
+        delete node.mesh;
+        notes.push(`“${e.name}”已固化当前蒙皮姿态；绑定与可编辑权重请使用动画 GLB 或项目包保存。`);
+      }
     } else if (e.kind === 'camera') {
       const c = e.camera!;
       node.camera = cameras.length;
@@ -1352,7 +1516,7 @@ export function exportGLB(
   // Legacy directional lights point toward the world origin. Put the light on a rotated child,
   // preserving the exported transform of any ordinary children attached to the original node.
   included.forEach((e, i) => {
-    if (e.light?.kind !== 'directional' || e.light.direction) return;
+    if (!visible(e) || e.light?.kind !== 'directional' || e.light.direction) return;
     if (animated) {
       let ancestor: Entity | undefined = e;
       while (ancestor) {
@@ -1377,6 +1541,10 @@ export function exportGLB(
     nodes[i].children = [...((nodes[i].children as number[]) || []), nodes.length];
     nodes.push(child);
   });
+  for (const node of frozenNodes) {
+    frozenRoots.push(nodes.length);
+    nodes.push(node);
+  }
   if (lights.length) extensionsUsed.add('KHR_lights_punctual');
   const animations: JSONRecord[] = [];
   if (animated) {
@@ -1422,18 +1590,22 @@ export function exportGLB(
   const json: JSONRecord = {
     asset: {
       version: '2.0',
-      generator: 'Frameforge Studio 0.11 scene exchange',
+      generator: 'Frameforge Studio 0.12 scene exchange',
       ...(scene.source?.copyright ? { copyright: scene.source.copyright } : {}),
     },
     scene: 0,
     scenes: [
       {
         name: scene.name,
-        nodes: included.filter((e) => !e.parentId).map((e) => nodeIndex.get(e.id)!),
+        nodes: [
+          ...included.filter((e) => !e.parentId).map((e) => nodeIndex.get(e.id)!),
+          ...frozenRoots,
+        ],
       },
     ],
     ...(nodes.length ? { nodes } : {}),
     ...(meshes.length ? { meshes, materials } : {}),
+    ...(skins.length ? { skins } : {}),
     ...(byteLength
       ? {
           accessors: outputAccessors,
