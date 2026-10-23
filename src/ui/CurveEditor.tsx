@@ -1,6 +1,9 @@
 import { useEffect, useId, useRef, useState, type PointerEvent } from 'react';
 import {
   editTrack,
+  activeTracks,
+  sampleTrack,
+  quaternionFromEuler,
   keyHandles,
   segmentControls,
   type KeyEdit,
@@ -15,6 +18,7 @@ import {
   type Entity,
   type Project,
   type Vec3,
+  type AnimationValue,
   type KeyHandles,
 } from '../core/model';
 import { NumberInput } from './Inspector';
@@ -42,8 +46,13 @@ type Drag = {
   moved: boolean;
   pan?: boolean;
 };
-const colors = ['#ef978e', '#8bd7a9', '#83b9ff'];
-const labels = { position: '位置', rotation: '旋转', scale: '缩放' };
+const colors = ['#ef978e', '#8bd7a9', '#83b9ff', '#d3a8f0'];
+const labels = {
+  position: '位置',
+  rotation: '旋转（欧拉角）',
+  scale: '缩放',
+  quaternion: '旋转（四元数）',
+};
 const clamp = (n: number, min: number, max: number) => Math.max(min, Math.min(max, n));
 const display = (n: number) => Number(n.toPrecision(4)).toString();
 function fit(track: AnimationTrack | undefined, axis: number, duration: number): View {
@@ -55,6 +64,12 @@ function fit(track: AnimationTrack | undefined, axis: number, duration: number):
       points.push([k.frame + h.right[0], k.value[axis] + h.right[1]]);
     if (i > 0 && track.keys[i - 1].interpolation === 'bezier')
       points.push([k.frame + h.left[0], k.value[axis] + h.left[1]]);
+    const next = track.keys[i + 1];
+    if (next && (k.interpolation === 'cubic' || track.property === 'quaternion'))
+      for (let step = 1; step < 48; step++) {
+        const frame = k.frame + ((next.frame - k.frame) * step) / 48;
+        points.push([frame, sampleTrack(track, frame)![axis]]);
+      }
   });
   let minX = Infinity,
     maxX = -Infinity,
@@ -104,10 +119,17 @@ function Editor({
   const svg = useRef<SVGSVGElement>(null),
     drag = useRef<Drag | null>(null),
     clipId = useId();
-  const current = p.animationTracks.find(
-    (t) => t.entityId === entity.id && t.property === property,
-  );
+  const tracks = activeTracks(p, entity.id);
+  const conflictingRotation = (property: string) =>
+    tracks.some(
+      (t) =>
+        (property === 'rotation' && t.property === 'quaternion') ||
+        (property === 'quaternion' && t.property === 'rotation'),
+    );
+  const current = tracks.find((t) => t.entityId === entity.id && t.property === property);
   const track = preview || current;
+  const quaternion = property === 'quaternion';
+  const axisColors = quaternion ? colors : colors.slice(0, 3);
   const v = view || fit(track, axis, p.timeline.duration);
   const selected =
     track?.id === selectedKey?.trackId
@@ -116,7 +138,8 @@ function Editor({
   const selectedIndex = selected && track ? track.keys.indexOf(selected) : -1;
   const handles = selectedIndex >= 0 && track ? keyHandles(track, selectedIndex, axis) : undefined;
   const unit = property === 'rotation' ? 180 / Math.PI : 1;
-  const suffix = property === 'rotation' ? '°' : property === 'position' ? 'm' : '倍';
+  const suffix =
+    property === 'rotation' ? '°' : property === 'position' ? 'm' : quaternion ? '分量' : '倍';
   const x = (f: number) => 60 + ((f - v.x) / v.width) * 720;
   const y = (value: number) => 290 - ((value - v.y) / v.height) * 274;
   const xy = (point: Point) => `${x(point[0])},${y(point[1])}`;
@@ -126,11 +149,12 @@ function Editor({
     setError('');
   };
   useEffect(() => {
-    const t = p.animationTracks.find(
+    const t = activeTracks(p, entity.id).find(
       (t) => t.id === selectedKey?.trackId && t.entityId === entity.id,
     );
     if (t && t.property !== property) {
       setProperty(t.property);
+      setAxis(0);
       setView(null);
       setPreview(null);
       drag.current = null;
@@ -206,13 +230,13 @@ function Editor({
         ],
       };
     } else {
-      const value = [...key.value] as Vec3;
+      const value = [...key.value] as AnimationValue;
       value[axis] = clamp(value[axis] + dy, -1e7, 1e7);
       command = {
         type: 'key.update',
         trackId: d.track.id,
         keyId: key.id,
-        patch: { frame: clamp(Math.round(key.frame + dx), 0, 1e6), value },
+        patch: { frame: clamp(key.frame + (event.altKey ? dx : Math.round(dx)), 0, 1e6), value },
       };
     }
     try {
@@ -251,7 +275,12 @@ function Editor({
         path += `M${xy([b.frame, b.value[component]])}`;
         return;
       }
-      if (a.interpolation === 'bezier') {
+      if (a.interpolation === 'cubic' || (quaternion && a.interpolation !== 'constant')) {
+        for (let step = 1; step <= 48; step++) {
+          const f = a.frame + ((b.frame - a.frame) * step) / 48;
+          path += `L${xy([f, sampleTrack(track, f)![component]])}`;
+        }
+      } else if (a.interpolation === 'bezier') {
         const points = segmentControls(track, i, component);
         path += `C${xy(points[1])} ${xy(points[2])} ${xy(points[3])}`;
       } else if (a.interpolation === 'smooth') {
@@ -289,21 +318,22 @@ function Editor({
           onChange={(event) => {
             cancel();
             setProperty(event.target.value as AnimationTrack['property']);
+            setAxis(0);
             selectKey(null);
             setView(null);
           }}
         >
           {Object.entries(labels).map(([key, label]) => (
-            <option key={key} value={key}>
+            <option key={key} value={key} disabled={conflictingRotation(key)}>
               {label}
             </option>
           ))}
         </select>
         <div className="segmented">
-          {colors.map((color, i) => (
+          {axisColors.map((color, i) => (
             <button
               key={i}
-              aria-label={`曲线 ${'XYZ'[i]}`}
+              aria-label={`曲线 ${'XYZW'[i]}`}
               className={i === axis ? 'active' : ''}
               style={{ color }}
               onClick={() => {
@@ -312,12 +342,17 @@ function Editor({
                 setView(null);
               }}
             >
-              {'XYZ'[i]}
+              {'XYZW'[i]}
             </button>
           ))}
         </div>
         <button
-          disabled={busy}
+          disabled={busy || conflictingRotation(property)}
+          title={
+            conflictingRotation(property)
+              ? '当前动作已有另一种旋转轨道，请选择该轨道编辑'
+              : undefined
+          }
           onClick={() =>
             send(
               [
@@ -325,7 +360,13 @@ function Editor({
                   type: 'key.set',
                   entityId: entity.id,
                   property,
-                  key: { id: id(), frame, value: evaluatedTransform(p, entity, frame)[property] },
+                  key: {
+                    id: id(),
+                    frame,
+                    value:
+                      evaluatedTransform(p, entity, frame)[property] ||
+                      quaternionFromEuler(evaluatedTransform(p, entity, frame).rotation),
+                  },
                 },
               ],
               '记录动画关键帧',
@@ -409,7 +450,7 @@ function Editor({
         </text>
         <g clipPath={`url(#${clipId})`}>
           <line className="curve-playhead" x1={x(frame)} x2={x(frame)} y1="16" y2="290" />
-          {colors.map((color, i) => (
+          {axisColors.map((color, i) => (
             <path
               key={i}
               d={curve(i)}
@@ -474,7 +515,8 @@ function Editor({
         </g>
       </svg>
       <div className="curve-hint">
-        拖动圆点调整时间和值；拖动方块调整手柄；Shift + 拖动空白处平移。松开提交，Esc 取消。
+        拖动圆点调整时间和值，Alt 拖动不吸附整帧；Shift 拖动空白处平移。松开提交，Esc
+        取消。四元数修改后归一化，线性段使用球面插值。
       </div>
       <fieldset disabled={busy || !!preview} className="curve-fields">
         {selected && handles ? (
@@ -488,10 +530,10 @@ function Editor({
               onChange={(f) => update({ frame: f })}
             />
             <NumberInput
-              label={`关键帧 ${'XYZ'[axis]}（${suffix}）`}
+              label={`关键帧 ${'XYZW'[axis]}（${suffix}）`}
               value={selected.value[axis] * unit}
               onChange={(n) => {
-                const value = [...selected.value] as Vec3;
+                const value = [...selected.value] as AnimationValue;
                 value[axis] = n / unit;
                 update({ value });
               }}
@@ -505,14 +547,16 @@ function Editor({
               >
                 <option value="constant">保持</option>
                 <option value="linear">线性</option>
-                <option value="smooth">平滑</option>
-                <option value="bezier">Bézier</option>
+                {!quaternion && <option value="smooth">平滑</option>}
+                {!quaternion && <option value="bezier">Bézier</option>}
+                <option value="cubic">Hermite 切线</option>
               </select>
             </label>
             <label className="field">
-              {'XYZ'[axis]} 手柄
+              {'XYZW'[axis]} 手柄
               <select
                 aria-label="手柄类型"
+                disabled={quaternion || selected.interpolation === 'cubic'}
                 value={handles.mode}
                 onChange={(event) =>
                   commit({
@@ -541,25 +585,45 @@ function Editor({
             >
               删除关键帧
             </button>
-            <div className="curve-handle-fields">
-              {(['left', 'right'] as const).map((side) => (
-                <div key={side}>
+            {!quaternion && selected.interpolation !== 'cubic' && (
+              <div className="curve-handle-fields">
+                {(['left', 'right'] as const).map((side) => (
+                  <div key={side}>
+                    <NumberInput
+                      label={`${side === 'left' ? '左' : '右'}手柄 Δ帧`}
+                      value={handles[side][0]}
+                      onChange={(n) => handle(side, [n, handles[side][1]])}
+                    />
+                    <NumberInput
+                      label={`${side === 'left' ? '左' : '右'}手柄 Δ值`}
+                      value={handles[side][1] * unit}
+                      onChange={(n) => handle(side, [handles[side][0], n / unit])}
+                    />
+                  </div>
+                ))}
+                <span className="muted">
+                  插值应用于此帧之后的段。时间与插值按 XYZ 成组；手柄按轴编辑。
+                </span>
+              </div>
+            )}
+            {(selected.interpolation === 'cubic' || selected.inTangent) && (
+              <div className="curve-handle-fields">
+                {(['inTangent', 'outTangent'] as const).map((side) => (
                   <NumberInput
-                    label={`${side === 'left' ? '左' : '右'}手柄 Δ帧`}
-                    value={handles[side][0]}
-                    onChange={(n) => handle(side, [n, handles[side][1]])}
+                    key={side}
+                    label={`${side === 'inTangent' ? '入' : '出'}切线 ${'XYZW'[axis]} / 帧`}
+                    value={(selected[side]?.[axis] || 0) * unit}
+                    onChange={(n) => {
+                      const tangent = [
+                        ...(selected[side] || selected.value.map(() => 0)),
+                      ] as AnimationValue;
+                      tangent[axis] = n / unit;
+                      update({ [side]: tangent });
+                    }}
                   />
-                  <NumberInput
-                    label={`${side === 'left' ? '左' : '右'}手柄 Δ值`}
-                    value={handles[side][1] * unit}
-                    onChange={(n) => handle(side, [handles[side][0], n / unit])}
-                  />
-                </div>
-              ))}
-              <span className="muted">
-                插值应用于此帧之后的段。时间与插值按 XYZ 成组；手柄按轴编辑。
-              </span>
-            </div>
+                ))}
+              </div>
+            )}
           </>
         ) : (
           <p className="muted">

@@ -16,6 +16,9 @@
 - `pbr-textures.ffstudio`：格式 v7，真实导入五类图片材质、UV0/UV1 与切线，含可编辑原始图片和后台视频产物。选择 Texture study 场景和 Textured panel 对象，在材质贴图面板继续编辑；镜头引用导入摄影机。
 - `pbr-textures.glb`：同场景实际导出，内嵌两张原创 PNG、保留五类绑定与采样参数；Khronos 校验 0 错误/0 警告/0 信息。
 - `pbr-textures.mp4`：普通后台任务输出，480×270、12 帧、0.5 秒，无音轨。显示红/蓝/绿色区和透明裁剪区；是基本材质数据通路的实际产物，不是外部艺术素材或 AI 生成视频。
+- `animation-exchange.ffstudio`：格式 v8，包含父子对象、分数帧键、四元数旋转、Hermite 位置、STEP/缩放及多个可编辑动作。选择 Animation exchange 场景，可在“动画动作”切换 Arc and turn、Hold and tilt 或 Arc revision；进入动画曲线编辑 XYZW 或每帧切线。
+- `animation-exchange.glb`：同场景通过界面导出的三个动作，含原生 CUBICSPLINE/SLERP/STEP；Khronos 校验 0 错误/0 警告/0 信息，可再导入编辑。未保存完整镜头时间轴或当前动作选择。
+- `animation-exchange.mp4`：Arc and turn 动作的真实后台输出，480×270、36 帧、1.5 秒，无音轨。红色长方体随父对象移动并自身旋转；提交后切换动作不影响该任务快照。几何、动作和材质均由本项目原创脚本生成。
 
 在平台点击“打开”选择项目包即可导入。项目名保留生成时的检查时间；ID 冲突时平台创建副本。场景与音频均由本项目生成，无外部素材。此文件是保存/编辑/导出的运行依据，不代表专业制作能力。
 

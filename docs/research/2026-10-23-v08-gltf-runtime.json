@@ -1,0 +1,43 @@
+{
+  "checkedAt": "2026-10-23T07:50:28.755Z",
+  "projectId": "62c6f290-f3d7-45e1-8bc1-d6e09b09a83f",
+  "importedProjectId": "7caf8734-d302-40a5-b3df-82ccc7a9d09d",
+  "jobId": "81b7df0a-b015-40ee-8278-f7ef87823bc5",
+  "browser": "155.0.8059.82",
+  "format": 8,
+  "validator": {
+    "version": "2.0.0-dev.3.10",
+    "issues": {
+      "numErrors": 0,
+      "numWarnings": 0,
+      "numInfos": 1,
+      "numHints": 0,
+      "messages": [
+        {
+          "code": "UNUSED_OBJECT",
+          "message": "This object may be unused.",
+          "severity": 2,
+          "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+        }
+      ],
+      "truncated": false
+    }
+  },
+  "checks": [
+    "unsupported morph animation rejected without saving",
+    "external binary file import",
+    "hierarchy and shared geometry",
+    "single undo/redo import transaction",
+    "material color/opacity and mesh editing",
+    "normal invalidation and undo restoration",
+    "reload and GLB UI download",
+    "GLB reimport",
+    "imported camera/scene feeds ordinary render job",
+    "actual MP4/PNG visual output",
+    "portable project preserves geometry/materials/source metadata"
+  ],
+  "frames": 12,
+  "greenPixels": 3651,
+  "previewExportMeanAbsoluteDifference": 0.4239557613168724,
+  "pageErrors": []
+}

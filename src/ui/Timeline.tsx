@@ -1,5 +1,6 @@
 import { type Command } from '../core/commands';
 import { type Project } from '../core/model';
+import { activeTracks } from '../core/animation';
 import { NumberInput } from './Inspector';
 import type { KeySelection } from './CurveEditor';
 
@@ -31,7 +32,7 @@ export function Timeline({
   const channels = [...new Set([0, 1, 2, ...p.timeline.clips.map((c) => c.channel)])].sort(
     (a, b) => b - a,
   );
-  const tracks = p.animationTracks.filter((t) => t.entityId === selectedEntity);
+  const tracks = selectedEntity ? activeTracks(p, selectedEntity) : [];
   return (
     <section className="timeline">
       <div className="timeline-toolbar">
@@ -50,7 +51,7 @@ export function Timeline({
           step={1}
           min={0}
           max={p.timeline.duration - 1}
-          onChange={(v) => setFrame(Math.max(0, Math.min(p.timeline.duration - 1, Math.round(v))))}
+          onChange={(v) => setFrame(Math.max(0, Math.min(p.timeline.duration - 1, v)))}
         />
         <span>
           {(frame / p.timeline.fps).toFixed(2)} s /{' '}
@@ -61,7 +62,7 @@ export function Timeline({
           {p.timeline.fps} FPS · {p.timeline.width} × {p.timeline.height}
         </span>
         <button
-          disabled={!selectedClip}
+          disabled={!selectedClip || !Number.isInteger(frame)}
           onClick={() => send([{ type: 'clip.split', id: selectedClip!, frame }], '切分片段')}
         >
           切分 · K
@@ -117,7 +118,11 @@ export function Timeline({
           {tracks.map((t) => (
             <div className="timeline-track key-track" key={t.id}>
               <div className="track-label">
-                {{ position: '位置', rotation: '旋转', scale: '缩放' }[t.property]}
+                {
+                  { position: '位置', rotation: '旋转', quaternion: '四元数', scale: '缩放' }[
+                    t.property
+                  ]
+                }
               </div>
               <div className="track-content">
                 {t.keys.map((k) => (

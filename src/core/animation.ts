@@ -1,4 +1,50 @@
-import type { AnimationTrack, Keyframe, Vec3, KeyHandles } from './model';
+import type {
+  AnimationTrack,
+  Keyframe,
+  Vec3,
+  Vec4,
+  AnimationValue,
+  KeyHandles,
+  Project,
+  Entity,
+} from './model';
+import { Euler, Quaternion } from 'three';
+
+export function activeTracks(p: Project, entityId: string) {
+  const entity = p.entities.find((e) => e.id === entityId);
+  const action = p.scenes.find((s) => s.id === entity?.sceneId)?.activeActionId || undefined;
+  return p.animationTracks.filter((t) => t.entityId === entityId && t.actionId === action);
+}
+export function rotationProperty(p: Project, e: Entity) {
+  const tracks = activeTracks(p, e.id);
+  return tracks.some((t) => t.property === 'quaternion') ||
+    (!tracks.some((t) => t.property === 'rotation') && e.transform.quaternion)
+    ? 'quaternion'
+    : 'rotation';
+}
+export function normalizeQuaternion(q: readonly number[]): Vec4 {
+  const length = Math.hypot(...q);
+  if (q.length !== 4 || !Number.isFinite(length) || length < 1e-12)
+    throw new Error('四元数长度为零或无效');
+  return q.map((v) => v / length) as Vec4;
+}
+export const quaternionFromEuler = (v: Vec3): Vec4 =>
+  new Quaternion().setFromEuler(new Euler(...v, 'XYZ')).toArray();
+export const eulerFromQuaternion = (v: Vec4): Vec3 => {
+  const e = new Euler().setFromQuaternion(new Quaternion(...v), 'XYZ');
+  return [e.x, e.y, e.z];
+};
+export function slerp(a: Vec4, b: Vec4, t: number): Vec4 {
+  let dot = a.reduce((sum, v, i) => sum + v * b[i], 0);
+  const end = dot < 0 ? b.map((v) => -v) : b;
+  dot = Math.min(1, Math.abs(dot));
+  if (dot > 0.9995) return normalizeQuaternion(a.map((v, i) => v + (end[i] - v) * t));
+  const angle = Math.acos(dot),
+    denominator = Math.sin(angle);
+  return normalizeQuaternion(
+    a.map((v, i) => (Math.sin((1 - t) * angle) * v + Math.sin(t * angle) * end[i]) / denominator),
+  );
+}
 
 export type Point = [number, number];
 export const cubic = (a: number, b: number, c: number, d: number, t: number) =>
@@ -73,14 +119,82 @@ export function sampleBezier(points: [Point, Point, Point, Point], frame: number
   }
   return cubic(points[0][1], points[1][1], points[2][1], points[3][1], (low + high) / 2);
 }
+const polynomial = (coefficients: number[], t: number) =>
+  coefficients.reduceRight((value, coefficient) => value * t + coefficient, 0);
+/** Isolate polynomial roots on [0,1] using derivative extrema, including double roots. */
+function intervalRoots(coefficients: number[]): number[] {
+  const c = [...coefficients];
+  while (c.length > 1 && c.at(-1) === 0) c.pop();
+  if (c.length === 1) return [];
+  const magnitude = Math.max(...c.map(Math.abs));
+  const normalized = c.map((v) => v / magnitude);
+  const boundaries = [0, ...intervalRoots(normalized.slice(1).map((v, i) => v * (i + 1))), 1];
+  const roots = boundaries.filter((t) => Math.abs(polynomial(normalized, t)) < 1e-13);
+  for (let i = 1; i < boundaries.length; i++) {
+    let low = boundaries[i - 1],
+      high = boundaries[i];
+    const sign = Math.sign(polynomial(normalized, low));
+    if (sign * polynomial(normalized, high) >= 0) continue;
+    for (let step = 0; step < 60; step++) {
+      const middle = (low + high) / 2;
+      if (sign * polynomial(normalized, middle) > 0) low = middle;
+      else high = middle;
+    }
+    roots.push((low + high) / 2);
+  }
+  return [...new Set(roots)].sort((a, b) => a - b);
+}
+function validateQuaternionSegment(a: Keyframe, b: Keyframe) {
+  const span = b.frame - a.frame;
+  const coefficients = a.value.map((v, i) => {
+    const outgoing = span * a.outTangent![i],
+      incoming = span * b.inTangent![i];
+    return [
+      v,
+      outgoing,
+      -3 * v - 2 * outgoing + 3 * b.value[i] - incoming,
+      2 * v + outgoing - 2 * b.value[i] + incoming,
+    ];
+  });
+  // A common zero must be a root of every component; use a nonzero component to find candidates.
+  const axis = a.value.reduce(
+    (best, v, i) => (Math.abs(v) > Math.abs(a.value[best]) ? i : best),
+    0,
+  );
+  if (
+    intervalRoots(coefficients[axis]).some(
+      (t) => Math.hypot(...coefficients.map((c) => polynomial(c, t))) < 1e-8,
+    )
+  )
+    throw new Error('四元数 Hermite 段经过零长度旋转，请调整关键帧符号或切线');
+}
 export function validateTrack(track: AnimationTrack) {
   const ids = new Set<string>();
   for (let i = 0; i < track.keys.length; i++) {
     const k = track.keys[i];
     if (ids.has(k.id)) throw new Error('动画轨道内的关键帧 ID 重复');
     ids.add(k.id);
+    const width = track.property === 'quaternion' ? 4 : 3;
+    if (
+      k.value.length !== width ||
+      [k.inTangent, k.outTangent].some((t) => t && t.length !== width)
+    )
+      throw new Error('动画数值或切线维度不匹配');
+    if (track.property === 'quaternion') {
+      if (Math.abs(Math.hypot(...k.value) - 1) > 0.001)
+        throw new Error('旋转关键帧的四元数必须归一化');
+      if (!['linear', 'constant', 'cubic'].includes(k.interpolation) || k.handles)
+        throw new Error('四元数支持球面线性、保持或 Hermite 插值');
+    }
+    if (
+      k.interpolation === 'cubic' &&
+      (!k.outTangent || (i + 1 < track.keys.length && !track.keys[i + 1].inTangent))
+    )
+      throw new Error('Hermite 段缺少出入切线');
     if (i > 0 && k.frame <= track.keys[i - 1].frame)
       throw new Error('关键帧必须按帧序排列且不重复');
+    if (track.property === 'quaternion' && k.interpolation === 'cubic' && track.keys[i + 1])
+      validateQuaternionSegment(k, track.keys[i + 1]);
     for (const h of k.handles || []) {
       if (h.left[0] > 0 || h.right[0] < 0) throw new Error('左手柄必须朝过去，右手柄必须朝未来');
       if (h.mode === 'aligned') {
@@ -93,12 +207,24 @@ export function validateTrack(track: AnimationTrack) {
     }
   }
 }
+export function prepareCubic(track: AnimationTrack) {
+  track.keys.forEach((k, i) => {
+    if (k.interpolation !== 'cubic') return;
+    const zero = k.value.map(() => 0) as AnimationValue;
+    k.inTangent ||= [...zero];
+    k.outTangent ||= [...zero];
+    const next = track.keys[i + 1];
+    if (next) next.inTangent ||= [...zero];
+  });
+}
 export type KeyEdit =
   | {
       type: 'key.update';
       trackId: string;
       keyId: string;
-      patch: Partial<Pick<Keyframe, 'frame' | 'value' | 'interpolation'>>;
+      patch: Partial<
+        Pick<Keyframe, 'frame' | 'value' | 'interpolation' | 'inTangent' | 'outTangent'>
+      >;
     }
   | {
       type: 'key.handle';
@@ -127,8 +253,11 @@ export function editTrack(track: AnimationTrack, edit: KeyEdit) {
     )
       throw new Error('目标帧已有关键帧；此次移动未覆盖原关键帧');
     Object.assign(k, edit.patch);
+    if (track.property === 'quaternion' && edit.patch.value) k.value = normalizeQuaternion(k.value);
     track.keys.sort((a, b) => a.frame - b.frame);
+    prepareCubic(track);
   } else {
+    if (track.property === 'quaternion') throw new Error('四元数不能使用欧拉角 Bézier 手柄');
     const handles = [0, 1, 2].map((axis) => keyHandles(track, index, axis)) as KeyHandles;
     const h = handles[edit.axis];
     if (edit.type === 'key.handles') {
@@ -154,7 +283,7 @@ function align(h: KeyHandles[0], side: 'left' | 'right') {
   h[other] = [h[side][0] * ratio, h[side][1] * ratio];
 }
 
-export function sampleTrack(track: AnimationTrack, frame: number): Vec3 | undefined {
+export function sampleTrack(track: AnimationTrack, frame: number): AnimationValue | undefined {
   const keys = track.keys;
   if (!keys.length) return;
   if (frame <= keys[0].frame) return [...keys[0].value];
@@ -170,10 +299,24 @@ export function sampleTrack(track: AnimationTrack, frame: number): Vec3 | undefi
   const a = keys[low],
     b = keys[high];
   if (frame === a.frame) return [...a.value];
+  let t = (frame - a.frame) / (b.frame - a.frame);
+  if (a.interpolation === 'constant') return [...a.value];
+  if (a.interpolation === 'cubic') {
+    const span = b.frame - a.frame,
+      t2 = t * t,
+      t3 = t2 * t;
+    const value = a.value.map(
+      (v, i) =>
+        (2 * t3 - 3 * t2 + 1) * v +
+        (t3 - 2 * t2 + t) * span * a.outTangent![i] +
+        (-2 * t3 + 3 * t2) * b.value[i] +
+        (t3 - t2) * span * b.inTangent![i],
+    ) as AnimationValue;
+    return track.property === 'quaternion' ? normalizeQuaternion(value) : value;
+  }
+  if (track.property === 'quaternion') return slerp(a.value as Vec4, b.value as Vec4, t);
   if (a.interpolation === 'bezier')
     return [0, 1, 2].map((axis) => sampleBezier(segmentControls(track, low, axis), frame)) as Vec3;
-  let t = (frame - a.frame) / (b.frame - a.frame);
-  if (a.interpolation === 'constant') t = 0;
-  else if (a.interpolation === 'smooth') t = t * t * (3 - 2 * t);
+  if (a.interpolation === 'smooth') t = t * t * (3 - 2 * t);
   return a.value.map((v, j) => v + (b.value[j] - v) * t) as Vec3;
 }

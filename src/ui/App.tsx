@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { applyCommands, type Command } from '../core/commands';
 import { evaluatedTransform } from '../core/evaluate';
+import { activeTracks, rotationProperty, quaternionFromEuler } from '../core/animation';
+import { ActionPanel } from './ActionPanel';
 import { importOBJ } from '../core/geometry';
 import {
   id,
@@ -198,14 +200,23 @@ export function App() {
         base = structuredClone(e.transform);
       for (const property of ['position', 'rotation', 'scale'] as const) {
         if (t[property].every((v, i) => Math.abs(v - evaluated[property][i]) < 1e-7)) continue;
-        if (p.animationTracks.some((a) => a.entityId === entityId && a.property === property))
+        const target = property === 'rotation' ? rotationProperty(p, e) : property;
+        if (activeTracks(p, entityId).some((a) => a.property === target))
           commands.push({
             type: 'key.set',
             entityId,
-            property,
-            key: { frame, value: t[property] },
+            property: target,
+            key: {
+              frame,
+              value: target === 'quaternion' ? quaternionFromEuler(t.rotation) : t[property],
+            },
           });
-        else base[property] = t[property];
+        else {
+          base[property] = t[property];
+          if (property === 'rotation') {
+            if (base.quaternion) base.quaternion = quaternionFromEuler(t.rotation);
+          }
+        }
       }
       commands.unshift({ type: 'entity.update', id: entityId, patch: { transform: base } });
       void send(commands, '变换对象');
@@ -241,9 +252,11 @@ export function App() {
       } else if (e.code === 'Space') {
         e.preventDefault();
         setPlaying((v) => !v);
-      } else if (e.key.toLowerCase() === 'k' && selectedClip)
-        void send([{ type: 'clip.split', id: selectedClip, frame }], '切分片段');
-      else if (e.key === 'Delete') {
+      } else if (e.key.toLowerCase() === 'k' && selectedClip) {
+        if (Number.isInteger(frame))
+          void send([{ type: 'clip.split', id: selectedClip, frame }], '切分片段');
+        else setError('片段只能在整帧处切分，请调整播放头');
+      } else if (e.key === 'Delete') {
         if (workspace === 'studio' && view === 'scene' && meshSelection) {
           if (meshSelection.indices.length)
             void send(
@@ -420,8 +433,9 @@ export function App() {
   };
   const addAssetClip = (asset: Asset) => {
     const p = projectRef.current!,
+      insertAt = Math.min(p.timeline.duration - 1, Math.round(frame)),
       duration = Math.min(
-        p.timeline.duration - frame,
+        p.timeline.duration - insertAt,
         asset.duration
           ? Math.max(1, Math.floor(asset.duration * p.timeline.fps))
           : p.timeline.fps * 3,
@@ -429,7 +443,8 @@ export function App() {
     let channel = asset.kind === 'audio' ? 2 : 1;
     while (
       p.timeline.clips.some(
-        (c) => c.channel === channel && c.start < frame + duration && c.start + c.duration > frame,
+        (c) =>
+          c.channel === channel && c.start < insertAt + duration && c.start + c.duration > insertAt,
       )
     )
       channel++;
@@ -442,7 +457,7 @@ export function App() {
             name: asset.name,
             kind: asset.kind,
             sourceId: asset.id,
-            start: frame,
+            start: insertAt,
             duration,
             sourceIn: 0,
             channel,
@@ -489,7 +504,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.7</small>
+            FRAMEFORGE<small>创作工作台 · 0.8</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -614,6 +629,14 @@ export function App() {
               </option>
             ))}
           </select>
+          <ActionPanel
+            project={p}
+            sceneId={sceneId}
+            send={(commands, label) => {
+              setSelectedKey(null);
+              void send(commands, label);
+            }}
+          />
           <div className="add-controls">
             <select
               aria-label="添加对象"
@@ -716,12 +739,13 @@ export function App() {
                   ))}
               </select>
               <button
-                title="加入时间轴"
+                title="加入时间轴（吸附最近整帧）"
                 onClick={() => {
+                  const insertAt = Math.min(p.timeline.duration - 1, Math.round(frame));
                   let channel = 0;
                   while (
                     p.timeline.clips.some(
-                      (c) => c.channel === channel && c.start + c.duration > frame,
+                      (c) => c.channel === channel && c.start + c.duration > insertAt,
                     )
                   )
                     channel++;
@@ -734,8 +758,8 @@ export function App() {
                           name: s.name,
                           kind: 'shot',
                           sourceId: s.id,
-                          start: frame,
-                          duration: p.timeline.duration - frame,
+                          start: insertAt,
+                          duration: p.timeline.duration - insertAt,
                           sourceIn: 0,
                           channel,
                           muted: false,
@@ -952,7 +976,9 @@ export function App() {
                         {a.kind} · {(a.bytes / 1024).toFixed(0)} KB{' '}
                         {a.duration ? `· ${a.duration.toFixed(1)} s` : ''}
                       </small>
-                      <button onClick={() => addAssetClip(a)}>加入时间轴</button>
+                      <button title="吸附最近整帧" onClick={() => addAssetClip(a)}>
+                        加入时间轴
+                      </button>
                       <button
                         title="移除素材记录"
                         onClick={() => void send([{ type: 'asset.delete', id: a.id }], '移除素材')}

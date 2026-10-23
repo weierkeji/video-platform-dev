@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { evaluatedTransform } from '../core/evaluate';
+import { activeTracks, rotationProperty, quaternionFromEuler } from '../core/animation';
 import { type Command } from '../core/commands';
 import { type Clip, type Entity, type Project, type Vec3 } from '../core/model';
 import { exportOBJ } from '../core/geometry';
@@ -212,6 +213,8 @@ export function Inspector({
             禁用片段
           </label>
           <button
+            disabled={!Number.isInteger(frame)}
+            title="在整帧处切分片段"
             onClick={() => send([{ type: 'clip.split', id: clip.id, frame }], '在播放头处切分')}
           >
             在帧 {frame} 切分
@@ -353,8 +356,14 @@ export function Inspector({
               (['position', 'rotation', 'scale'] as const).map((property) => ({
                 type: 'key.set',
                 entityId: e.id,
-                property,
-                key: { frame, value: t[property] },
+                property: property === 'rotation' ? rotationProperty(p, e) : property,
+                key: {
+                  frame,
+                  value:
+                    property === 'rotation' && rotationProperty(p, e) === 'quaternion'
+                      ? t.quaternion || quaternionFromEuler(t.rotation)
+                      : t[property],
+                },
               })),
               `记录帧 ${frame} 的变换`,
             )
@@ -362,41 +371,47 @@ export function Inspector({
         >
           ◇ 记录当前变换关键帧
         </button>
-        {p.animationTracks.some((a) => a.entityId === e.id) && (
+        {activeTracks(p, e.id).length > 0 && (
           <p className="muted">已有动画属性的修改会更新当前帧关键帧。</p>
         )}
-        {p.animationTracks
-          .filter((a) => a.entityId === e.id)
-          .map((track) => {
-            const key = track.keys.find((k) => k.frame === frame);
-            return key ? (
-              <label className="field" key={track.id}>
-                {{ position: '位置', rotation: '旋转', scale: '缩放' }[track.property]} 插值
-                <select
-                  aria-label={`${track.property} 插值`}
-                  value={key.interpolation}
-                  onChange={(event) =>
-                    send(
-                      [
-                        {
-                          type: 'key.set',
-                          entityId: e.id,
-                          property: track.property,
-                          key: { ...key, interpolation: event.target.value as 'linear' },
-                        },
-                      ],
-                      '修改关键帧插值',
-                    )
-                  }
-                >
-                  <option value="linear">线性</option>
-                  <option value="constant">保持</option>
+        {activeTracks(p, e.id).map((track) => {
+          const key = track.keys.find((k) => k.frame === frame);
+          return key ? (
+            <label className="field" key={track.id}>
+              {
+                { position: '位置', rotation: '欧拉旋转', quaternion: '四元数旋转', scale: '缩放' }[
+                  track.property
+                ]
+              }{' '}
+              插值
+              <select
+                aria-label={`${track.property} 插值`}
+                value={key.interpolation}
+                onChange={(event) =>
+                  send(
+                    [
+                      {
+                        type: 'key.set',
+                        entityId: e.id,
+                        property: track.property,
+                        key: { ...key, interpolation: event.target.value as 'linear' },
+                      },
+                    ],
+                    '修改关键帧插值',
+                  )
+                }
+              >
+                <option value="linear">线性</option>
+                <option value="constant">保持</option>
+                {track.property !== 'quaternion' && (
                   <option value="smooth">平滑（smoothstep）</option>
-                  <option value="bezier">Bézier 曲线</option>
-                </select>
-              </label>
-            ) : null;
-          })}
+                )}
+                {track.property !== 'quaternion' && <option value="bezier">Bézier 曲线</option>}
+                <option value="cubic">Hermite 切线</option>
+              </select>
+            </label>
+          ) : null;
+        })}
         {m && (
           <>
             <h3>表面材质</h3>

@@ -10,11 +10,16 @@ import {
   type Geometry,
   type Project,
   type Vec3,
+  type Vec4,
+  type AnimationValue,
+  type AnimationTrack,
   type TextureBinding,
 } from './model';
 import { checkedImage, imageInfo, sha256 } from './image';
 import { CommandSchema, type Command } from './commands';
 import { evaluatedTransform } from './evaluate';
+import { animationSampler } from './animation-exchange';
+import { normalizeQuaternion, validateTrack } from './animation';
 import { displayColor, linearColor, surfaceGeometry } from './surface';
 
 // Independent bounded format mapping. No external URI requests and no runtime product dependency.
@@ -174,7 +179,35 @@ const documentSchema = base.extend({
     )
     .max(2000)
     .default([]),
-  animations: z.array(z.unknown()).default([]),
+  animations: z
+    .array(
+      base.extend({
+        channels: z
+          .array(
+            base.extend({
+              sampler: integer,
+              target: base.extend({
+                node: integer.optional(),
+                path: z.enum(['translation', 'rotation', 'scale', 'weights']),
+              }),
+            }),
+          )
+          .min(1)
+          .max(6000),
+        samplers: z
+          .array(
+            base.extend({
+              input: integer,
+              output: integer,
+              interpolation: z.enum(['LINEAR', 'STEP', 'CUBICSPLINE']).default('LINEAR'),
+            }),
+          )
+          .min(1)
+          .max(6000),
+      }),
+    )
+    .max(100)
+    .default([]),
   skins: z.array(z.unknown()).default([]),
   extensionsRequired: z.array(z.string()).default([]),
   extensionsUsed: z.array(z.string()).default([]),
@@ -381,15 +414,25 @@ function accessors(doc: Document, buffers: Uint8Array[]) {
   };
   return (
     index: number,
-    semantic: 'POSITION' | 'NORMAL' | 'TEXCOORD_0' | 'TEXCOORD_1' | 'TANGENT' | 'indices',
+    semantic:
+      | 'POSITION'
+      | 'NORMAL'
+      | 'TEXCOORD_0'
+      | 'TEXCOORD_1'
+      | 'TANGENT'
+      | 'indices'
+      | 'time'
+      | 'translation'
+      | 'rotation'
+      | 'scale',
   ) => {
     const a = at(doc.accessors, index, 'accessor'),
       width =
-        semantic === 'indices'
+        semantic === 'indices' || semantic === 'time'
           ? 1
           : semantic.startsWith('TEXCOORD_')
             ? 2
-            : semantic === 'TANGENT'
+            : semantic === 'TANGENT' || semantic === 'rotation'
               ? 4
               : 3;
     if (a.type !== (width === 1 ? 'SCALAR' : `VEC${width}`) || a.count < 1)
@@ -397,12 +440,17 @@ function accessors(doc: Document, buffers: Uint8Array[]) {
     if (
       semantic === 'indices'
         ? ![5121, 5123, 5125].includes(a.componentType) || a.normalized
-        : semantic.startsWith('TEXCOORD_')
+        : semantic === 'rotation'
           ? !(
               (a.componentType === 5126 && !a.normalized) ||
-              ([5121, 5123].includes(a.componentType) && a.normalized)
+              ([5120, 5121, 5122, 5123].includes(a.componentType) && a.normalized)
             )
-          : a.componentType !== 5126 || a.normalized
+          : semantic.startsWith('TEXCOORD_')
+            ? !(
+                (a.componentType === 5126 && !a.normalized) ||
+                ([5121, 5123].includes(a.componentType) && a.normalized)
+              )
+            : a.componentType !== 5126 || a.normalized
     )
       unsupported(`${semantic} 的分量编码（量化扩展尚未接入）`);
     if (cache.has(index)) return cache.get(index)!;
@@ -472,17 +520,23 @@ function nodeTransform(node: Document['nodes'][number]): Entity['transform'] {
     q.normalize();
   }
   const e = new Euler().setFromQuaternion(q, 'XYZ');
-  return { position: p.toArray(), rotation: [e.x, e.y, e.z], scale: s.toArray() };
+  return {
+    position: p.toArray(),
+    rotation: [e.x, e.y, e.z],
+    scale: s.toArray(),
+    ...(node.rotation || node.matrix ? { quaternion: q.toArray() } : {}),
+  };
 }
 
 export async function importGLTF(
   bytes: Uint8Array,
   files: ExchangeFile[] = [],
+  fps = 24,
 ): Promise<GLTFImport> {
+  if (!Number.isInteger(fps) || fps < 1 || fps > 120) throw new Error('动画导入帧率无效');
   const unpacked = unpackGLTF(bytes),
     doc = documentSchema.parse(unpacked.json),
     notes = new Set(unpacked.notes);
-  if (doc.animations.length) unsupported('动画导入；四元数与秒时间轨道仍待接入');
   if (doc.skins.length || doc.nodes.some((n) => n.skin !== undefined)) unsupported('骨骼蒙皮');
   if (
     doc.nodes.some((n) => n.weights !== undefined) ||
@@ -736,6 +790,7 @@ export async function importGLTF(
     ? lightData.parse(doc.extensions.KHR_lights_punctual).lights
     : [];
   const visitedAll = new Set<number>();
+  const sceneNodes: { sceneId: string; nodes: Map<number, string> }[] = [];
   doc.scenes.forEach((source, sceneIndex) => {
     const scene: Project['scenes'][number] = {
       id: id(),
@@ -749,6 +804,8 @@ export async function importGLTF(
       },
     };
     command.scenes.push(scene);
+    const nodes = new Map<number, string>();
+    sceneNodes.push({ sceneId: scene.id, nodes });
     const visited = new Set<number>();
     const visit = (index: number, parentId: string | null, depth: number) => {
       if (depth > 128) throw new Error('glTF 对象层级超过 128 层');
@@ -766,6 +823,7 @@ export async function importGLTF(
         transform: nodeTransform(node),
       };
       command.entities.push(e);
+      nodes.set(index, e.id);
       const mesh = node.mesh === undefined ? undefined : at(doc.meshes, node.mesh, 'mesh');
       const lightRef =
         node.extensions?.KHR_lights_punctual === undefined
@@ -826,6 +884,104 @@ export async function importGLTF(
     };
     source.nodes.forEach((i) => visit(i, null, 0));
   });
+  let animationKeys = 0;
+  for (const [animationIndex, animation] of doc.animations.entries()) {
+    const used = new Set<string>();
+    const channels = animation.channels.flatMap((channel) => {
+      if (channel.target.node === undefined) {
+        notes.add('没有目标节点的动画通道已忽略。');
+        return [];
+      }
+      if (channel.target.path === 'weights') unsupported('形态键动画');
+      const node = at(doc.nodes, channel.target.node, 'animation.target.node');
+      if (node.matrix) throw new Error('动画节点必须使用 TRS，不能使用 matrix');
+      const key = `${channel.target.node}:${channel.target.path}`;
+      if (used.has(key)) throw new Error('同一动画的节点属性通道重复');
+      used.add(key);
+      const sampler = at(animation.samplers, channel.sampler, 'animation.sampler');
+      const input = at(doc.accessors, sampler.input, 'animation.input');
+      if (
+        !Array.isArray(input.min) ||
+        !Array.isArray(input.max) ||
+        input.min.length !== 1 ||
+        input.max.length !== 1
+      )
+        throw new Error('动画时间 accessor 需要 min/max');
+      const times = read(sampler.input, 'time').map((r) => r[0]),
+        values = read(sampler.output, channel.target.path);
+      const min = z.tuple([z.number().finite()]).parse(input.min)[0],
+        max = z.tuple([z.number().finite()]).parse(input.max)[0];
+      if (Math.fround(min) !== times[0] || Math.fround(max) !== times.at(-1))
+        throw new Error('动画时间 accessor 范围与数据不匹配');
+      if (
+        times.length > 10000 ||
+        times.some((t, i) => t < 0 || t * fps > 1e6 || (i > 0 && t <= times[i - 1]))
+      )
+        throw new Error('动画时间必须递增且在当前关键帧限制内');
+      const cubic = sampler.interpolation === 'CUBICSPLINE';
+      if (values.length !== times.length * (cubic ? 3 : 1) || (cubic && times.length < 2))
+        throw new Error('动画输入输出数量或 Hermite 关键帧数量无效');
+      const property =
+        channel.target.path === 'rotation'
+          ? 'quaternion'
+          : channel.target.path === 'translation'
+            ? 'position'
+            : 'scale';
+      const keys = times.map((time, i) => {
+        let value = [...values[cubic ? i * 3 + 1 : i]] as AnimationValue;
+        if (property === 'quaternion') {
+          if (Math.abs(Math.hypot(...value) - 1) > 0.02) throw new Error('动画四元数长度无效');
+          value = normalizeQuaternion(value);
+        }
+        return {
+          id: id(),
+          frame: time * fps,
+          value,
+          interpolation: (cubic
+            ? 'cubic'
+            : sampler.interpolation === 'STEP'
+              ? 'constant'
+              : 'linear') as AnimationTrack['keys'][number]['interpolation'],
+          ...(cubic
+            ? {
+                inTangent: values[i * 3].map((v) => v / fps) as AnimationValue,
+                outTangent: values[i * 3 + 2].map((v) => v / fps) as AnimationValue,
+              }
+            : {}),
+        };
+      });
+      return [{ node: channel.target.node, property, keys }];
+    });
+    for (const mapping of sceneNodes) {
+      const relevant = channels.filter((c) => mapping.nodes.has(c.node));
+      if (!relevant.length) continue;
+      const action = {
+        id: id(),
+        name: name(animation.name, `动画 ${animationIndex + 1}`),
+        sceneId: mapping.sceneId,
+      };
+      (command.animationActions ||= []).push(action);
+      const scene = command.scenes.find((s) => s.id === action.sceneId)!;
+      scene.activeActionId ||= action.id;
+      for (const channel of relevant) {
+        animationKeys += channel.keys.length;
+        if (animationKeys > 200000) throw new Error('导入动画合计超过 20 万关键帧限制');
+        const track: AnimationTrack = {
+          id: id(),
+          actionId: action.id,
+          entityId: mapping.nodes.get(channel.node)!,
+          property: channel.property as AnimationTrack['property'],
+          keys: structuredClone(channel.keys),
+        };
+        validateTrack(track);
+        (command.animationTracks ||= []).push(track);
+      }
+    }
+  }
+  if (doc.animations.length)
+    notes.add(
+      `动画秒时间按 ${fps} FPS 转为非整帧键；每个场景可选择动作，首个动作为默认。镜头/时间轴时长保持原设置。`,
+    );
   if (visitedAll.size < doc.nodes.length) notes.add('未被任何场景引用的节点未导入。');
   if (
     primitives.size < doc.meshes.reduce((n, m) => n + m.primitives.length, 0) ||
@@ -867,6 +1023,7 @@ export function exportGLB(
   sceneId: string,
   frame: number,
   imageBytes: ReadonlyMap<string, Uint8Array> = new Map(),
+  animated = false,
 ) {
   if (!Number.isFinite(frame) || frame < 0) throw new Error('导出帧无效');
   const scene = project.scenes.find((s) => s.id === sceneId);
@@ -962,24 +1119,31 @@ export function exportGLB(
     }
     return info;
   }
-  function attribute(values: number[], width: number, type: 'FLOAT' | 'INDEX', bounds = false) {
+  function attribute(
+    values: number[],
+    width: number,
+    type: 'FLOAT' | 'INDEX' | 'ANIMATION',
+    bounds = false,
+  ) {
+    if (type !== 'INDEX' && values.some((v) => !Number.isFinite(Math.fround(v))))
+      throw new Error('导出数值超过 Float32 范围，请调整动画间距或切线');
     const bytes = new Uint8Array(values.length * 4),
       view = new DataView(bytes.buffer);
     values.forEach((v, i) =>
-      type === 'FLOAT' ? view.setFloat32(i * 4, v, true) : view.setUint32(i * 4, v, true),
+      type !== 'INDEX' ? view.setFloat32(i * 4, v, true) : view.setUint32(i * 4, v, true),
     );
     views.push({
       buffer: 0,
       byteOffset: byteLength,
       byteLength: bytes.length,
-      target: type === 'INDEX' ? 34963 : 34962,
+      ...(type !== 'ANIMATION' ? { target: type === 'INDEX' ? 34963 : 34962 } : {}),
     });
     chunks.push(bytes);
     byteLength += bytes.length;
     if (byteLength > LIMIT) throw new Error('导出 GLB 超过 50 MB 限制');
     const a: JSONRecord = {
       bufferView: views.length - 1,
-      componentType: type === 'FLOAT' ? 5126 : 5125,
+      componentType: type !== 'INDEX' ? 5126 : 5125,
       count: values.length / width,
       type: width === 1 ? 'SCALAR' : `VEC${width}`,
     };
@@ -1003,10 +1167,12 @@ export function exportGLB(
     geometryMap = new Map<string, JSONRecord>();
   const world = new Map<string, Matrix4>();
   const localMatrix = (e: Entity) => {
-    const t = evaluatedTransform(project, e, frame);
+    const t = animated ? e.transform : evaluatedTransform(project, e, frame);
     return new Matrix4().compose(
       new Vector3(...t.position),
-      new Quaternion().setFromEuler(new Euler(...t.rotation, 'XYZ')),
+      t.quaternion
+        ? new Quaternion(...t.quaternion)
+        : new Quaternion().setFromEuler(new Euler(...t.rotation, 'XYZ')),
       new Vector3(...t.scale),
     );
   };
@@ -1021,11 +1187,12 @@ export function exportGLB(
     return world.get(e.id)!;
   };
   included.forEach((e) => {
-    const t = evaluatedTransform(project, e, frame),
+    const t = animated ? e.transform : evaluatedTransform(project, e, frame),
       node: JSONRecord = {
         name: e.name,
         translation: t.position,
-        rotation: new Quaternion().setFromEuler(new Euler(...t.rotation, 'XYZ')).toArray(),
+        rotation:
+          t.quaternion || new Quaternion().setFromEuler(new Euler(...t.rotation, 'XYZ')).toArray(),
         scale: t.scale,
       };
     const children = included.filter((c) => c.parentId === e.id).map((c) => nodeIndex.get(c.id)!);
@@ -1170,6 +1337,16 @@ export function exportGLB(
   // preserving the exported transform of any ordinary children attached to the original node.
   included.forEach((e, i) => {
     if (e.light?.kind !== 'directional' || e.light.direction) return;
+    if (animated) {
+      let ancestor: Entity | undefined = e;
+      while (ancestor) {
+        if (project.animationTracks.some((t) => t.entityId === ancestor!.id && t.keys.length))
+          throw new Error(
+            '动画 GLB 尚不能保持旧式朝世界原点平行光的动态追踪；请使用项目包保存此动画',
+          );
+        ancestor = ancestor.parentId ? byId.get(ancestor.parentId) : undefined;
+      }
+    }
     const matrix = worldMatrix(e),
       direction = new Vector3().setFromMatrixPosition(matrix).negate();
     if (direction.lengthSq() < 1e-12)
@@ -1185,10 +1362,51 @@ export function exportGLB(
     nodes.push(child);
   });
   if (lights.length) extensionsUsed.add('KHR_lights_punctual');
+  const animations: JSONRecord[] = [];
+  if (animated) {
+    const groups = [
+      { id: undefined, name: '项目动画' },
+      ...(project.animationActions || []).filter((a) => a.sceneId === sceneId),
+    ];
+    for (const group of groups) {
+      const tracks = project.animationTracks.filter(
+        (t) => t.actionId === group.id && nodeIndex.has(t.entityId) && t.keys.length,
+      );
+      const samplers: JSONRecord[] = [],
+        channels: JSONRecord[] = [];
+      for (const track of tracks) {
+        const sample = animationSampler(track, project.timeline.fps);
+        if (sample.baked)
+          notes.push(
+            `动作“${group.name}”的 ${byId.get(track.entityId)!.name}/${track.property} 按 ${project.timeline.fps} FPS 及原始键时间采样为线性键；帧间曲线为近似，完整曲线保存在项目包。`,
+          );
+        const index = samplers.length;
+        samplers.push({
+          input: attribute(sample.times, 1, 'ANIMATION', true),
+          output: attribute(sample.values.flat(), sample.values[0].length, 'ANIMATION'),
+          interpolation: sample.interpolation,
+        });
+        channels.push({
+          sampler: index,
+          target: {
+            node: nodeIndex.get(track.entityId),
+            path:
+              track.property === 'position'
+                ? 'translation'
+                : track.property === 'quaternion'
+                  ? 'rotation'
+                  : track.property,
+          },
+        });
+      }
+      if (channels.length) animations.push({ name: group.name, samplers, channels });
+    }
+    notes.push('动画 GLB 保存本场景全部动作及静态基础姿态；glTF 没有当前动作选择或镜头时间轴。');
+  }
   const json: JSONRecord = {
     asset: {
       version: '2.0',
-      generator: 'Frameforge Studio 0.7 scene exchange',
+      generator: 'Frameforge Studio 0.8 scene exchange',
       ...(scene.source?.copyright ? { copyright: scene.source.copyright } : {}),
     },
     scene: 0,
@@ -1199,16 +1417,16 @@ export function exportGLB(
       },
     ],
     ...(nodes.length ? { nodes } : {}),
-    ...(meshes.length
+    ...(meshes.length ? { meshes, materials } : {}),
+    ...(byteLength
       ? {
-          meshes,
-          materials,
           accessors: outputAccessors,
           bufferViews: views,
           buffers: [{ byteLength }],
         }
       : {}),
     ...(cameras.length ? { cameras } : {}),
+    ...(animations.length ? { animations } : {}),
     ...(images.length ? { images, textures, samplers } : {}),
     ...(extensionsUsed.size ? { extensionsUsed: [...extensionsUsed] } : {}),
     ...(extensionsRequired.size ? { extensionsRequired: [...extensionsRequired] } : {}),
@@ -1243,6 +1461,7 @@ export async function exportGLBWithAssets(
   sceneId: string,
   frame: number,
   load: (asset: Asset) => Promise<Uint8Array>,
+  animated = false,
 ) {
   const images = new Map<string, Uint8Array>();
   const entities = project.entities.filter((e) => e.sceneId === sceneId),
@@ -1268,5 +1487,5 @@ export async function exportGLBWithAssets(
       await checkedImage(bytes, asset);
       images.set(asset.id, bytes);
     }
-  return exportGLB(project, sceneId, frame, images);
+  return exportGLB(project, sceneId, frame, images, animated);
 }

@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import {
   ArtifactSchema,
+  AnimationActionSchema,
+  AnimationTrackSchema,
   AssetSchema,
   ClipSchema,
   EntitySchema,
@@ -20,7 +22,7 @@ import {
   type Project,
 } from './model';
 import { extrudeFace, primitive, subdivide, projectUV } from './geometry';
-import { editTrack } from './animation';
+import { editTrack, normalizeQuaternion, prepareCubic, activeTracks } from './animation';
 import { displayColor } from './surface';
 import { deleteElements, extrudeRegion, mergeVertices, transformVertices } from './mesh';
 
@@ -31,12 +33,23 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('scene.add'), scene: SceneSchema }).strict(),
   z
     .object({
+      type: z.literal('action.add'),
+      action: AnimationActionSchema,
+      copyFrom: ID.nullable().optional(),
+    })
+    .strict(),
+  z.object({ type: z.literal('action.rename'), id: ID, name: z.string().min(1).max(160) }).strict(),
+  z.object({ type: z.literal('action.delete'), id: ID }).strict(),
+  z
+    .object({
       type: z.literal('scene.import'),
       scenes: z.array(SceneSchema).min(1).max(100),
       entities: z.array(EntitySchema).max(2000),
       geometries: z.array(GeometrySchema).max(2000),
       materials: z.array(MaterialSchema).max(2000),
       assets: z.array(AssetSchema).max(1000).optional(),
+      animationActions: z.array(AnimationActionSchema).max(1000).optional(),
+      animationTracks: z.array(AnimationTrackSchema).max(6000).optional(),
     })
     .strict(),
   z
@@ -123,7 +136,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
     .object({
       type: z.literal('key.set'),
       entityId: ID,
-      property: z.enum(['position', 'rotation', 'scale']),
+      property: z.enum(['position', 'rotation', 'scale', 'quaternion']),
       key: KeySchema.extend({
         id: ID.optional(),
         interpolation: KeySchema.shape.interpolation.optional(),
@@ -131,14 +144,24 @@ export const CommandSchema = z.discriminatedUnion('type', [
     })
     .strict(),
   z
-    .object({ type: z.literal('key.delete'), trackId: ID, frame: z.number().int().nonnegative() })
+    .object({
+      type: z.literal('key.delete'),
+      trackId: ID,
+      frame: z.number().finite().nonnegative(),
+    })
     .strict(),
   z
     .object({
       type: z.literal('key.update'),
       trackId: ID,
       keyId: ID,
-      patch: KeySchema.pick({ frame: true, value: true, interpolation: true }).partial(),
+      patch: KeySchema.pick({
+        frame: true,
+        value: true,
+        interpolation: true,
+        inTangent: true,
+        outTangent: true,
+      }).partial(),
     })
     .strict(),
   z
@@ -220,7 +243,43 @@ function apply(p: Project, c: Command) {
       p.geometries.push(...c.geometries);
       p.materials.push(...c.materials);
       p.assets.push(...(c.assets || []));
+      if (c.animationActions?.length) (p.animationActions ||= []).push(...c.animationActions);
+      p.animationTracks.push(...(c.animationTracks || []));
       break;
+    case 'action.add': {
+      const scene = get(p.scenes, c.action.sceneId);
+      if (c.copyFrom && get(p.animationActions || [], c.copyFrom).sceneId !== scene.id)
+        throw new Error('只能复制同一场景的动作');
+      if (c.copyFrom !== undefined) {
+        const targets = new Set(p.entities.filter((e) => e.sceneId === scene.id).map((e) => e.id));
+        const tracks = p.animationTracks.filter(
+          (t) => targets.has(t.entityId) && (t.actionId || null) === c.copyFrom,
+        );
+        p.animationTracks.push(
+          ...tracks.map((t) => ({
+            ...structuredClone(t),
+            id: id(),
+            actionId: c.action.id,
+            keys: t.keys.map((k) => ({ ...structuredClone(k), id: id() })),
+          })),
+        );
+      }
+      (p.animationActions ||= []).push(c.action);
+      scene.activeActionId = c.action.id;
+      break;
+    }
+    case 'action.rename':
+      get(p.animationActions || [], c.id).name = c.name;
+      break;
+    case 'action.delete': {
+      get(p.animationActions || [], c.id);
+      p.animationActions = p.animationActions?.filter((a) => a.id !== c.id);
+      p.animationTracks = p.animationTracks.filter((t) => t.actionId !== c.id);
+      p.scenes.forEach((s) => {
+        if (s.activeActionId === c.id) s.activeActionId = null;
+      });
+      break;
+    }
     case 'scene.update':
       Object.assign(get(p.scenes, c.id), c.patch);
       break;
@@ -366,10 +425,17 @@ function apply(p: Project, c: Command) {
       break;
     }
     case 'key.set': {
-      get(p.entities, c.entityId);
-      let t = p.animationTracks.find((t) => t.entityId === c.entityId && t.property === c.property);
+      const entity = get(p.entities, c.entityId),
+        actionId = get(p.scenes, entity.sceneId).activeActionId || undefined;
+      let t = activeTracks(p, c.entityId).find((t) => t.property === c.property);
       if (!t) {
-        t = { id: id(), entityId: c.entityId, property: c.property, keys: [] };
+        t = {
+          id: id(),
+          entityId: c.entityId,
+          property: c.property,
+          keys: [],
+          ...(actionId ? { actionId } : {}),
+        };
         p.animationTracks.push(t);
       }
       const previous = t.keys.find((k) => k.frame === c.key.frame);
@@ -379,8 +445,10 @@ function apply(p: Project, c: Command) {
         ...c.key,
         id: previous?.id || c.key.id || id(),
         interpolation: c.key.interpolation || previous?.interpolation || 'linear',
+        ...(c.property === 'quaternion' ? { value: normalizeQuaternion(c.key.value) } : {}),
       });
       t.keys.sort((a, b) => a.frame - b.frame);
+      prepareCubic(t);
       break;
     }
     case 'key.update':
@@ -391,6 +459,7 @@ function apply(p: Project, c: Command) {
     case 'key.delete': {
       const t = get(p.animationTracks, c.trackId);
       t.keys = t.keys.filter((k) => k.frame !== c.frame);
+      prepareCubic(t);
       if (!t.keys.length) p.animationTracks = p.animationTracks.filter((x) => x.id !== t.id);
       break;
     }

@@ -1,8 +1,26 @@
 # 持续开发恢复记录
 
-更新时间：2026-10-23。用户附件要求的完整 Blender + LibTV 功能目标保持 active；此处是 0.7 基础版本检查点，不是目标完成声明。下方旧版本段落仅保留历史证据。
+更新时间：2026-10-23。用户附件要求的完整 Blender + LibTV 功能目标保持 active；此处是 0.8 基础版本检查点，不是目标完成声明。下方旧版本段落仅保留历史证据。
 
-## 0.7 最新恢复入口
+## 0.8 最新恢复入口
+
+0.7 已推送 `bc42302`。0.8 加入场景动作、分数帧、四元数 SLERP、Hermite 切线与 glTF 变换动画交换，格式 v8；最新提交以实际 git log/status 为准。没有新依赖、外部模型调用或 Blender 运行时。新增 `core/animation-exchange.ts`、`ui/ActionPanel.tsx` 与原创文件夹具/集成脚本。`core/animation.ts` 统一动作过滤、数学取样和键校验，SceneRenderer 直接应用四元数，Inspector/空间编辑保留 Euler 显示与操作。
+
+场景动作面板支持新建/复制/改名/删除/选择；同场景复制重建轨道/键 ID，所有操作经过统一命令与撤销。默认“项目动画”只求值无 actionId 的旧轨道；选中动作只求值该动作，未覆盖属性保留基础姿态。每个场景的所有镜头共享选择。动画导入是一次 scene.import，按当前 FPS 保存小数帧与每帧导数；多场景共享源节点映射为各场景独立动作，首个相关动作默认启用。当前帧和动画 GLB 分开导出。
+
+**最终依据**：52 项核心检查通过；类型检查/正式构建通过，主 bundle 945.92 KB，有体积提示，无性能达标声明。正式入口 `smoke:animation-exchange`、`smoke:gltf`、`smoke:textures`、`smoke:mesh`、`smoke` 通过；开发入口旧 `smoke:animation` 也通过。实际动作操作、9.25 帧键、归一化 W、Hermite 切线、分数播放头片段吸附、撤销/重载、GLB 下载/再导入、任务快照、包重导入都走通。动画 GLB 校验 0 错误/0 警告/0 信息；480×270、36 帧 MP4 四个采样帧与 PNG 平均通道差 0.412–0.429/255，无 pageerror。最后一次动画运行时间 `2026-10-23T07:57:31.904Z`。没有重跑所有历史媒体/供应商脚本，不将历史证据改称新结果。
+
+证据见 `research/2026-10-23-animation-exchange.md`、`*-animation-exchange-runtime.json`、`*-v08-*-runtime.json` 与 `*-v08-runtime.json`；真实项目/GLB/MP4 为 `examples/animation-exchange.*`，截图/PNG/validator 原始报告在 `.local/checks/animation-exchange/`。独立对照使用 Three GLTFLoader/AnimationMixer 的单场景副本；多场景另以映射断言和 UI 验证。检查侧补齐 Node ProgressEvent，并修正刷新后等待修订的竞态，最终无核心失败。
+
+v8 实际升级并审计：58 个项目、277 个撤销历史、308 条版本、41 个任务快照，除格式号外逐项相同，历史游标不变。备份 `before-schema-v8-1792740882523.sqlite`；摘要 `research/2026-10-23-v08-migration.json`，本地只读审计脚本 `.local/checks/audit-v8.mjs`。新字段可选，旧 Euler/键 ID/材质/媒体数据保留。务必保护 `.local/data`。
+
+**限制**：只支持变换动作，无 NLA/骨架/蒙皮/形态键/重定向/多键编辑/循环或旋转解缠。动作选择尚不能按镜头/片段覆盖。原生 STEP/LINEAR/SLERP/兼容 Hermite 可保留；Euler、混合保持、混合四元数插值、时间非线性 Bézier 按整数帧及原键时间采样，帧间有近似，UI 明示且项目包保持原曲线。每次导入最多 100 源动作、单轨 10000 键、映射后 20 万键；项目最多 1000 动作/6000 轨道。Float32 时间重合/溢出拒绝。四元数三次内部共同零点由浮点根隔离检查，不是任意极端值的形式化证明；缩放曲线仍可能在键之间过零。旧式朝世界原点平行光/祖先有动画时，动画 GLB 拒绝导出以免静默丢失追踪。
+
+**下一单元**：研究并实现镜头/片段的动作选择与源时间映射，让同场景的不同动作能在同一成片组合；随后明确重复/混合规则。需保持现有场景默认动作与旧片段行为、统一求值、撤销和任务快照，并实际输出多动作影片。继续保留 UV 岛、环境照明、多边形拓扑、节点产物协议及完整专业功能范围。Seedance 缺少凭据/预算不阻塞其他工作，不能伪造结果。
+
+本轮启动的开发/正式服务均已停止，已核查 4173 无监听。恢复时先确认实际进程，再按 README 启动；不能把本文当作服务状态证据。Git 保存及推送沿用用户授权，完成状态以命令返回和 HEAD/origin/main 一致为准。
+
+## 0.7 历史恢复记录
 
 0.6 已推送 `b08a726` 与检查补充 `ba4ca11`。0.7 增加图片材质/UV 数据和真实异步渲染，项目格式 v7；提交号以实际 git log/status 为准。没有新增依赖。新增 `core/image.ts`、`render/textures.ts`、`ui/TexturePanel.tsx`；扩展统一 `scene.import`、`material.update` 与 `geometry.uvProject`。图片仍是同一素材库的 Asset，支持 PNG/JPEG/WebP、五类 PBR、UV0/1、采样/仿射变换、切线、GLB 原图内嵌、资源文件夹和可撤销盒式投影。glTF 导入现在异步计算图片哈希，调用方均已 await。
 

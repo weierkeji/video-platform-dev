@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { GenerationOptionsSchema, GenerationRequestSchema } from './generation';
 import { validateTrack } from './animation';
 
-export const PROJECT_VERSION = 7;
+export const PROJECT_VERSION = 8;
 
 export const id = () => crypto.randomUUID();
 const ID = z
@@ -14,6 +14,10 @@ const Name = z.string().min(1).max(160);
 const NumberValue = z.number().finite().min(-1e7).max(1e7);
 export const Vec3Schema = z.tuple([NumberValue, NumberValue, NumberValue]);
 export type Vec3 = z.infer<typeof Vec3Schema>;
+export const Vec4Schema = z.tuple([NumberValue, NumberValue, NumberValue, NumberValue]);
+export type Vec4 = z.infer<typeof Vec4Schema>;
+export const AnimationValueSchema = z.union([Vec3Schema, Vec4Schema]);
+export type AnimationValue = Vec3 | Vec4;
 export const Vec2Schema = z.tuple([NumberValue, NumberValue]);
 export const TextureBindingSchema = z
   .object({
@@ -58,7 +62,12 @@ export function textureBinding(assetId: string): TextureBinding {
   };
 }
 export const TransformSchema = z
-  .object({ position: Vec3Schema, rotation: Vec3Schema, scale: Vec3Schema })
+  .object({
+    position: Vec3Schema,
+    rotation: Vec3Schema,
+    scale: Vec3Schema,
+    quaternion: Vec4Schema.optional(),
+  })
   .strict();
 export const identity = () => ({
   position: [0, 0, 0] as Vec3,
@@ -166,6 +175,7 @@ export const SceneSchema = z
     name: Name,
     background: z.string().regex(/^#[\da-fA-F]{6}$/),
     ambient: z.number().min(0).max(5),
+    activeActionId: ID.nullable().optional(),
     source: z
       .object({
         format: z.literal('gltf2'),
@@ -187,10 +197,12 @@ export const HandleSchema = z
 export const KeySchema = z
   .object({
     id: ID,
-    frame: z.number().int().min(0).max(1000000),
-    value: Vec3Schema,
-    interpolation: z.enum(['constant', 'linear', 'smooth', 'bezier']),
+    frame: z.number().finite().min(0).max(1000000),
+    value: AnimationValueSchema,
+    interpolation: z.enum(['constant', 'linear', 'smooth', 'bezier', 'cubic']),
     handles: z.tuple([HandleSchema, HandleSchema, HandleSchema]).optional(),
+    inTangent: AnimationValueSchema.optional(),
+    outTangent: AnimationValueSchema.optional(),
   })
   .strict();
 export type Keyframe = z.infer<typeof KeySchema>;
@@ -199,11 +211,14 @@ export const AnimationTrackSchema = z
   .object({
     id: ID,
     entityId: ID,
-    property: z.enum(['position', 'rotation', 'scale']),
+    property: z.enum(['position', 'rotation', 'scale', 'quaternion']),
+    actionId: ID.optional(),
     keys: z.array(KeySchema).max(10000),
   })
   .strict();
 export type AnimationTrack = z.infer<typeof AnimationTrackSchema>;
+export const AnimationActionSchema = z.object({ id: ID, name: Name, sceneId: ID }).strict();
+export type AnimationAction = z.infer<typeof AnimationActionSchema>;
 export const AssetSchema = z
   .object({
     id: ID,
@@ -352,6 +367,7 @@ export const ProjectSchema = z
     geometries: z.array(GeometrySchema).max(2000),
     materials: z.array(MaterialSchema).max(2000),
     animationTracks: z.array(AnimationTrackSchema).max(6000),
+    animationActions: z.array(AnimationActionSchema).max(1000).optional(),
     assets: z.array(AssetSchema).max(10000),
     shots: z.array(ShotSchema).max(10000),
     timeline: TimelineSchema,
@@ -405,6 +421,7 @@ export function parseProject(input: unknown): Project {
     ...p.geometries,
     ...p.materials,
     ...p.animationTracks,
+    ...(p.animationActions || []),
     ...p.assets,
     ...p.shots,
     p.timeline,
@@ -464,6 +481,8 @@ export function parseProject(input: unknown): Project {
       throw new Error('摄影机裁剪范围无效');
     if (e.kind === 'light' && !e.light) throw new Error('灯光参数缺失');
     if (e.transform.scale.some((v) => Math.abs(v) < 0.00001)) throw new Error('缩放不能为零');
+    if (e.transform.quaternion && Math.abs(Math.hypot(...e.transform.quaternion) - 1) > 0.001)
+      throw new Error('对象四元数必须归一化');
     const ancestors = new Set([e.id]);
     let parentId = e.parentId;
     while (parentId) {
@@ -475,9 +494,20 @@ export function parseProject(input: unknown): Project {
     }
   }
   const paths = new Set<string>();
+  const actions = new Map((p.animationActions || []).map((a) => [a.id, a]));
+  for (const a of actions.values())
+    if (!scenes.has(a.sceneId)) throw new Error('动画动作所属场景不存在');
+  for (const s of p.scenes)
+    if (s.activeActionId && actions.get(s.activeActionId)?.sceneId !== s.id)
+      throw new Error('场景的动画动作引用无效');
   for (const track of p.animationTracks) {
     if (!entities.has(track.entityId)) throw new Error('动画目标不存在');
-    const path = `${track.entityId}:${track.property}`;
+    if (
+      track.actionId &&
+      actions.get(track.actionId)?.sceneId !== entities.get(track.entityId)!.sceneId
+    )
+      throw new Error('动画轨道与动作必须属于同一场景');
+    const path = `${track.actionId || ''}:${track.entityId}:${track.property === 'quaternion' ? 'rotation' : track.property}`;
     if (paths.has(path)) throw new Error('同一属性不能有重复动画轨道');
     paths.add(path);
     validateTrack(track);
@@ -533,7 +563,7 @@ export function migrateProject(input: unknown) {
     typeof input !== 'object' ||
     !input ||
     !('schemaVersion' in input) ||
-    ![1, 2, 3, 4, 5, 6, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
+    ![1, 2, 3, 4, 5, 6, 7, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
     typeof input.schemaVersion !== 'number'
   )
     throw new Error('不支持此项目版本；原文件未修改');

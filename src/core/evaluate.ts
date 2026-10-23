@@ -1,11 +1,20 @@
-import { type Entity, type Project } from './model';
-import { sampleTrack } from './animation';
+import { type Entity, type Project, type Vec3, type Vec4 } from './model';
+import { sampleTrack, activeTracks, eulerFromQuaternion } from './animation';
 export { sampleTrack } from './animation';
 export function evaluatedTransform(p: Project, entity: Entity, frame: number) {
   const t = structuredClone(entity.transform);
-  for (const track of p.animationTracks.filter((t) => t.entityId === entity.id)) {
+  if (t.quaternion) t.rotation = eulerFromQuaternion(t.quaternion);
+  for (const track of activeTracks(p, entity.id)) {
     const value = sampleTrack(track, frame);
-    if (value) t[track.property] = value;
+    if (value) {
+      if (track.property === 'quaternion') {
+        t.quaternion = value as Vec4;
+        t.rotation = eulerFromQuaternion(t.quaternion);
+      } else {
+        t[track.property] = value as Vec3;
+        if (track.property === 'rotation') delete t.quaternion;
+      }
+    }
   }
   return t;
 }

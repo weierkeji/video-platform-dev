@@ -55,11 +55,21 @@ try {
   }
   await page.getByRole('button', { name: 'glTF', exact: true }).click();
   await page.getByLabel('选择 glTF 文件', { exact: true }).setInputFiles({
-    name: 'animated.gltf',
+    name: 'morph-animation.gltf',
     mimeType: 'model/gltf+json',
-    buffer: Buffer.from(JSON.stringify({ ...gltfFixture(), animations: [{}] })),
+    buffer: Buffer.from(
+      JSON.stringify({
+        ...gltfFixture(),
+        animations: [
+          {
+            channels: [{ sampler: 0, target: { node: 0, path: 'weights' } }],
+            samplers: [{ input: 0, output: 0 }],
+          },
+        ],
+      }),
+    ),
   });
-  await page.getByRole('alert').filter({ hasText: '动画导入' }).waitFor();
+  await page.getByRole('alert').filter({ hasText: '形态键动画' }).waitFor();
   assert.equal((await api<{ project: Project }>(`/projects/${p.id}`)).project.revision, 0);
   // Companion-file resolution exercises real file chooser handling rather than the exporter itself.
   const fixture = gltfFixture(),
@@ -239,7 +249,7 @@ try {
     format: PROJECT_VERSION,
     validator: { version: validation.validatorVersion, issues: validation.issues },
     checks: [
-      'unsupported animation rejected without saving',
+      'unsupported morph animation rejected without saving',
       'external binary file import',
       'hierarchy and shared geometry',
       'single undo/redo import transaction',

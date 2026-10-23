@@ -119,7 +119,8 @@ export class SceneRenderer {
       const t = evaluatedTransform(this.project, e, frame),
         o = this.objects.get(e.id)!;
       o.position.fromArray(t.position);
-      o.rotation.set(...t.rotation, 'XYZ');
+      if (t.quaternion) o.quaternion.fromArray(t.quaternion);
+      else o.rotation.set(...t.rotation, 'XYZ');
       o.scale.fromArray(t.scale);
     }
     this.scene.updateMatrixWorld(true);

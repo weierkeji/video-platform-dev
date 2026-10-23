@@ -1105,3 +1105,14 @@ pre {
     display: none;
   }
 }
+.action-panel {
+  padding: 0 10px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.action-panel select {
+  margin: 0;
+  width: 100%;
+}
+.action-panel .button-row {
+  flex-wrap: wrap;
+}
