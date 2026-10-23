@@ -1,6 +1,7 @@
 import { type Command } from '../core/commands';
 import { type Project } from '../core/model';
 import { activeTracks } from '../core/animation';
+import { shotAction } from '../core/playback';
 import { NumberInput } from './Inspector';
 import type { KeySelection } from './CurveEditor';
 
@@ -33,6 +34,17 @@ export function Timeline({
     (a, b) => b - a,
   );
   const tracks = selectedEntity ? activeTracks(p, selectedEntity) : [];
+  const motion = (clip: Project['timeline']['clips'][number]) => {
+    if (clip.kind !== 'shot') return '';
+    const shot = p.shots.find((s) => s.id === clip.sourceId)!;
+    const action =
+      p.animationActions?.find((a) => a.id === shotAction(p, shot, clip))?.name || '项目动画';
+    return `${action} · ${clip.playback?.rate ?? 1}×${
+      clip.playback
+        ? ' · ' + { hold: '保持', repeat: '循环', pingpong: '往返' }[clip.playback.mode]
+        : ''
+    }`;
+  };
   return (
     <section className="timeline">
       <div className="timeline-toolbar">
@@ -106,9 +118,10 @@ export function Timeline({
                         width: `${(c.duration / p.timeline.duration) * 100}%`,
                       }}
                       onClick={() => selectClip(c.id)}
-                      title={`${c.name} · ${c.start}–${c.start + c.duration} 帧（右开区间）`}
+                      title={`${c.name} · ${c.start}–${c.start + c.duration} 帧（右开区间）${c.kind === 'shot' ? ' · ' + motion(c) : ''}`}
                     >
                       {c.kind === 'shot' ? '▧' : c.kind === 'audio' ? '♫' : '▣'} {c.name}
+                      {c.kind === 'shot' && <span className="clip-motion"> · {motion(c)}</span>}
                       <small>{c.duration} f</small>
                     </button>
                   ))}

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { GenerationOptionsSchema, GenerationRequestSchema } from './generation';
 import { validateTrack } from './animation';
 
-export const PROJECT_VERSION = 8;
+export const PROJECT_VERSION = 9;
 
 export const id = () => crypto.randomUUID();
 const ID = z
@@ -245,7 +245,28 @@ export const AssetSchema = z
   })
   .strict();
 export type Asset = z.infer<typeof AssetSchema>;
-export const ShotSchema = z.object({ id: ID, name: Name, sceneId: ID, cameraId: ID }).strict();
+// A missing/null choice inherits; an explicit null actionId selects the original project tracks.
+export const ActionChoiceSchema = z.object({ actionId: ID.nullable() }).strict();
+export type ActionChoice = z.infer<typeof ActionChoiceSchema>;
+export const ShotPlaybackSchema = z
+  .object({
+    rate: z.number().finite().min(-16).max(16),
+    rangeStart: z.number().finite().min(0).max(1000000),
+    rangeEnd: z.number().finite().min(0).max(1000000),
+    mode: z.enum(['hold', 'repeat', 'pingpong']),
+  })
+  .strict();
+export type ShotPlayback = z.infer<typeof ShotPlaybackSchema>;
+export const ShotSchema = z
+  .object({
+    id: ID,
+    name: Name,
+    sceneId: ID,
+    cameraId: ID,
+    action: ActionChoiceSchema.nullable().optional(),
+  })
+  .strict();
+export type Shot = z.infer<typeof ShotSchema>;
 export const ClipSchema = z
   .object({
     id: ID,
@@ -254,7 +275,9 @@ export const ClipSchema = z
     sourceId: ID,
     start: z.number().int().nonnegative().max(1000000),
     duration: z.number().int().positive().max(1000000),
-    sourceIn: z.number().int().nonnegative().max(1000000),
+    sourceIn: z.number().finite().min(-1e9).max(1e9),
+    action: ActionChoiceSchema.nullable().optional(),
+    playback: ShotPlaybackSchema.nullable().optional(),
     channel: z.number().int().min(0).max(31),
     muted: z.boolean(),
     volume: z.number().min(0).max(2),
@@ -517,18 +540,33 @@ export function parseProject(input: unknown): Project {
     )
       throw new Error('关键帧缩放不能为零');
   }
-  for (const s of p.shots)
+  const checkAction = (choice: ActionChoice | null | undefined, sceneId: string) => {
+    if (choice?.actionId && actions.get(choice.actionId)?.sceneId !== sceneId)
+      throw new Error('镜头或片段的动作必须属于同一场景');
+  };
+  for (const s of p.shots) {
     if (
       !scenes.has(s.sceneId) ||
       entities.get(s.cameraId)?.kind !== 'camera' ||
       entities.get(s.cameraId)?.sceneId !== s.sceneId
     )
       throw new Error('镜头摄影机引用无效');
+    checkAction(s.action, s.sceneId);
+  }
   for (const c of p.timeline.clips) {
     if (c.start + c.duration > p.timeline.duration) throw new Error('片段超出时间轴范围');
     if (c.kind === 'shot') {
-      if (!p.shots.some((s) => s.id === c.sourceId)) throw new Error('片段引用的镜头不存在');
+      const shot = p.shots.find((s) => s.id === c.sourceId);
+      if (!shot) throw new Error('片段引用的镜头不存在');
+      checkAction(c.action, shot.sceneId);
+      if (c.playback && c.playback.rangeEnd - c.playback.rangeStart < 1e-6)
+        throw new Error('动作播放范围必须递增且至少间隔 0.000001 帧');
+      if (Math.abs(c.sourceIn + c.duration * (c.playback?.rate ?? 1)) > 1e9)
+        throw new Error('片段的源时间超出范围');
     } else {
+      if (c.action || c.playback) throw new Error('动作和动画变速只能用于镜头片段');
+      if (!Number.isInteger(c.sourceIn) || c.sourceIn < 0 || c.sourceIn > 1000000)
+        throw new Error('媒体源入点必须是范围内的非负整帧');
       const asset = p.assets.find((a) => a.id === c.sourceId);
       if (!asset || asset.kind !== c.kind) throw new Error('片段素材类型不匹配');
       if (
@@ -563,7 +601,7 @@ export function migrateProject(input: unknown) {
     typeof input !== 'object' ||
     !input ||
     !('schemaVersion' in input) ||
-    ![1, 2, 3, 4, 5, 6, 7, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
+    ![1, 2, 3, 4, 5, 6, 7, 8, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
     typeof input.schemaVersion !== 'number'
   )
     throw new Error('不支持此项目版本；原文件未修改');

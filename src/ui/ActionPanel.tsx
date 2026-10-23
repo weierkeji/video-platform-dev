@@ -86,7 +86,7 @@ export function ActionPanel({
           </button>
         )}
       </div>
-      <p className="muted">本场景的镜头共用当前动作。切换动作不会混合曲线。</p>
+      <p className="muted">场景默认动作；镜头或片段可覆盖选择。场景编辑使用此动作。</p>
     </div>
   );
 }

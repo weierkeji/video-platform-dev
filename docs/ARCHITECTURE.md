@@ -6,7 +6,7 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 
 | 模块 | 职责 |
 | --- | --- |
-| `src/core/model.ts` | v8 模型、v1–v7 迁移、引用/层级/时间轴/动作约束、工作流拓扑检查 |
+| `src/core/model.ts` | v9 模型、v1–v8 迁移、引用/层级/时间轴/动作约束、工作流拓扑检查 |
 | `src/core/generation.ts` | 生成参数、模型系列限制、不可变请求规格 |
 | `src/core/commands.ts` | 有限结构化命令，复制状态、整批应用并校验 |
 | `src/core/geometry.ts` | 自主基本几何、共享边中点细分、三角面法向挤出、OBJ 交换 |
@@ -14,6 +14,7 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 | `src/render/mesh-spatial.ts` / `mesh-edit.ts` | 三角形包围层级、遮挡拾取、选中覆盖层；不进入输出渲染 |
 | `src/core/animation.ts` / `animation-exchange.ts` | 动作选择、关键帧/切线、Bézier 时间反求、SLERP/Hermite、原生与采样交换 |
 | `src/core/evaluate.ts` | 组合变换动画、片段激活区间与源帧映射 |
+| `src/core/playback.ts` | 镜头/片段动作继承、未折回时间、恒速/倒放/循环/往返、动作范围 |
 | `src/core/media.ts` | 居中画幅矩形、音频源入点与采样边界 |
 | `src/core/image.ts` / `gltf.ts` | 图片头/哈希检查、有界场景/变换动画交换及图片资源映射 |
 | `src/render/textures.ts` | 图片解码、颜色空间/采样矩阵、并发加载缓存、取消和资源释放 |
@@ -35,13 +36,13 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 
 - ID：UUID 创建，项目内命名对象唯一校验；引用不依赖名称。
 - 空间：右手系、Y 向上、米；本地位置、XYZ Euler 弧度、非零缩放；v8 可选单位四元数 XYZW 优先表示姿态，求值时生成 Euler 供属性与空间编辑使用，Three.js 显示直接使用四元数。UI 角度显示为度。父子关系限制同场景，子对象继承父变换/可见性。重设父对象保留本地变换，不保留世界姿态。
-- 时间：零起点；片段边界/长度仍是整数帧，区间 `[start, start + duration)`，动画键允许小数帧。1–120 整数帧率，尚无 24000/1001。源帧=`sourceIn + timelineFrame - start`。改帧率保留帧位置，秒数变化。导入动画秒时间乘项目 FPS，切线除 FPS；导出反向转换。媒体/镜头插入吸附最近整帧，分数播放头不可切分片段。
+- 时间：零起点；片段边界/长度仍是整数帧，区间 `[start, start + duration)`，动画键允许小数帧。1–120 整数帧率，尚无 24000/1001。媒体源帧=`sourceIn + timelineFrame - start`，镜头可选恒速和范围映射，详见下文。改帧率保留帧位置，秒数变化。导入动画秒时间乘项目 FPS，切线除 FPS；导出反向转换。媒体/镜头插入吸附最近整帧，分数播放头不可切分片段。
 - 摄影机：透视垂直 FOV、有限 near/far；镜头引用摄影机实体。v6 可选 aspect 固定投影比例，缺省随输出尺寸调整；无自动信箱边框。
 - 颜色：sRGB 输入、Three.js 线性着色、ACES 映射、sRGB 输出；v6 材质可选 linearColor 保存原始线性 RGB，优先于 color 的 8 位显示值；修改颜色选择器会移除旧 linearColor。支持 opacity、OPAQUE/MASK/BLEND、alphaCutoff、emissive、doubleSided、flatShading，缺省仍为平面双面不透明。v7 基础色/自发光贴图按 sRGB，其他贴图按线性数据；alpha 为线性值。无 OCIO 或专业校色保证。
 - 几何：本地顶点/三角面，v5 允许无面、孤立顶点及空网格。边是三角面的规范化索引对；没有独立线段或多边形数据。修改几何后，预览和导出读取相同数据。线性四分三角形不是平滑曲面细分。
 - 素材：SHA-256 内容寻址，ffprobe 读取真实流信息；便携包 base64 嵌入素材并校验哈希。没有压缩包或缺失媒体重定位流程。
 - 画幅：Clip.fit 为 contain/cover/stretch。默认 contain 保持完整画面、空白处显示低轨；cover 居中裁切源画面；stretch 拉伸。预览和导出共用矩形计算。
-- 数据版本：schemaVersion=8；显式拒绝未知格式。v1 在副本上升级，每个旧片段设为 stretch，保留音量；v2–v7 保留已有设置。v1–v3 关键帧按轨道内原时间派生 `legacy-key-<frame>`，在历史/任务快照间保持一致；v4 及以上的键 ID 原样保留。v6–v8 新字段均可选，v7→v8 快照只改格式号。新关键帧为 UUID，ID 在轨道内唯一；完整身份是 `(trackId,keyId)`。复制动作创建新轨道/键 ID。不改原项目文件。数据库启动时先校验全部待迁移数据，`VACUUM INTO` 备份完整库，再在事务内升级项目、撤销历史、版本与任务快照，并写入 `schema_migrations` 的版本、备份名和计数；不增加用户编辑修订。夹具覆盖升级、原库备份和历史恢复。
+- 数据版本：schemaVersion=9；显式拒绝未知格式。v1 在副本上升级，每个旧片段设为 stretch，保留音量；v2–v8 保留已有设置。v1–v3 关键帧按轨道内原时间派生 `legacy-key-<frame>`，在历史/任务快照间保持一致；v4 及以上的键 ID 原样保留。v6–v9 新字段均可选，v8→v9 快照只改格式号。新关键帧为 UUID，ID 在轨道内唯一；完整身份是 `(trackId,keyId)`。复制动作创建新轨道/键 ID。不改原项目文件。数据库启动时先校验全部待迁移数据，`VACUUM INTO` 备份完整库，再在事务内升级项目、撤销历史、版本与任务快照，并写入 `schema_migrations` 的版本、备份名和计数；不增加用户编辑修订。夹具覆盖升级、原库备份和历史恢复。
 - 生成：工作流节点保存参数和首尾帧 Asset ID，通过统一命令编辑并验证引用；被引用图片不可删除。提交时保存解析后的 GenerationRequest、Project 快照、工作流/输出节点和 requestKey；后续编辑不影响已提交请求。
 
 ## 编辑、审计与任务
@@ -70,7 +71,13 @@ Geometry 增加 uv1 和 Vec4 tangents（xyz 单位向量、w 为 ±1，需有 no
 
 区域挤出按选面共享顶点复制，替换顶面，仅给选区边界加侧面，清除新产生的无引用原内部顶点；不创建内部重复墙面。拒绝非流形边、选面绕序冲突、退化面、零位移和无边界选区。合并将选中顶点移到平均位置并重映射，移除重复索引面和重复三角面；删除点移除关联面，删除边移除相邻面，删除面保留顶点。空网格不删除实体。全部操作仍受 baseRevision、项目校验、撤销/版本记录保护。
 
-动画轨道绑定对象的 position/rotation/scale（Vec3）或 quaternion（Vec4），可选 actionId。Scene.activeActionId 为空时只求值旧项目轨道，否则只求值该动作，未覆盖属性保留基础姿态；不混合，所有引用此场景的镜头共用选择。动作只能复制同场景轨道；动作/轨道/场景引用及 Euler/四元数互斥在项目校验中约束。选择、新建、复制、改名、删除都进入事务、撤销与任务快照。
+动画轨道绑定对象的 position/rotation/scale（Vec3）或 quaternion（Vec4），可选 actionId。Scene.activeActionId 为空时只求值旧项目轨道，否则只求值该动作，未覆盖属性保留基础姿态。场景编辑使用此默认选择；镜头和片段可覆盖选择。不混合。动作只能复制同场景轨道；动作/轨道/场景引用及 Euler/四元数互斥在项目校验中约束。选择、新建、复制、改名、删除都进入事务、撤销与任务快照。
+
+v9 的 Shot.action 与镜头 Clip.action 可为 `{actionId: ID}` 指定动作、`{actionId: null}` 指定旧项目轨道；缺省/null 表示继承。片段优先于镜头，镜头优先于场景；所有显式引用必须同场景，删除仍被显式引用的动作会拒绝整批命令。Scene.activeActionId 的旧删除清理行为保留。解析结果作为 `evaluatedTransform` / `SceneRenderer.evaluate` 的显式参数传入，不临时修改 Project，连续绘制同场景不同动作也从各对象基础姿态重新求值。
+
+镜头 Clip.playback 缺省/null 保留旧源帧语义。非空保存 rate、rangeStart、rangeEnd、mode（hold/repeat/pingpong）。原始时间 `raw = sourceIn + (timelineFrame - start) × rate`；rate 为 −16…16，0 定格，sourceIn 可为有符号小数。hold 钳制到闭范围；repeat 以范围长度取模，正放包含起点、排除终点，倒放相反；pingpong 以两倍范围长度取模后折返。周期端点以有界浮点容差归并，不能保证极大相位/极短周期下的无限精度。源范围限 0…100 万帧、跨度至少 1e-6，整个片段原始时间限 ±10 亿帧。媒体仍仅允许 0…100 万非负整帧入点，不接受动作或动画变速。
+
+`clip.split` 按原始时间设置后段 sourceIn，不能先折返，否则丢失往返方向和循环相位。动作选择、速度、范围和模式原样保留。移动起点保持入点，修改时长只裁剪/延长播放窗口，修改速度/范围不自动调整时长。“采用动作范围”显式读取选中动作最早/最晚键，固定保存范围并重置入点；之后改键不会自动改该范围。没有关键帧时默认 0…1，单键或极窄范围扩为有效窗口。TimelineRenderer 对摄影机和全部场景对象使用同一动作/源帧；场景编辑不追随片段调度。成片调度只保存在项目包，glTF 仍为场景动作交换。
 
 关键帧保存非负有限帧数、后续段插值和可选手柄/切线；手柄是相对 `[Δframe, Δvalue]`，左右时间偏移分别非正/非负。Bézier 段先反求时间三次式，再计算值三次式；跨越的时间手柄同比缩短以维持单值映射，原始手柄不改写。首尾范围外保持端点。Hermite 保存每帧入/出导数，求值乘实际键间距；切换至 Hermite 时补零切线。四元数 LINEAR 取最短弧 SLERP，Hermite 逐分量后归一化，不擅自翻转三次键的符号。零键拒绝；三次分量通过导数极值隔离根，再检查共同零点，长度低于 1e-8 的退化候选拒绝保存；取样仍保留非有限/零长度防护。曲线适配和绘制用 48 分段近似显示 Hermite/SLERP，不是精确极值包围。
 

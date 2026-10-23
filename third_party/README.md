@@ -32,3 +32,5 @@ glTF 解析/序列化由本仓库按公开格式独立实现；Three.js 负责�
 0.7 没有新增依赖或修改第三方源码。图片解码来自浏览器，GPU 采样/着色来自 Three.js；贴图资源生命周期、UV 投影和格式映射为本仓库实现。`pbr-textures` 的几何、PNG 像素与生成脚本为原创 MIT 资源，未复制 Blender/LibTV 或其他第三方图片。KHR_texture_transform / EXT_texture_webp 语义来自 Khronos 公开格式，不代表完整合规或认证。
 
 0.8 没有新增依赖或修改第三方源码。动作与命令、SLERP/Hermite 求值及动画文件映射在本仓库实现，遵循公开数学和 glTF 格式；Euler/四元数转换和显示使用 Three.js 数学/渲染。其 GLTFLoader/AnimationMixer 作为开发中的独立读取/取样对照。`animation-exchange` 的几何、材质、动作与生成脚本为原创 MIT 资源，无外部人物/模型/动画素材。
+
+0.9 没有新增依赖或修改第三方源码。镜头/片段动作继承、恒速/循环/往返映射和切分相位为本仓库实现；Blender 4.5 手册仅用于公开功能行为研究，不复制其界面、源码或资产。`action-montage` 使用本项目已有原创几何和动作，经自身渲染流程生成，无外部素材或模型调用。

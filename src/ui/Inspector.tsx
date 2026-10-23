@@ -6,6 +6,7 @@ import { type Clip, type Entity, type Project, type Vec3 } from '../core/model';
 import { exportOBJ } from '../core/geometry';
 import { displayColor } from '../core/surface';
 import { TexturePanel } from './TexturePanel';
+import { ShotPlaybackPanel } from './ShotPlaybackPanel';
 
 export function download(name: string, body: Blob | string, type = 'application/json') {
   const url = URL.createObjectURL(body instanceof Blob ? body : new Blob([body], { type }));
@@ -142,10 +143,10 @@ export function Inspector({
           <NumberInput
             label="源入点"
             value={clip.sourceIn}
-            min={0}
-            step={1}
+            min={clip.kind === 'shot' ? -1e9 : 0}
+            step={clip.kind === 'shot' ? 0.1 : 1}
             onChange={(v) =>
-              send([{ type: 'clip.update', id: clip.id, patch: { sourceIn: v } }], '调整素材入点')
+              send([{ type: 'clip.update', id: clip.id, patch: { sourceIn: v } }], '调整源入点')
             }
           />
           <NumberInput
@@ -158,6 +159,9 @@ export function Inspector({
               send([{ type: 'clip.update', id: clip.id, patch: { channel: v } }], '更换轨道')
             }
           />
+          {clip.kind === 'shot' && (
+            <ShotPlaybackPanel project={p} clip={clip} frame={frame} send={send} />
+          )}
           {['audio', 'video'].includes(clip.kind) && (
             <NumberInput
               label="音量"

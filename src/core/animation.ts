@@ -10,9 +10,12 @@ import type {
 } from './model';
 import { Euler, Quaternion } from 'three';
 
-export function activeTracks(p: Project, entityId: string) {
+export function activeTracks(p: Project, entityId: string, actionId?: string | null) {
   const entity = p.entities.find((e) => e.id === entityId);
-  const action = p.scenes.find((s) => s.id === entity?.sceneId)?.activeActionId || undefined;
+  const action =
+    (actionId === undefined
+      ? p.scenes.find((s) => s.id === entity?.sceneId)?.activeActionId
+      : actionId) || undefined;
   return p.animationTracks.filter((t) => t.entityId === entityId && t.actionId === action);
 }
 export function rotationProperty(p: Project, e: Entity) {

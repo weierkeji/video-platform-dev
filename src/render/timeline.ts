@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { activeClips, sourceFrame } from '../core/evaluate';
+import { shotAction } from '../core/playback';
 import { type Asset, type Project } from '../core/model';
 import { SceneRenderer } from './scene';
 import { fitRect } from '../core/media';
@@ -72,7 +73,7 @@ export class TimelineRenderer {
         const shot = p.shots.find((s) => s.id === clip.sourceId)!;
         this.scene.setProject(p, shot.sceneId);
         await this.scene.ready();
-        this.scene.evaluate(sourceFrame(clip, frame));
+        this.scene.evaluate(sourceFrame(clip, frame), shotAction(p, shot, clip));
         this.scene.render(this.scene.objects.get(shot.cameraId) as THREE.Camera, width, height);
         source = this.scene.renderer.domElement;
       } else {

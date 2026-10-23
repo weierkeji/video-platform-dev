@@ -419,6 +419,30 @@ small {
 .shot-row button {
   padding: 3px 7px;
 }
+.shot-item {
+  border-bottom: 1px solid #293749;
+  padding-bottom: 6px;
+}
+.shot-item > .field {
+  margin: 0 8px;
+  font-size: 10px;
+}
+.shot-item > .field > span {
+  max-width: 70px;
+}
+.shot-item > .field select {
+  min-width: 0;
+  max-width: 125px;
+  font-size: 10px;
+}
+.shot-playback {
+  border-block: 1px solid #293749;
+  padding-block: 8px;
+  margin-block: 8px;
+}
+.shot-playback .button-row {
+  flex-wrap: wrap;
+}
 .scene-settings {
   padding: 15px 12px;
   border-top: 1px solid #293749;

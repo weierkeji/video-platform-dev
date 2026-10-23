@@ -1,0 +1,118 @@
+{
+  "checkedAt": "2026-10-23T08:34:42.717Z",
+  "projectId": "d6edacf6-281c-4dac-a7fb-da13cf74fe82",
+  "jobId": "9c6151a7-622a-4772-809e-ba48f875ecd4",
+  "browser": "155.0.8059.82",
+  "videoHasAudio": true,
+  "silentVideoHasAudio": false,
+  "contained": {
+    "width": 320,
+    "center": [
+      254,
+      0,
+      0,
+      255
+    ],
+    "edge": [
+      0,
+      0,
+      0,
+      255
+    ],
+    "top": [
+      0,
+      0,
+      255,
+      255
+    ]
+  },
+  "covered": {
+    "width": 320,
+    "center": [
+      254,
+      0,
+      0,
+      255
+    ],
+    "edge": [
+      254,
+      0,
+      0,
+      255
+    ],
+    "top": [
+      254,
+      0,
+      0,
+      255
+    ]
+  },
+  "stretched": {
+    "width": 320,
+    "center": [
+      254,
+      0,
+      0,
+      255
+    ],
+    "edge": [
+      254,
+      0,
+      0,
+      255
+    ],
+    "top": [
+      0,
+      0,
+      253,
+      255
+    ]
+  },
+  "exportPixels": {
+    "center": [
+      252,
+      0,
+      0
+    ],
+    "edge": [
+      0,
+      0,
+      0
+    ],
+    "top": [
+      0,
+      0,
+      254
+    ]
+  },
+  "previewAudio": {
+    "low": 0.044133292578165915,
+    "high": 0.13282763807842699,
+    "ratio": 3.0096924638734266,
+    "error": "",
+    "state": "running"
+  },
+  "exportAudio": {
+    "sourceRms": 0.08833415427093903,
+    "outputRms": 0.132471829328554,
+    "gain": 1.4996671493818308,
+    "before": 0,
+    "after": 0,
+    "cutRms": 0.1322716824665968,
+    "firstFrequency": 660,
+    "secondFrequency": 875
+  },
+  "frames": 48,
+  "format": 9,
+  "checks": [
+    "UI contain/cover/stretch and encoded frame pixels",
+    "video source in",
+    "split linked audio",
+    "real preview gain",
+    "video original audio export",
+    "silent video export",
+    "pre/post clip silence",
+    "portable project reimport"
+  ],
+  "pageErrors": []
+}

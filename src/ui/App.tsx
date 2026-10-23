@@ -3,6 +3,7 @@ import { applyCommands, type Command } from '../core/commands';
 import { evaluatedTransform } from '../core/evaluate';
 import { activeTracks, rotationProperty, quaternionFromEuler } from '../core/animation';
 import { ActionPanel } from './ActionPanel';
+import { ActionSelect } from './ActionSelect';
 import { importOBJ } from '../core/geometry';
 import {
   id,
@@ -366,6 +367,13 @@ export function App() {
     setSelectedKey(null);
   };
   const selectClip = (id: string) => {
+    const project = projectRef.current,
+      selectedClip = project?.timeline.clips.find((c) => c.id === id),
+      shot =
+        selectedClip?.kind === 'shot'
+          ? project?.shots.find((s) => s.id === selectedClip.sourceId)
+          : undefined;
+    if (shot) setSceneId(shot.sceneId);
     setMeshSelection(null);
     setSelectedClip(id);
     setSelected(null);
@@ -504,7 +512,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.8</small>
+            FRAMEFORGE<small>创作工作台 · 0.9</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -718,62 +726,74 @@ export function App() {
             </button>
           </div>
           {p.shots.map((s) => (
-            <div className="shot-row" key={s.id}>
-              <span>{s.name}</span>
-              <select
-                aria-label={`${s.name} 摄影机`}
-                value={s.cameraId}
-                onChange={(event) =>
-                  void send(
-                    [{ type: 'shot.update', id: s.id, patch: { cameraId: event.target.value } }],
-                    '切换镜头摄影机',
-                  )
-                }
-              >
-                {p.entities
-                  .filter((e) => e.kind === 'camera' && e.sceneId === s.sceneId)
-                  .map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.name}
-                    </option>
-                  ))}
-              </select>
-              <button
-                title="加入时间轴（吸附最近整帧）"
-                onClick={() => {
-                  const insertAt = Math.min(p.timeline.duration - 1, Math.round(frame));
-                  let channel = 0;
-                  while (
-                    p.timeline.clips.some(
-                      (c) => c.channel === channel && c.start + c.duration > insertAt,
+            <div className="shot-item" key={s.id}>
+              <div className="shot-row">
+                <span>{s.name}</span>
+                <select
+                  aria-label={`${s.name} 摄影机`}
+                  value={s.cameraId}
+                  onChange={(event) =>
+                    void send(
+                      [{ type: 'shot.update', id: s.id, patch: { cameraId: event.target.value } }],
+                      '切换镜头摄影机',
                     )
-                  )
-                    channel++;
-                  void send(
-                    [
-                      {
-                        type: 'clip.add',
-                        clip: {
-                          id: id(),
-                          name: s.name,
-                          kind: 'shot',
-                          sourceId: s.id,
-                          start: insertAt,
-                          duration: p.timeline.duration - insertAt,
-                          sourceIn: 0,
-                          channel,
-                          muted: false,
-                          volume: 1,
-                          fit: 'contain',
+                  }
+                >
+                  {p.entities
+                    .filter((e) => e.kind === 'camera' && e.sceneId === s.sceneId)
+                    .map((e) => (
+                      <option key={e.id} value={e.id}>
+                        {e.name}
+                      </option>
+                    ))}
+                </select>
+                <button
+                  title="加入时间轴（吸附最近整帧）"
+                  onClick={() => {
+                    const insertAt = Math.min(p.timeline.duration - 1, Math.round(frame));
+                    let channel = 0;
+                    while (
+                      p.timeline.clips.some(
+                        (c) => c.channel === channel && c.start + c.duration > insertAt,
+                      )
+                    )
+                      channel++;
+                    void send(
+                      [
+                        {
+                          type: 'clip.add',
+                          clip: {
+                            id: id(),
+                            name: s.name,
+                            kind: 'shot',
+                            sourceId: s.id,
+                            start: insertAt,
+                            duration: p.timeline.duration - insertAt,
+                            sourceIn: 0,
+                            channel,
+                            muted: false,
+                            volume: 1,
+                            fit: 'contain',
+                          },
                         },
-                      },
-                    ],
-                    '镜头加入时间轴',
-                  );
-                }}
-              >
-                ＋
-              </button>
+                      ],
+                      '镜头加入时间轴',
+                    );
+                  }}
+                >
+                  ＋
+                </button>
+              </div>
+              <ActionSelect
+                project={p}
+                sceneId={s.sceneId}
+                label={`${s.name} 默认动作`}
+                inherit="跟随场景"
+                value={s.action}
+                onChange={(action) =>
+                  void send([{ type: 'shot.update', id: s.id, patch: { action } }], '选择镜头动作')
+                }
+              />
             </div>
           ))}
           <div className="scene-settings">

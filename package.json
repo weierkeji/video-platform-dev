@@ -1,6 +1,6 @@
 {
   "name": "frameforge-studio",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -21,6 +21,7 @@
     "smoke:gltf": "tsx scripts/gltf-smoke.ts",
     "smoke:textures": "tsx scripts/texture-smoke.ts",
     "smoke:animation-exchange": "tsx scripts/animation-exchange-smoke.ts",
+    "smoke:playback": "tsx scripts/playback-smoke.ts",
     "format": "prettier --write src server scripts tests index.html vite.config.ts tsconfig.json package.json .prettierrc.json"
   },
   "dependencies": {

@@ -23,6 +23,7 @@ import {
 } from './model';
 import { extrudeFace, primitive, subdivide, projectUV } from './geometry';
 import { editTrack, normalizeQuaternion, prepareCubic, activeTracks } from './animation';
+import { unwrappedSourceFrame } from './playback';
 import { displayColor } from './surface';
 import { deleteElements, extrudeRegion, mergeVertices, transformVertices } from './mesh';
 
@@ -273,6 +274,11 @@ function apply(p: Project, c: Command) {
       break;
     case 'action.delete': {
       get(p.animationActions || [], c.id);
+      if (
+        p.shots.some((s) => s.action?.actionId === c.id) ||
+        p.timeline.clips.some((clip) => clip.action?.actionId === c.id)
+      )
+        throw new Error('动作仍被镜头或片段引用，请先改为跟随或选择其他动作');
       p.animationActions = p.animationActions?.filter((a) => a.id !== c.id);
       p.animationTracks = p.animationTracks.filter((t) => t.actionId !== c.id);
       p.scenes.forEach((s) => {
@@ -491,7 +497,7 @@ function apply(p: Project, c: Command) {
         id: id(),
         name: clip.name + ' · 后段',
         start: c.frame,
-        sourceIn: clip.sourceIn + left,
+        sourceIn: unwrappedSourceFrame(clip, c.frame),
         duration: clip.duration - left,
       });
       clip.duration = left;
