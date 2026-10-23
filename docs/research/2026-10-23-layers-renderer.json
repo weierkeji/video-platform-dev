@@ -1,0 +1,79 @@
+{
+  "checkedAt": "2026-10-23T10:13:11.177Z",
+  "projectId": "9656e904-d70f-48a2-917e-a4c0321dbd46",
+  "importedProjectId": "171663ed-92d7-4ddd-9a8e-f673fd227ac1",
+  "jobId": "36afcd26-0503-4206-9668-21e16eb4322b",
+  "browser": "155.0.8059.82",
+  "format": 10,
+  "frames": 48,
+  "referenceRenderer": true,
+  "measurements": [
+    {
+      "frame": 0,
+      "source": 0,
+      "videoDifference": 0.434130658436214,
+      "referenceDifference": 0,
+      "redPixels": 1850
+    },
+    {
+      "frame": 6,
+      "source": 6,
+      "videoDifference": 0.4225591563786008,
+      "referenceDifference": 0,
+      "redPixels": 1783
+    },
+    {
+      "frame": 12,
+      "source": 12,
+      "videoDifference": 0.41324074074074074,
+      "referenceDifference": 0,
+      "redPixels": 1709
+    },
+    {
+      "frame": 23,
+      "source": 23,
+      "videoDifference": 0.42713991769547327,
+      "referenceDifference": 0,
+      "redPixels": 1449
+    },
+    {
+      "frame": 24,
+      "source": 47,
+      "videoDifference": 0.42435442386831274,
+      "referenceDifference": 0,
+      "redPixels": 1978
+    },
+    {
+      "frame": 28,
+      "source": 43,
+      "videoDifference": 0.4340997942386831,
+      "referenceDifference": 0,
+      "redPixels": 1836
+    },
+    {
+      "frame": 35,
+      "source": 36,
+      "videoDifference": 0.4206147119341564,
+      "referenceDifference": 0,
+      "redPixels": 1470
+    },
+    {
+      "frame": 47,
+      "source": 24,
+      "videoDifference": 0.4288837448559671,
+      "referenceDifference": 0,
+      "redPixels": 1456
+    }
+  ],
+  "pageErrors": [],
+  "checks": [
+    "layer creation weights fades channel masks and additive blend via UI",
+    "reorder mute delete undo redo reload",
+    "referenced actions protected",
+    "base-action edits do not write mixed poses",
+    "static GLB mixed pose and explicit animated GLB refusal",
+    "fixed render snapshot after layer mutation",
+    "PNG/MP4 agreement with retimed shot",
+    "portable project retains layers"
+  ]
+}

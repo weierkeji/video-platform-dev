@@ -6,7 +6,7 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 
 | 模块 | 职责 |
 | --- | --- |
-| `src/core/model.ts` | v9 模型、v1–v8 迁移、引用/层级/时间轴/动作约束、工作流拓扑检查 |
+| `src/core/model.ts` | v10 模型、v1–v9 迁移、引用/层级/时间轴/动作约束、工作流拓扑检查 |
 | `src/core/generation.ts` | 生成参数、模型系列限制、不可变请求规格 |
 | `src/core/commands.ts` | 有限结构化命令，复制状态、整批应用并校验 |
 | `src/core/geometry.ts` | 自主基本几何、共享边中点细分、三角面法向挤出、OBJ 交换 |
@@ -14,6 +14,7 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 | `src/render/mesh-spatial.ts` / `mesh-edit.ts` | 三角形包围层级、遮挡拾取、选中覆盖层；不进入输出渲染 |
 | `src/core/animation.ts` / `animation-exchange.ts` | 动作选择、关键帧/切线、Bézier 时间反求、SLERP/Hermite、原生与采样交换 |
 | `src/core/evaluate.ts` | 组合变换动画、片段激活区间与源帧映射 |
+| `src/core/layers.ts` | 对象动作层、通道过滤、有序替换/基础姿态增量、权重包络与层源时间 |
 | `src/core/playback.ts` | 镜头/片段动作继承、未折回时间、恒速/倒放/循环/往返、动作范围 |
 | `src/core/media.ts` | 居中画幅矩形、音频源入点与采样边界 |
 | `src/core/image.ts` / `gltf.ts` | 图片头/哈希检查、有界场景/变换动画交换及图片资源映射 |
@@ -32,7 +33,7 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 
 ## 数据模型
 
-`Project` 包含 `Asset`、`Scene`、`Entity`、`Geometry`、`Material`、实体上的 `Light` / `Camera`、`AnimationAction` / `AnimationTrack`、`Shot`、`Timeline`、`Workflow`、`Artifact`。`GenerationJob` / `Revision` 在同一数据库通过 projectId 和修订号关联，避免编辑反向改变运行任务。
+`Project` 包含 `Asset`、`Scene`、`Entity`、`Geometry`、`Material`、实体上的 `Light` / `Camera`、`AnimationAction` / `AnimationTrack` / `AnimationLayer`、`Shot`、`Timeline`、`Workflow`、`Artifact`。`GenerationJob` / `Revision` 在同一数据库通过 projectId 和修订号关联，避免编辑反向改变运行任务。
 
 - ID：UUID 创建，项目内命名对象唯一校验；引用不依赖名称。
 - 空间：右手系、Y 向上、米；本地位置、XYZ Euler 弧度、非零缩放；v8 可选单位四元数 XYZW 优先表示姿态，求值时生成 Euler 供属性与空间编辑使用，Three.js 显示直接使用四元数。UI 角度显示为度。父子关系限制同场景，子对象继承父变换/可见性。重设父对象保留本地变换，不保留世界姿态。
@@ -42,10 +43,14 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 - 几何：本地顶点/三角面，v5 允许无面、孤立顶点及空网格。边是三角面的规范化索引对；没有独立线段或多边形数据。修改几何后，预览和导出读取相同数据。线性四分三角形不是平滑曲面细分。
 - 素材：SHA-256 内容寻址，ffprobe 读取真实流信息；便携包 base64 嵌入素材并校验哈希。没有压缩包或缺失媒体重定位流程。
 - 画幅：Clip.fit 为 contain/cover/stretch。默认 contain 保持完整画面、空白处显示低轨；cover 居中裁切源画面；stretch 拉伸。预览和导出共用矩形计算。
-- 数据版本：schemaVersion=9；显式拒绝未知格式。v1 在副本上升级，每个旧片段设为 stretch，保留音量；v2–v8 保留已有设置。v1–v3 关键帧按轨道内原时间派生 `legacy-key-<frame>`，在历史/任务快照间保持一致；v4 及以上的键 ID 原样保留。v6–v9 新字段均可选，v8→v9 快照只改格式号。新关键帧为 UUID，ID 在轨道内唯一；完整身份是 `(trackId,keyId)`。复制动作创建新轨道/键 ID。不改原项目文件。数据库启动时先校验全部待迁移数据，`VACUUM INTO` 备份完整库，再在事务内升级项目、撤销历史、版本与任务快照，并写入 `schema_migrations` 的版本、备份名和计数；不增加用户编辑修订。夹具覆盖升级、原库备份和历史恢复。
+- 数据版本：schemaVersion=10；显式拒绝未知格式。v1 在副本上升级，每个旧片段设为 stretch，保留音量；v2–v9 保留已有设置。v1–v3 关键帧按轨道内原时间派生 `legacy-key-<frame>`，在历史/任务快照间保持一致；v4 及以上的键 ID 原样保留。v6–v10 新字段均可选，v9→v10 快照只改格式号。新关键帧为 UUID，ID 在轨道内唯一；完整身份是 `(trackId,keyId)`。复制动作创建新轨道/键 ID。不改原项目文件。数据库启动时先校验全部待迁移数据，`VACUUM INTO` 备份完整库，再在事务内升级项目、撤销历史、版本与任务快照，并写入 `schema_migrations` 的版本、备份名和计数；不增加用户编辑修订。夹具覆盖升级、原库备份和历史恢复。
 - 生成：工作流节点保存参数和首尾帧 Asset ID，通过统一命令编辑并验证引用；被引用图片不可删除。提交时保存解析后的 GenerationRequest、Project 快照、工作流/输出节点和 requestKey；后续编辑不影响已提交请求。
 
 ## 编辑、审计与任务
+
+v10 的可选 `animationLayers` 保存对象、同场景动作、通道、权重、模式、窗口、淡入淡出及源时间。每项目 512 层/每对象 64 层；按数组顺序叠加基础动作。窗口半开，淡入/出权重取线性包络最小值，窗口外无贡献；缺失轨道不贡献基础姿态。向量替换用线性插值，旋转 SLERP；增量向量取相对对象基础姿态的线性差（缩放也如此），四元数采用 `current × SLERP(identity, inverse(rest) × sample, w)`。不归一化不同层权重，不采用 Blender Combine 的缩放比例幂。每层复用源帧折回规则，输入帧先经过镜头映射。
+
+`evaluatedBaseTransform` 供原动作数值/曲线/记键，`evaluatedTransform` 增加层求值。SceneRenderer/TimelineRenderer/PNG/MP4 和静态 GLB 共用后者。编辑视口的临时“预览动作层”可关闭层显示；启用时，含启用层对象的变换手柄隐藏，防止最终姿态回写到原始动作。切换取消拖动。输出始终使用完整层。层可新增/改动/删除/调整顺序，动作引用保护，删除/复制对象同步处理层；批次与撤销/快照复用原通道。动画 GLB 对有启用层的场景明确拒绝，待实现有界采样烘焙；禁用层导出原始动作，静态 GLB 包含完整混合姿态。
 
 `core/gltf.ts` 独立读取有界 GLB/glTF、紧密/交错/稀疏 accessor，并将场景映射到 `scene.import` 一次事务。只读取调用者提供的字节，不访问网络或文件系统。三角列表/带/扇转换为三角索引；多图元拆成子网格，共享网格保留几何引用，多场景共享节点复制为各自实体。矩阵分解后重建核对，剪切/奇异矩阵拒绝。四元数保持原生存储；动画节点有 matrix 时拒绝。TRS 通道按各场景的节点映射复制为动作，首个相关动作默认激活；导入不修改项目时长。验证通道唯一、时间递增/min/max、输出维度与 Hermite 三倍数量；忽略无目标节点通道并列明。最多 100 源动作、每轨 10000 键、映射后合计 20 万键，另受项目 1000 动作/6000 轨道限制。
 
@@ -71,7 +76,7 @@ Geometry 增加 uv1 和 Vec4 tangents（xyz 单位向量、w 为 ±1，需有 no
 
 区域挤出按选面共享顶点复制，替换顶面，仅给选区边界加侧面，清除新产生的无引用原内部顶点；不创建内部重复墙面。拒绝非流形边、选面绕序冲突、退化面、零位移和无边界选区。合并将选中顶点移到平均位置并重映射，移除重复索引面和重复三角面；删除点移除关联面，删除边移除相邻面，删除面保留顶点。空网格不删除实体。全部操作仍受 baseRevision、项目校验、撤销/版本记录保护。
 
-动画轨道绑定对象的 position/rotation/scale（Vec3）或 quaternion（Vec4），可选 actionId。Scene.activeActionId 为空时只求值旧项目轨道，否则只求值该动作，未覆盖属性保留基础姿态。场景编辑使用此默认选择；镜头和片段可覆盖选择。不混合。动作只能复制同场景轨道；动作/轨道/场景引用及 Euler/四元数互斥在项目校验中约束。选择、新建、复制、改名、删除都进入事务、撤销与任务快照。
+动画轨道绑定对象的 position/rotation/scale（Vec3）或 quaternion（Vec4），可选 actionId。Scene.activeActionId 为空时只求值旧项目轨道，否则只求值该动作，未覆盖属性保留基础姿态。场景编辑使用此默认选择；镜头和片段可覆盖选择。此结果作为对象层混合的基础。动作只能复制同场景轨道；动作/轨道/场景引用及 Euler/四元数互斥在项目校验中约束。选择、新建、复制、改名、删除都进入事务、撤销与任务快照。
 
 v9 的 Shot.action 与镜头 Clip.action 可为 `{actionId: ID}` 指定动作、`{actionId: null}` 指定旧项目轨道；缺省/null 表示继承。片段优先于镜头，镜头优先于场景；所有显式引用必须同场景，删除仍被显式引用的动作会拒绝整批命令。Scene.activeActionId 的旧删除清理行为保留。解析结果作为 `evaluatedTransform` / `SceneRenderer.evaluate` 的显式参数传入，不临时修改 Project，连续绘制同场景不同动作也从各对象基础姿态重新求值。
 

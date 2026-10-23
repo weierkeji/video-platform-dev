@@ -196,6 +196,7 @@ export function SceneExchange({
         <h3>导出当前场景 · 帧 {frame}</h3>
         <p className="muted">
           当前帧 GLB 保存可见对象的静态姿态和材质；动画 GLB 另外保存变换动作。
+          当前帧包含动作层结果；启用动作层的场景暂不支持动画 GLB 烘焙。
           时间轴、背景、环境光、阴影和工作流不包含在内；完整作品请使用项目包。
         </p>
         {[false, true].map((animated) => (

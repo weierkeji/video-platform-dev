@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { applyCommands, type Command } from '../core/commands';
-import { evaluatedTransform } from '../core/evaluate';
+import { evaluatedBaseTransform } from '../core/evaluate';
 import { activeTracks, rotationProperty, quaternionFromEuler } from '../core/animation';
 import { ActionPanel } from './ActionPanel';
 import { ActionSelect } from './ActionSelect';
@@ -49,7 +49,8 @@ export function App() {
     [meshXray, setMeshXray] = useState(false),
     [sceneId, setSceneId] = useState(''),
     [frame, setFrame] = useState(0),
-    [playing, setPlaying] = useState(false);
+    [playing, setPlaying] = useState(false),
+    [layersPreview, setLayersPreview] = useState(true);
   const [mode, setMode] = useState<'translate' | 'rotate' | 'scale'>('translate'),
     [view, setView] = useState<'scene' | 'sequence'>('scene'),
     [workspace, setWorkspace] = useState<'studio' | 'curves' | 'workflow'>('studio'),
@@ -197,7 +198,7 @@ export function App() {
       const p = projectRef.current!,
         e = p.entities.find((e) => e.id === entityId)!;
       const commands: Command[] = [];
-      const evaluated = evaluatedTransform(p, e, frame),
+      const evaluated = evaluatedBaseTransform(p, e, frame),
         base = structuredClone(e.transform);
       for (const property of ['position', 'rotation', 'scale'] as const) {
         if (t[property].every((v, i) => Math.abs(v - evaluated[property][i]) < 1e-7)) continue;
@@ -512,7 +513,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.9</small>
+            FRAMEFORGE<small>创作工作台 · 0.10</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -855,11 +856,23 @@ export function App() {
                     </button>
                   ))}
                 </div>
+                {view === 'scene' && (
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      aria-label="预览动作层"
+                      checked={layersPreview}
+                      onChange={(event) => setLayersPreview(event.target.checked)}
+                    />
+                    预览动作层
+                  </label>
+                )}
                 <span className="spacer" />
                 <button onClick={() => void png()}>导出当前帧 PNG</button>
               </div>
               <Viewport
                 key={view}
+                layersPreview={layersPreview}
                 project={p}
                 sceneId={sceneId}
                 frame={frame}

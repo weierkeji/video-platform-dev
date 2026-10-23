@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { GenerationOptionsSchema, GenerationRequestSchema } from './generation';
 import { validateTrack } from './animation';
 
-export const PROJECT_VERSION = 9;
+export const PROJECT_VERSION = 10;
 
 export const id = () => crypto.randomUUID();
 const ID = z
@@ -257,6 +257,28 @@ export const ShotPlaybackSchema = z
   })
   .strict();
 export type ShotPlayback = z.infer<typeof ShotPlaybackSchema>;
+export const AnimationLayerSchema = z
+  .object({
+    id: ID,
+    name: Name,
+    entityId: ID,
+    actionId: ID.nullable(),
+    enabled: z.boolean(),
+    blend: z.enum(['replace', 'additive']),
+    weight: z.number().finite().min(0).max(1),
+    channels: z
+      .array(z.enum(['position', 'rotation', 'scale']))
+      .min(1)
+      .max(3),
+    start: z.number().finite().min(0).max(1e6),
+    duration: z.number().finite().min(1e-6).max(1e6),
+    sourceIn: z.number().finite().min(-1e9).max(1e9),
+    playback: ShotPlaybackSchema,
+    fadeIn: z.number().finite().min(0).max(1e6),
+    fadeOut: z.number().finite().min(0).max(1e6),
+  })
+  .strict();
+export type AnimationLayer = z.infer<typeof AnimationLayerSchema>;
 export const ShotSchema = z
   .object({
     id: ID,
@@ -391,6 +413,7 @@ export const ProjectSchema = z
     materials: z.array(MaterialSchema).max(2000),
     animationTracks: z.array(AnimationTrackSchema).max(6000),
     animationActions: z.array(AnimationActionSchema).max(1000).optional(),
+    animationLayers: z.array(AnimationLayerSchema).max(512).optional(),
     assets: z.array(AssetSchema).max(10000),
     shots: z.array(ShotSchema).max(10000),
     timeline: TimelineSchema,
@@ -445,6 +468,7 @@ export function parseProject(input: unknown): Project {
     ...p.materials,
     ...p.animationTracks,
     ...(p.animationActions || []),
+    ...(p.animationLayers || []),
     ...p.assets,
     ...p.shots,
     p.timeline,
@@ -544,6 +568,24 @@ export function parseProject(input: unknown): Project {
     if (choice?.actionId && actions.get(choice.actionId)?.sceneId !== sceneId)
       throw new Error('镜头或片段的动作必须属于同一场景');
   };
+  const layerCounts = new Map<string, number>();
+  for (const layer of p.animationLayers || []) {
+    const entity = entities.get(layer.entityId);
+    if (!entity) throw new Error('动作层的对象不存在');
+    if (layer.actionId && actions.get(layer.actionId)?.sceneId !== entity.sceneId)
+      throw new Error('动作层与对象必须属于同一场景');
+    const count = (layerCounts.get(entity.id) || 0) + 1;
+    layerCounts.set(entity.id, count);
+    if (count > 64) throw new Error('每个对象最多 64 个动作层');
+    if (new Set(layer.channels).size !== layer.channels.length)
+      throw new Error('动作层通道不能重复');
+    if (layer.start + layer.duration > 1e6 || layer.fadeIn + layer.fadeOut > layer.duration)
+      throw new Error('动作层时间或淡入淡出超出范围');
+    if (layer.playback.rangeEnd - layer.playback.rangeStart < 1e-6)
+      throw new Error('动作层源范围必须递增且至少间隔 0.000001 帧');
+    if (Math.abs(layer.sourceIn + layer.duration * layer.playback.rate) > 1e9)
+      throw new Error('动作层源时间超出范围');
+  }
   for (const s of p.shots) {
     if (
       !scenes.has(s.sceneId) ||
@@ -601,7 +643,7 @@ export function migrateProject(input: unknown) {
     typeof input !== 'object' ||
     !input ||
     !('schemaVersion' in input) ||
-    ![1, 2, 3, 4, 5, 6, 7, 8, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
+    ![1, 2, 3, 4, 5, 6, 7, 8, 9, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
     typeof input.schemaVersion !== 'number'
   )
     throw new Error('不支持此项目版本；原文件未修改');

@@ -1,0 +1,123 @@
+{
+  "checkedAt": "2026-10-23T10:21:56.377Z",
+  "projectId": "c3335a06-7405-40bb-aecc-16f21d14c36b",
+  "importedProjectId": "9218efe5-6d4e-4a63-a12d-98aff9fcefeb",
+  "jobId": "24d9140a-5f64-48bf-940e-23c759fa74cd",
+  "browser": "155.0.8059.82",
+  "format": 10,
+  "frames": 96,
+  "referenceRenderer": false,
+  "measurements": [
+    {
+      "frame": 0,
+      "source": 0,
+      "actionId": "846be8c8-2f7b-4cad-b507-20e0a35bff90",
+      "videoDifference": 0.416304012345679,
+      "redPixels": 1693
+    },
+    {
+      "frame": 8,
+      "source": 8,
+      "actionId": "846be8c8-2f7b-4cad-b507-20e0a35bff90",
+      "videoDifference": 0.4350360082304527,
+      "redPixels": 1669
+    },
+    {
+      "frame": 23,
+      "source": 23,
+      "actionId": "846be8c8-2f7b-4cad-b507-20e0a35bff90",
+      "videoDifference": 0.44411008230452675,
+      "redPixels": 1732
+    },
+    {
+      "frame": 24,
+      "source": 24,
+      "actionId": "3c91ea1f-b57e-4ec0-b79a-8a8d7fa84423",
+      "videoDifference": 0.4404603909465021,
+      "redPixels": 2033
+    },
+    {
+      "frame": 32,
+      "source": 16,
+      "actionId": "3c91ea1f-b57e-4ec0-b79a-8a8d7fa84423",
+      "videoDifference": 0.4388940329218107,
+      "redPixels": 1776
+    },
+    {
+      "frame": 47,
+      "source": 1,
+      "actionId": "3c91ea1f-b57e-4ec0-b79a-8a8d7fa84423",
+      "videoDifference": 0.41563271604938273,
+      "redPixels": 1205
+    },
+    {
+      "frame": 48,
+      "source": 0,
+      "actionId": "846be8c8-2f7b-4cad-b507-20e0a35bff90",
+      "videoDifference": 0.41852880658436215,
+      "redPixels": 1693
+    },
+    {
+      "frame": 52,
+      "source": 8,
+      "actionId": "846be8c8-2f7b-4cad-b507-20e0a35bff90",
+      "videoDifference": 0.44140946502057615,
+      "redPixels": 1669
+    },
+    {
+      "frame": 60,
+      "source": 0,
+      "actionId": "846be8c8-2f7b-4cad-b507-20e0a35bff90",
+      "videoDifference": 0.4184747942386831,
+      "redPixels": 1693
+    },
+    {
+      "frame": 72,
+      "source": 3.5,
+      "actionId": "846be8c8-2f7b-4cad-b507-20e0a35bff90",
+      "videoDifference": 0.44085133744855964,
+      "redPixels": 1649
+    },
+    {
+      "frame": 80,
+      "source": 6.5,
+      "actionId": "846be8c8-2f7b-4cad-b507-20e0a35bff90",
+      "videoDifference": 0.4204783950617284,
+      "redPixels": 1647
+    },
+    {
+      "frame": 81,
+      "source": 5.25,
+      "actionId": "846be8c8-2f7b-4cad-b507-20e0a35bff90",
+      "videoDifference": 0.43805041152263374,
+      "redPixels": 1675
+    },
+    {
+      "frame": 82,
+      "source": 4,
+      "actionId": "846be8c8-2f7b-4cad-b507-20e0a35bff90",
+      "videoDifference": 0.4334104938271605,
+      "redPixels": 1656
+    },
+    {
+      "frame": 95,
+      "source": 7.75,
+      "actionId": "846be8c8-2f7b-4cad-b507-20e0a35bff90",
+      "videoDifference": 0.4400797325102881,
+      "redPixels": 1662
+    }
+  ],
+  "pageErrors": [],
+  "checks": [
+    "shot defaults and clip overrides share scene objects",
+    "speed reverse repeat and ping-pong edited through UI",
+    "fractional phase preserved through split undo redo reload",
+    "referenced action deletion rejected without saving",
+    "explicit project tracks override is undoable",
+    "submitted action and speed snapshot remains fixed",
+    "same-scene overlapping layers do not leak action or scale",
+    "cycle frames are pixel-identical",
+    "actual preview and MP4 agree across cuts and split",
+    "portable project retains shot choices and timing"
+  ]
+}

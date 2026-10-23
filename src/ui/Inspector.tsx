@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { evaluatedTransform } from '../core/evaluate';
+import { evaluatedBaseTransform } from '../core/evaluate';
+import { LayerPanel } from './LayerPanel';
 import { activeTracks, rotationProperty, quaternionFromEuler } from '../core/animation';
 import { type Command } from '../core/commands';
 import { type Clip, type Entity, type Project, type Vec3 } from '../core/model';
@@ -273,7 +274,7 @@ export function Inspector({
       </>
     );
   const e = entity,
-    t = evaluatedTransform(p, e, frame),
+    t = evaluatedBaseTransform(p, e, frame),
     g = p.geometries.find((g) => g.id === e.geometryId),
     m = p.materials.find((m) => m.id === e.materialId);
   return (
@@ -337,6 +338,11 @@ export function Inspector({
           显示对象
         </label>
         <h3>变换</h3>
+        {p.animationLayers?.some((l) => l.entityId === e.id) && (
+          <p className="muted">
+            这里编辑场景动作的原始变换；混合结果见预览。关闭“预览动作层”可用空间手柄编辑源动作。
+          </p>
+        )}
         <VectorInput
           label="位置"
           value={t.position}
@@ -375,6 +381,7 @@ export function Inspector({
         >
           ◇ 记录当前变换关键帧
         </button>
+        <LayerPanel project={p} entity={e} frame={frame} send={send} />
         {activeTracks(p, e.id).length > 0 && (
           <p className="muted">已有动画属性的修改会更新当前帧关键帧。</p>
         )}

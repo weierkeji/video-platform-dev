@@ -1030,6 +1030,10 @@ export function exportGLB(
   if (!scene) throw new Error('场景不存在');
   const entities = project.entities.filter((e) => e.sceneId === sceneId),
     byId = new Map(entities.map((e) => [e.id, e]));
+  if (animated && project.animationLayers?.some((l) => l.enabled && byId.has(l.entityId)))
+    throw new Error(
+      '动画 GLB 尚不支持动作层烘焙；请保存项目包、导出成片或当前帧 GLB，或先禁用本场景动作层以导出原始动作',
+    );
   const visible = (e: Entity): boolean =>
     e.visible && (!e.parentId || visible(byId.get(e.parentId)!));
   const included = entities.filter(visible),
@@ -1406,7 +1410,7 @@ export function exportGLB(
   const json: JSONRecord = {
     asset: {
       version: '2.0',
-      generator: 'Frameforge Studio 0.9 scene exchange',
+      generator: 'Frameforge Studio 0.10 scene exchange',
       ...(scene.source?.copyright ? { copyright: scene.source.copyright } : {}),
     },
     scene: 0,

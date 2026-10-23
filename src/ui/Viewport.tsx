@@ -13,6 +13,7 @@ export type ViewportProps = {
   sceneId: string;
   frame: number;
   playing: boolean;
+  layersPreview: boolean;
   selected: string | null;
   select: (id: string) => void;
   mode: 'translate' | 'rotate' | 'scale';
@@ -69,6 +70,7 @@ export function Viewport(props: ViewportProps) {
         projectId: string;
         revision: number;
         frame: number;
+        layersPreview: boolean;
         selection: MeshSelection | null;
         world: THREE.Matrix4;
         start: THREE.Matrix4;
@@ -102,6 +104,7 @@ export function Viewport(props: ViewportProps) {
             projectId: p.project.id,
             revision: p.project.revision,
             frame: p.frame,
+            layersPreview: p.layersPreview,
             selection: p.meshSelection,
             world: overlay?.mesh.matrixWorld.clone() || new THREE.Matrix4(),
             start: proxy.matrixWorld.clone(),
@@ -117,6 +120,7 @@ export function Viewport(props: ViewportProps) {
             p.project.id === pending.projectId &&
             p.project.revision === pending.revision &&
             p.frame === pending.frame &&
+            p.layersPreview === pending.layersPreview &&
             p.meshSelection === pending.selection;
           if (pending.geometry && overlay) {
             overlay.preview(pending.geometry.positions, true);
@@ -174,7 +178,7 @@ export function Viewport(props: ViewportProps) {
       const syncSelection = () => {
         const p = current.current;
         if (renderer.project !== p.project || renderer.sceneId !== p.sceneId) sync();
-        if (!gizmo.dragging) renderer.evaluate(p.frame);
+        if (!gizmo.dragging) renderer.evaluate(p.frame, undefined, p.layersPreview);
         const selected = p.selected ? renderer.objects.get(p.selected) : undefined;
         if (p.meshSelection !== lastSelection || p.meshXray !== lastXray) {
           overlay?.dispose();
@@ -343,6 +347,7 @@ export function Viewport(props: ViewportProps) {
           drag &&
           (p.project.revision !== drag.revision ||
             p.frame !== drag.frame ||
+            p.layersPreview !== drag.layersPreview ||
             p.meshSelection !== drag.selection ||
             p.playing)
         )
@@ -358,7 +363,10 @@ export function Viewport(props: ViewportProps) {
           ? overlay?.vertices.length && Math.abs(overlay.mesh.matrixWorld.determinant()) > 1e-12
             ? proxy
             : undefined
-          : selected;
+          : p.layersPreview &&
+              p.project.animationLayers?.some((l) => l.entityId === p.selected && l.enabled)
+            ? undefined
+            : selected;
         if (target && gizmo.object !== target) gizmo.attach(target);
         else if (!target) gizmo.detach();
         gizmo.enabled =

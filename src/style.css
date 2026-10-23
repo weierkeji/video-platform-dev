@@ -1140,3 +1140,16 @@ pre {
 .action-panel .button-row {
   flex-wrap: wrap;
 }
+:root .animation-layer {
+  margin-top: 10px;
+  padding: 8px;
+  border: 1px solid #38495b;
+  border-radius: 6px;
+}
+.animation-layer summary {
+  cursor: pointer;
+  padding: 4px 0;
+}
+.animation-layer .button-row {
+  flex-wrap: wrap;
+}

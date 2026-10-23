@@ -1,0 +1,68 @@
+{
+  "checkedAt": "2026-10-23T10:22:39.132Z",
+  "projectId": "e73168be-79d8-4c12-be33-ac4b4f193147",
+  "importedProjectId": "7d9f4846-7bfb-4735-adc5-7551e15e443b",
+  "jobId": "d5be3299-80fd-4d88-94cb-5bc936e7592d",
+  "browser": "155.0.8059.82",
+  "format": 10,
+  "validator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 0,
+    "numHints": 0,
+    "messages": [],
+    "truncated": false
+  },
+  "frames": 36,
+  "pixels": [
+    {
+      "frame": 0,
+      "difference": 0.4120627572016461,
+      "redPixels": 1693,
+      "center": [
+        191.9775546367395,
+        134.50620200826936
+      ]
+    },
+    {
+      "frame": 8,
+      "difference": 0.4280324074074074,
+      "redPixels": 1654,
+      "center": [
+        237.80169286577993,
+        96.26420798065297
+      ]
+    },
+    {
+      "frame": 16,
+      "difference": 0.42934413580246916,
+      "redPixels": 1624,
+      "center": [
+        268.05726600985224,
+        115.94458128078817
+      ]
+    },
+    {
+      "frame": 26,
+      "difference": 0.4210030864197531,
+      "redPixels": 1773,
+      "center": [
+        295.3919909757473,
+        134.03666102650874
+      ]
+    }
+  ],
+  "pageErrors": [],
+  "checks": [
+    "multiple actions and shared scenes imported in one undo transaction",
+    "action selection changes evaluated transform",
+    "fractional quaternion key and normalized W edit",
+    "clip insertion snaps fractional playhead to integer frame and remains undoable",
+    "Hermite derivative edit and undo",
+    "action copy rename delete undo and reload",
+    "animated GLB validation and reimport",
+    "submitted action snapshot remains fixed while editing",
+    "actual PNG and MP4 frames agree",
+    "portable project retains all actions and tracks"
+  ]
+}

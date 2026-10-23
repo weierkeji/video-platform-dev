@@ -113,10 +113,10 @@ export class SceneRenderer {
       });
     void this.pending.catch(() => {});
   }
-  evaluate(frame: number, actionId?: string | null) {
+  evaluate(frame: number, actionId?: string | null, layers = true) {
     if (!this.project) return;
     for (const e of this.project.entities.filter((e) => e.sceneId === this.sceneId)) {
-      const t = evaluatedTransform(this.project, e, frame, actionId),
+      const t = evaluatedTransform(this.project, e, frame, actionId, layers),
         o = this.objects.get(e.id)!;
       o.position.fromArray(t.position);
       if (t.quaternion) o.quaternion.fromArray(t.quaternion);

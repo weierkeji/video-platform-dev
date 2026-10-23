@@ -10,7 +10,7 @@ import {
   type Point,
 } from '../core/animation';
 import { CommandSchema, type Command } from '../core/commands';
-import { evaluatedTransform } from '../core/evaluate';
+import { evaluatedBaseTransform as evaluatedTransform } from '../core/evaluate';
 import {
   AnimationTrackSchema,
   id,

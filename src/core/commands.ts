@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   ArtifactSchema,
   AnimationActionSchema,
+  AnimationLayerSchema,
   AnimationTrackSchema,
   AssetSchema,
   ClipSchema,
@@ -41,6 +42,22 @@ export const CommandSchema = z.discriminatedUnion('type', [
     .strict(),
   z.object({ type: z.literal('action.rename'), id: ID, name: z.string().min(1).max(160) }).strict(),
   z.object({ type: z.literal('action.delete'), id: ID }).strict(),
+  z.object({ type: z.literal('layer.add'), layer: AnimationLayerSchema }).strict(),
+  z
+    .object({
+      type: z.literal('layer.update'),
+      id: ID,
+      patch: AnimationLayerSchema.omit({ id: true, entityId: true }).partial(),
+    })
+    .strict(),
+  z.object({ type: z.literal('layer.delete'), id: ID }).strict(),
+  z
+    .object({
+      type: z.literal('layer.move'),
+      id: ID,
+      direction: z.union([z.literal(-1), z.literal(1)]),
+    })
+    .strict(),
   z
     .object({
       type: z.literal('scene.import'),
@@ -274,6 +291,8 @@ function apply(p: Project, c: Command) {
       break;
     case 'action.delete': {
       get(p.animationActions || [], c.id);
+      if (p.animationLayers?.some((layer) => layer.actionId === c.id))
+        throw new Error('动作仍被动作层引用，请先删除该层或选择其他动作');
       if (
         p.shots.some((s) => s.action?.actionId === c.id) ||
         p.timeline.clips.some((clip) => clip.action?.actionId === c.id)
@@ -284,6 +303,28 @@ function apply(p: Project, c: Command) {
       p.scenes.forEach((s) => {
         if (s.activeActionId === c.id) s.activeActionId = null;
       });
+      break;
+    }
+    case 'layer.add':
+      (p.animationLayers ||= []).push(c.layer);
+      break;
+    case 'layer.update':
+      Object.assign(get(p.animationLayers || [], c.id), c.patch);
+      break;
+    case 'layer.delete':
+      get(p.animationLayers || [], c.id);
+      p.animationLayers = p.animationLayers?.filter((l) => l.id !== c.id);
+      break;
+    case 'layer.move': {
+      const layers = p.animationLayers || [],
+        current = get(layers, c.id);
+      const own = layers.filter((l) => l.entityId === current.entityId);
+      const other = own[own.indexOf(current) + c.direction];
+      if (other) {
+        const a = layers.indexOf(current),
+          b = layers.indexOf(other);
+        [layers[a], layers[b]] = [layers[b], layers[a]];
+      }
       break;
     }
     case 'scene.update':
@@ -346,6 +387,7 @@ function apply(p: Project, c: Command) {
         throw new Error('摄影机被镜头引用，请先为镜头选择其他摄影机');
       p.entities = p.entities.filter((e) => !removing.has(e.id));
       p.animationTracks = p.animationTracks.filter((t) => !removing.has(t.entityId));
+      p.animationLayers = p.animationLayers?.filter((l) => !removing.has(l.entityId));
       p.geometries = p.geometries.filter((g) => p.entities.some((e) => e.geometryId === g.id));
       p.materials = p.materials.filter((m) => p.entities.some((e) => e.materialId === m.id));
       break;
@@ -369,6 +411,8 @@ function apply(p: Project, c: Command) {
         p.materials.push(m);
       }
       p.entities.push(e);
+      for (const layer of p.animationLayers?.filter((l) => l.entityId === source.id) || [])
+        p.animationLayers!.push({ ...structuredClone(layer), id: id(), entityId: e.id });
       for (const t of p.animationTracks.filter((t) => t.entityId === source.id)) {
         const copy = structuredClone(t);
         copy.id = id();

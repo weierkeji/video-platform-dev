@@ -1,8 +1,9 @@
 import { type Entity, type Project, type Vec3, type Vec4 } from './model';
 import { sampleTrack, activeTracks, eulerFromQuaternion } from './animation';
+import { applyLayers } from './layers';
 export { sampleTrack } from './animation';
 export { sourceFrame } from './playback';
-export function evaluatedTransform(
+export function evaluatedBaseTransform(
   p: Project,
   entity: Entity,
   frame: number,
@@ -23,6 +24,16 @@ export function evaluatedTransform(
     }
   }
   return t;
+}
+export function evaluatedTransform(
+  p: Project,
+  entity: Entity,
+  frame: number,
+  actionId?: string | null,
+  layers = true,
+) {
+  const t = evaluatedBaseTransform(p, entity, frame, actionId);
+  return layers ? applyLayers(p, entity, frame, t) : t;
 }
 export function activeClips(p: Project, frame: number) {
   return p.timeline.clips

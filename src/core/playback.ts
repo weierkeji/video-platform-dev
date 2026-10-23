@@ -1,4 +1,4 @@
-import type { Clip, Project, Shot } from './model';
+import type { Clip, Project, Shot, ShotPlayback } from './model';
 
 /** Keep the unwrapped phase when splitting: wrapping would lose ping-pong direction. */
 export function unwrappedSourceFrame(clip: Clip, frame: number) {
@@ -9,7 +9,11 @@ export function unwrappedSourceFrame(clip: Clip, frame: number) {
 export function sourceFrame(clip: Clip, frame: number) {
   const raw = unwrappedSourceFrame(clip, frame);
   if (clip.kind !== 'shot' || !clip.playback) return raw;
-  const { rangeStart: start, rangeEnd: end, mode, rate } = clip.playback;
+  return mapSourceFrame(raw, clip.playback);
+}
+
+export function mapSourceFrame(raw: number, playback: ShotPlayback) {
+  const { rangeStart: start, rangeEnd: end, mode, rate } = playback;
   if (mode === 'hold') return Math.max(start, Math.min(end, raw));
   const span = end - start;
   const period = mode === 'pingpong' ? 2 * span : span;
