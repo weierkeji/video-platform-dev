@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { evaluatedTransform } from '../core/evaluate';
+import { activeConstraints, sceneEvaluator } from '../core/constraints';
 import { type Entity, type Geometry, type Project } from '../core/model';
 import { deformGeometry } from '../core/skin';
 import { linearColor, surfaceGeometry, surfaceMaterial } from '../core/surface';
@@ -24,6 +25,8 @@ export class SceneRenderer {
   sceneId = '';
   loading = false;
   textureError = '';
+  constraintWarnings: string[] = [];
+  private evaluateScene?: ReturnType<typeof sceneEvaluator>;
   private textures?: TextureBank;
   private pending = Promise.resolve();
   private generation = 0;
@@ -48,6 +51,7 @@ export class SceneRenderer {
     this.clear();
     this.project = p;
     this.sceneId = sceneId;
+    this.evaluateScene = sceneEvaluator(p, sceneId);
     const generation = this.generation,
       textures = (this.textures = new TextureBank(p, this.renderer.capabilities.maxTextureSize));
     const tasks: Promise<void>[] = [];
@@ -148,6 +152,10 @@ export class SceneRenderer {
   }
   evaluate(frame: number, actionId?: string | null, layers = true, restEntityId?: string) {
     if (!this.project) return;
+    const pose = this.evaluateScene!(frame, actionId, layers);
+    this.constraintWarnings = pose.warnings.map(
+      (w) => `${this.project!.entities.find((e) => e.id === w.entityId)!.name}：${w.message}`,
+    );
     for (const e of this.project.entities.filter((e) => e.sceneId === this.sceneId)) {
       const t = evaluatedTransform(this.project, e, frame, actionId, layers),
         o = this.objects.get(e.id)!;
@@ -155,6 +163,11 @@ export class SceneRenderer {
       if (t.quaternion) o.quaternion.fromArray(t.quaternion);
       else o.rotation.set(...t.rotation, 'XYZ');
       o.scale.fromArray(t.scale);
+      o.matrixAutoUpdate = !activeConstraints(e).length;
+      if (!o.matrixAutoUpdate) {
+        o.matrix.copy(pose.local.get(e.id)!);
+        o.matrix.decompose(o.position, o.quaternion, o.scale);
+      }
     }
     this.scene.updateMatrixWorld(true);
     const world = new Map([...this.objects].map(([id, o]) => [id, o.matrixWorld]));

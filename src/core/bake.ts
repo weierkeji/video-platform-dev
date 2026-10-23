@@ -16,6 +16,7 @@ import {
   validateTrack,
 } from './animation';
 import { evaluatedTransform } from './evaluate';
+import { activeConstraints, matrixTransform, sceneEvaluator } from './constraints';
 
 export const BakeOptionsSchema = z
   .object({
@@ -220,6 +221,7 @@ export function bakeAnimation(
   let maxBoundarySpanFrames = 0;
   let probes = 0,
     entities = 0;
+  const plans: { entity: Entity; scope: Project; created: AnimationTrack[] }[] = [];
   for (const entity of p.entities.filter((e) => e.sceneId === sceneId)) {
     const layers = (p.animationLayers || []).filter(
       (l) => l.entityId === entity.id && l.enabled && l.weight,
@@ -237,40 +239,73 @@ export function bakeAnimation(
           layer.channels.includes(t.property === 'quaternion' ? 'rotation' : t.property),
         )
         .forEach(include);
+    if (activeConstraints(entity).length) {
+      channels.add('position');
+      channels.add('quaternion');
+      channels.add('scale');
+    }
     if (!channels.size) continue;
-    if (tracks.reduce((n, t) => n + t.keys.length, 0) + grid.length * channels.size > MAX_KEYS)
+    if (
+      (plans.reduce((n, plan) => n + plan.created.length, 0) + channels.size) * grid.length >
+      MAX_KEYS
+    )
       throw new Error('烘焙总量超过 20 万键；请增大步长或缩短范围');
     entities++;
-    // Local transforms do not depend on parent evaluation. Restrict lookup scans
-    // without changing hierarchy or source evaluation semantics.
+    // Unconstrained local channels can still use a narrow lookup scope. Owners
+    // with constraints use the full scene graph sampled once at each time below.
     const scope: Project = {
       ...p,
       entities: [entity],
       animationTracks: sourceTracks,
       animationLayers: layers,
     };
-    const value = (
-      t: Entity['transform'],
-      channel: 'position' | 'quaternion' | 'scale',
-    ): AnimationValue =>
-      channel === 'quaternion'
-        ? normalizeQuaternion(t.quaternion || quaternionFromEuler(t.rotation))
-        : t[channel];
-    const poses = grid.map((g) => evaluatedTransform(scope, entity, g.source, options.actionId));
     const created = [...channels].map(
       (property): AnimationTrack => ({
         id: id(),
         entityId: entity.id,
         actionId: action.id,
         property,
-        keys: grid.map((g, i) => ({
-          id: id(),
-          frame: g.frame,
-          value: value(poses[i], property),
-          interpolation: options.interpolation,
-        })),
+        keys: [],
       }),
     );
+    plans.push({ entity, scope, created });
+  }
+  const value = (
+    t: Entity['transform'],
+    channel: 'position' | 'quaternion' | 'scale',
+  ): AnimationValue =>
+    channel === 'quaternion'
+      ? normalizeQuaternion(t.quaternion || quaternionFromEuler(t.rotation))
+      : t[channel];
+  const hasConstraints = plans.some(({ entity }) => activeConstraints(entity).length);
+  const evaluateScene = hasConstraints ? sceneEvaluator(p, sceneId) : undefined;
+  const warnings = new Set<string>();
+  const sample = (frame: number) => {
+    const pose = evaluateScene?.(frame, options.actionId);
+    for (const warning of pose?.warnings || [])
+      if (warnings.size < 20)
+        warnings.add(
+          `${p.entities.find((e) => e.id === warning.entityId)!.name}：${warning.message}`,
+        );
+    return plans.map(({ entity, scope }) =>
+      activeConstraints(entity).length
+        ? matrixTransform(pose!.local.get(entity.id)!, `${entity.name}（帧 ${frame}）`)
+        : evaluatedTransform(scope, entity, frame, options.actionId),
+    );
+  };
+  for (const g of grid) {
+    const poses = sample(g.source);
+    plans.forEach(({ created }, index) => {
+      for (const track of created)
+        track.keys.push({
+          id: id(),
+          frame: g.frame,
+          value: value(poses[index], track.property as 'position' | 'quaternion' | 'scale'),
+          interpolation: options.interpolation,
+        });
+    });
+  }
+  for (const { entity, created } of plans) {
     for (const track of created) {
       AnimationTrackSchema.parse(track);
       validateTrack(track);
@@ -280,18 +315,21 @@ export function bakeAnimation(
       )
         throw new Error(`对象“${entity.name}”的烘焙缩放接近零，不能保存为动画键`);
     }
-    for (let i = 0; i < grid.length - 1; i++) {
-      const atBoundary = grid[i].boundaryAfter;
-      const category = atBoundary ? boundaryErrors : smoothErrors;
-      if (atBoundary)
-        maxBoundarySpanFrames = Math.max(maxBoundarySpanFrames, grid[i + 1].frame - grid[i].frame);
-      for (const fraction of [0.25, 0.5, 0.75]) {
-        const frame = grid[i].frame + (grid[i + 1].frame - grid[i].frame) * fraction;
-        const actual = evaluatedTransform(scope, entity, frame + offset, options.actionId);
+    tracks.push(...created);
+  }
+  for (let i = 0; i < grid.length - 1; i++) {
+    const atBoundary = grid[i].boundaryAfter;
+    const category = atBoundary ? boundaryErrors : smoothErrors;
+    if (atBoundary)
+      maxBoundarySpanFrames = Math.max(maxBoundarySpanFrames, grid[i + 1].frame - grid[i].frame);
+    for (const fraction of [0.25, 0.5, 0.75]) {
+      const frame = grid[i].frame + (grid[i + 1].frame - grid[i].frame) * fraction;
+      const actual = sample(frame + offset);
+      plans.forEach(({ created }, index) => {
         probes++;
         for (const track of created) {
           const channel = track.property as 'position' | 'quaternion' | 'scale';
-          const expected = value(actual, channel),
+          const expected = value(actual[index], channel),
             sampled = sampleTrack(track, frame)!;
           if (channel === 'quaternion') {
             const dot = Math.min(
@@ -307,9 +345,8 @@ export function bakeAnimation(
             category[channel] = Math.max(category[channel], error);
           }
         }
-      }
+      });
     }
-    tracks.push(...created);
   }
   if (!tracks.length) throw new Error('当前场景和所选动作没有可烘焙的变换动画');
   const stats = {
@@ -329,7 +366,8 @@ export function bakeAnimation(
     `每段 1/4、1/2、3/4 位置共 ${probes} 次探测：最大位置分量差 ${errors.position.toPrecision(4)} 米、旋转差 ${errors.rotationDegrees.toPrecision(4)}°、缩放分量差 ${errors.scale.toPrecision(4)}。这是局部变换探测值，不是全区间误差上界；GLB 数值另有 Float32 量化。`,
     `边界细分段以外的探测最大差：位置 ${smoothErrors.position.toPrecision(4)} 米、旋转 ${smoothErrors.rotationDegrees.toPrecision(4)}°、缩放 ${smoothErrors.scale.toPrecision(4)}。边界细分段最长 ${maxBoundarySpanFrames.toPrecision(4)} 帧；其中最大差：位置 ${boundaryErrors.position.toPrecision(4)} 米、旋转 ${boundaryErrors.rotationDegrees.toPrecision(4)}°、缩放 ${boundaryErrors.scale.toPrecision(4)}。`,
     `${guarded} 个可能跳变的边界加入 Float32 两侧时刻，并留出源时间浮点运算的舍入间隔。时间按秒量化；边界位置与两侧过渡为近似，不能精确表达瞬时跳变。`,
-    '烘焙仅采样所选基础动作与当前启用的对象层；保留父子局部变换。镜头/片段调度、层设置和原始曲线不写入该烘焙动作；完整作品保存项目包。',
+    '烘焙采样所选基础动作、当前启用的对象层与约束；保留父子局部变换。无法由 TRS 表达的局部剪切会拒绝烘焙。镜头/片段调度、层/约束设置和原始曲线不写入该动作；完整作品保存项目包。',
+    ...warnings,
   ];
   return { action, tracks, stats, notes, options };
 }
@@ -341,6 +379,11 @@ export function bakedProject(p: Project, sceneId: string, options: BakeOptions) 
     ...baked,
     project: {
       ...p,
+      entities: p.entities.map((e) =>
+        targets.has(e.id) && e.constraints
+          ? { ...e, constraints: e.constraints.map((c) => ({ ...c, enabled: false })) }
+          : e,
+      ),
       animationActions: [
         ...(p.animationActions || []).filter((a) => a.sceneId !== sceneId),
         baked.action,

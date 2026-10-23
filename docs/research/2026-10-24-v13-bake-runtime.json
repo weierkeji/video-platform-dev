@@ -1,0 +1,222 @@
+{
+  "checkedAt": "2026-10-23T19:24:01.774Z",
+  "projectId": "20a28dba-3c53-4f96-a574-1e558c10b092",
+  "importedProjectId": "36678112-f950-428e-a575-9921de539450",
+  "jobId": "ba67ca53-5151-4699-84d9-20be5d741c0b",
+  "browser": "155.0.8059.82",
+  "format": 12,
+  "frames": 48,
+  "stats": {
+    "samples": 101,
+    "tracks": 4,
+    "keys": 404,
+    "entities": 3,
+    "guardedBoundaries": 3,
+    "probes": 900,
+    "errors": {
+      "position": 0.1249999925494194,
+      "rotationDegrees": 7.874999999999966,
+      "scale": 2.1457672083613488e-8
+    },
+    "smoothErrors": {
+      "position": 0.0001627610375489752,
+      "rotationDegrees": 0.009035530346870092,
+      "scale": 2.1457672083613488e-8
+    },
+    "boundaryErrors": {
+      "position": 0.1249999925494194,
+      "rotationDegrees": 7.874999999999966,
+      "scale": 2.220446049250313e-16
+    },
+    "maxBoundarySpanFrames": 0.00000286102294921875
+  },
+  "validator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 0,
+    "numHints": 0,
+    "messages": [],
+    "truncated": false
+  },
+  "measurements": [
+    {
+      "frame": 0,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 0.125,
+      "bakeDifference": 0.0007716049382716049
+    },
+    {
+      "frame": 0.25,
+      "bakeDifference": 0.000023148148148148147
+    },
+    {
+      "frame": 6,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 12,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 15.999,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 16,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 16.001,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 17,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 23,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 24,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 31,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 32,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 35,
+      "bakeDifference": 0
+    },
+    {
+      "frame": 47,
+      "bakeDifference": 0
+    }
+  ],
+  "videoMeasurements": [
+    {
+      "frame": 0,
+      "videoDifference": 0.43210133744855966
+    },
+    {
+      "frame": 6,
+      "videoDifference": 0.420298353909465
+    },
+    {
+      "frame": 12,
+      "videoDifference": 0.41778034979423867
+    },
+    {
+      "frame": 16,
+      "videoDifference": 0.42102880658436215
+    },
+    {
+      "frame": 17,
+      "videoDifference": 0.41760802469135805
+    },
+    {
+      "frame": 23,
+      "videoDifference": 0.4282510288065844
+    },
+    {
+      "frame": 24,
+      "videoDifference": 0.42258487654320986
+    },
+    {
+      "frame": 31,
+      "videoDifference": 0.4251105967078189
+    },
+    {
+      "frame": 32,
+      "videoDifference": 0.4145061728395062
+    },
+    {
+      "frame": 35,
+      "videoDifference": 0.4220601851851852
+    },
+    {
+      "frame": 47,
+      "videoDifference": 0.42648148148148146
+    }
+  ],
+  "roundtrip": [
+    {
+      "frame": 0,
+      "differenceAfterImport": 0.0000051440329218107
+    },
+    {
+      "frame": 0.125,
+      "differenceAfterImport": 0.0007844650205761317
+    },
+    {
+      "frame": 0.25,
+      "differenceAfterImport": 0.000028292181069958848
+    },
+    {
+      "frame": 6,
+      "differenceAfterImport": 0.000012860082304526749
+    },
+    {
+      "frame": 12,
+      "differenceAfterImport": 0.00000257201646090535
+    },
+    {
+      "frame": 15.999,
+      "differenceAfterImport": 0.00000771604938271605
+    },
+    {
+      "frame": 16,
+      "differenceAfterImport": 0.00000771604938271605
+    },
+    {
+      "frame": 16.001,
+      "differenceAfterImport": 0.0000051440329218107
+    },
+    {
+      "frame": 17,
+      "differenceAfterImport": 0.00000257201646090535
+    },
+    {
+      "frame": 23,
+      "differenceAfterImport": 0.0000051440329218107
+    },
+    {
+      "frame": 24,
+      "differenceAfterImport": 0.0000102880658436214
+    },
+    {
+      "frame": 31,
+      "differenceAfterImport": 0.0000102880658436214
+    },
+    {
+      "frame": 32,
+      "differenceAfterImport": 0.0000102880658436214
+    },
+    {
+      "frame": 35,
+      "differenceAfterImport": 0.0000051440329218107
+    },
+    {
+      "frame": 47,
+      "differenceAfterImport": 0.0000051440329218107
+    }
+  ],
+  "pageErrors": [],
+  "checks": [
+    "worker cancellation and invalid range leave project unchanged",
+    "UI sampling range step interpolation and rebase",
+    "baked GLB validated and reimported through UI",
+    "save new action retains originals; activation disables layers atomically",
+    "undo redo and reload retain baked keys",
+    "original vs baked vs reimported images",
+    "fixed render snapshot while editing source layers",
+    "portable project retains source and baked actions"
+  ]
+}

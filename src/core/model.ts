@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { GenerationOptionsSchema, GenerationRequestSchema } from './generation';
 import { validateTrack } from './animation';
+import { dependencyOrder } from './constraints';
 
-export const PROJECT_VERSION = 11;
+export const PROJECT_VERSION = 12;
 
 export const id = () => crypto.randomUUID();
 const ID = z
@@ -188,6 +189,33 @@ export const CameraSchema = z
     aspect: z.number().positive().optional(),
   })
   .strict();
+const ConstraintBase = {
+  id: ID,
+  name: Name,
+  targetId: ID,
+  enabled: z.boolean(),
+  influence: z.number().finite().min(0).max(1),
+};
+export const ConstraintSchema = z.discriminatedUnion('type', [
+  z
+    .object({
+      ...ConstraintBase,
+      type: z.enum(['copy-transform', 'copy-position']),
+      targetSpace: z.enum(['local', 'world']),
+      ownerSpace: z.enum(['local', 'world']),
+    })
+    .strict(),
+  z
+    .object({
+      ...ConstraintBase,
+      type: z.literal('aim'),
+      trackAxis: z.enum(['x', 'y', 'z', '-x', '-y', '-z']),
+      upAxis: z.enum(['x', 'y', 'z']),
+      worldUp: Vec3Schema,
+    })
+    .strict(),
+]);
+export type Constraint = z.infer<typeof ConstraintSchema>;
 export const EntitySchema = z
   .object({
     id: ID,
@@ -203,6 +231,7 @@ export const EntitySchema = z
     light: LightSchema.optional(),
     joint: z.boolean().optional(),
     skin: SkinSchema.optional(),
+    constraints: z.array(ConstraintSchema).max(32).optional(),
   })
   .strict();
 export type Entity = z.infer<typeof EntitySchema>;
@@ -501,6 +530,7 @@ export function parseProject(input: unknown): Project {
   for (const item of [
     ...p.scenes,
     ...p.entities,
+    ...p.entities.flatMap((e) => e.constraints || []),
     ...p.geometries,
     ...p.materials,
     ...p.animationTracks,
@@ -583,6 +613,7 @@ export function parseProject(input: unknown): Project {
       parentId = parent.parentId;
     }
   }
+  dependencyOrder(p.entities);
   const paths = new Set<string>();
   for (const e of p.entities)
     if (e.skin) {
@@ -717,7 +748,7 @@ export function migrateProject(input: unknown) {
     typeof input !== 'object' ||
     !input ||
     !('schemaVersion' in input) ||
-    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
+    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, PROJECT_VERSION].includes(Number(input.schemaVersion)) ||
     typeof input.schemaVersion !== 'number'
   )
     throw new Error('不支持此项目版本；原文件未修改');

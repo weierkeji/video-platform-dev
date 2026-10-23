@@ -1,16 +1,7 @@
-import { Euler, Matrix4, Quaternion, Vector3 } from 'three';
+import { Matrix4, Vector3 } from 'three';
 import type { Entity, Geometry, Project, Skin, Vec3, VertexInfluences } from './model';
-import { evaluatedTransform } from './evaluate';
-
-export function transformMatrix(t: Entity['transform']) {
-  return new Matrix4().compose(
-    new Vector3(...t.position),
-    t.quaternion
-      ? new Quaternion(...t.quaternion)
-      : new Quaternion().setFromEuler(new Euler(...t.rotation, 'XYZ')),
-    new Vector3(...t.scale),
-  );
-}
+import { sceneEvaluator } from './constraints';
+export { transformMatrix } from './constraints';
 
 /** Ordinary intermediate parents and invisible joints participate in evaluation. */
 export function worldMatrices(
@@ -20,22 +11,7 @@ export function worldMatrices(
   actionId?: string | null,
   layers = true,
 ) {
-  const entities = new Map(p.entities.filter((e) => e.sceneId === sceneId).map((e) => [e.id, e]));
-  const result = new Map<string, Matrix4>();
-  const visit = (e: Entity): Matrix4 => {
-    if (!result.has(e.id))
-      result.set(
-        e.id,
-        (e.parentId ? visit(entities.get(e.parentId)!).clone() : new Matrix4()).multiply(
-          transformMatrix(
-            frame === undefined ? e.transform : evaluatedTransform(p, e, frame, actionId, layers),
-          ),
-        ),
-      );
-    return result.get(e.id)!;
-  };
-  entities.forEach(visit);
-  return result;
+  return sceneEvaluator(p, sceneId)(frame, actionId, layers).world;
 }
 
 export function normalizedInfluences(rows: VertexInfluences[]): VertexInfluences {

@@ -18,6 +18,7 @@ import {
   TransformSchema,
   WorkflowSchema,
   VertexInfluencesSchema,
+  ConstraintSchema,
   id,
   identity,
   parseProject,
@@ -104,6 +105,18 @@ export const CommandSchema = z.discriminatedUnion('type', [
     .strict(),
   z.object({ type: z.literal('entity.delete'), id: ID }).strict(),
   z.object({ type: z.literal('entity.duplicate'), id: ID }).strict(),
+  z
+    .object({ type: z.literal('constraint.put'), entityId: ID, constraint: ConstraintSchema })
+    .strict(),
+  z.object({ type: z.literal('constraint.delete'), entityId: ID, id: ID }).strict(),
+  z
+    .object({
+      type: z.literal('constraint.move'),
+      entityId: ID,
+      id: ID,
+      direction: z.union([z.literal(-1), z.literal(1)]),
+    })
+    .strict(),
   z
     .object({
       type: z.literal('skin.bind'),
@@ -328,6 +341,9 @@ function apply(p: Project, c: Command) {
         );
         for (const layer of p.animationLayers || [])
           if (targets.has(layer.entityId)) layer.enabled = false;
+        for (const entity of p.entities)
+          if (targets.has(entity.id))
+            for (const constraint of entity.constraints || []) constraint.enabled = false;
       }
       break;
     }
@@ -431,6 +447,12 @@ function apply(p: Project, c: Command) {
         throw new Error('摄影机被镜头引用，请先为镜头选择其他摄影机');
       if (
         p.entities.some(
+          (e) => !removing.has(e.id) && e.constraints?.some((c) => removing.has(c.targetId)),
+        )
+      )
+        throw new Error('对象仍被约束引用，请先删除相关约束或一起删除');
+      if (
+        p.entities.some(
           (e) =>
             !removing.has(e.id) &&
             e.skin &&
@@ -451,6 +473,9 @@ function apply(p: Project, c: Command) {
         e = structuredClone(source);
       e.id = id();
       e.name += ' 副本';
+      e.constraints?.forEach((constraint) => {
+        constraint.id = id();
+      });
       if (!e.skin) e.transform.position[0] += 2.5;
       if (e.geometryId) {
         const g = structuredClone(get(p.geometries, e.geometryId));
@@ -490,6 +515,27 @@ function apply(p: Project, c: Command) {
         visible: true,
         transform: identity(),
       });
+      break;
+    }
+    case 'constraint.put': {
+      const constraints = (get(p.entities, c.entityId).constraints ||= []);
+      const index = constraints.findIndex((constraint) => constraint.id === c.constraint.id);
+      if (index < 0) constraints.push(c.constraint);
+      else constraints[index] = c.constraint;
+      break;
+    }
+    case 'constraint.delete': {
+      const entity = get(p.entities, c.entityId);
+      get(entity.constraints || [], c.id);
+      entity.constraints = entity.constraints!.filter((constraint) => constraint.id !== c.id);
+      break;
+    }
+    case 'constraint.move': {
+      const constraints = get(p.entities, c.entityId).constraints || [];
+      const index = constraints.indexOf(get(constraints, c.id)),
+        other = index + c.direction;
+      if (constraints[other])
+        [constraints[index], constraints[other]] = [constraints[other], constraints[index]];
       break;
     }
     case 'skin.bind': {

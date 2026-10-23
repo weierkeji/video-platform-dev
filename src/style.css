@@ -1,4 +1,5 @@
 :root {
+  --border: #2b3a4d;
   font-family: Inter, 'Segoe UI', 'Microsoft YaHei', sans-serif;
   color: #d4dce6;
   background: #10151d;
@@ -1224,4 +1225,20 @@ pre {
 .bake-panel .field input:not([type='number']) {
   width: 260px;
   max-width: 60%;
+}
+.constraint-panel {
+  margin-top: 16px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.constraint-panel summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.constraint-card {
+  margin: 12px 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  min-width: 0;
 }

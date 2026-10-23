@@ -1,0 +1,112 @@
+{
+  "checkedAt": "2026-10-23T19:18:37.107Z",
+  "projectId": "b24fddca-0308-4680-9bc9-878ff037a113",
+  "importedProjectId": "617f6607-eaaa-4399-b6a9-c121eb56470a",
+  "jobId": "c35f054a-8e62-4218-95f3-ff5f1de5d77b",
+  "browser": "155.0.8059.82",
+  "format": 12,
+  "frames": 48,
+  "validator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 2,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/7"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/9"
+      }
+    ],
+    "truncated": false
+  },
+  "staticValidator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 3,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/6"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/7"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/9"
+      }
+    ],
+    "truncated": false
+  },
+  "staticDifference": 0.00005915637860082304,
+  "measurements": [
+    {
+      "frame": 0,
+      "difference": 0.0010390946502057614
+    },
+    {
+      "frame": 6.25,
+      "difference": 0.0023431069958847737
+    },
+    {
+      "frame": 12,
+      "difference": 0.0003523662551440329
+    },
+    {
+      "frame": 24,
+      "difference": 0.000046296296296296294
+    },
+    {
+      "frame": 36.5,
+      "difference": 0.0004063786008230453
+    },
+    {
+      "frame": 47,
+      "difference": 0.0013117283950617284
+    }
+  ],
+  "videoMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0.40700102880658434
+    },
+    {
+      "frame": 12,
+      "difference": 0.4132381687242798
+    },
+    {
+      "frame": 24,
+      "difference": 0.4428935185185185
+    },
+    {
+      "frame": 47,
+      "difference": 0.4286625514403292
+    }
+  ],
+  "pageErrors": [],
+  "checks": [
+    "aim axis edit and undo",
+    "constraint creation order influence mute undo redo reload",
+    "dependency cycle rejects UI transaction without revision change",
+    "bake activation disables constraints and undo restores original",
+    "static and baked GLB validation and UI reimport",
+    "fixed render snapshot while disabling joint constraint",
+    "portable project preserves editable constraints skin and weights"
+  ]
+}

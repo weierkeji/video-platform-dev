@@ -8,6 +8,7 @@ import { type Entity, type Project } from '../core/model';
 import { transformVertices, type MeshSelection } from '../core/mesh';
 import { MeshOverlay, MeshPicker } from '../render/mesh-edit';
 import { JointOverlay } from '../render/joints';
+import { activeConstraints } from '../core/constraints';
 
 export type ViewportProps = {
   project: Project;
@@ -36,6 +37,7 @@ export function Viewport(props: ViewportProps) {
     controls = useRef<TransformControls | null>(null),
     camera = useRef<THREE.PerspectiveCamera | null>(null);
   const [error, setError] = useState(''),
+    [constraintWarning, setConstraintWarning] = useState(''),
     [loadingTextures, setLoadingTextures] = useState(false),
     [boxTool, setBoxTool] = useState(false),
     [showJoints, setShowJoints] = useState(true),
@@ -187,6 +189,7 @@ export function Viewport(props: ViewportProps) {
         if (renderer.project !== p.project || renderer.sceneId !== p.sceneId) sync();
         if (!gizmo.dragging)
           renderer.evaluate(p.frame, undefined, p.layersPreview, p.meshSelection?.entityId);
+        setConstraintWarning(renderer.constraintWarnings.join('；'));
         joints?.update(jointsRef.current && !p.meshSelection, p.selected);
         const selected = p.selected ? renderer.objects.get(p.selected) : undefined;
         if (p.meshSelection !== lastSelection || p.meshXray !== lastXray) {
@@ -380,7 +383,9 @@ export function Viewport(props: ViewportProps) {
           ? overlay?.vertices.length && Math.abs(overlay.mesh.matrixWorld.determinant()) > 1e-12
             ? proxy
             : undefined
-          : p.project.entities.find((e) => e.id === p.selected)?.skin ||
+          : p.project.entities.some(
+                (e) => e.id === p.selected && (e.skin || activeConstraints(e).length),
+              ) ||
               (p.layersPreview &&
                 p.project.animationLayers?.some((l) => l.entityId === p.selected && l.enabled))
             ? undefined
@@ -545,6 +550,11 @@ export function Viewport(props: ViewportProps) {
       {error && (
         <div className="viewport-error" role="alert">
           {error}
+        </div>
+      )}
+      {constraintWarning && props.view === 'scene' && !error && (
+        <div className="viewport-error" role="status">
+          {constraintWarning}
         </div>
       )}
       {loadingTextures && props.view === 'scene' && (

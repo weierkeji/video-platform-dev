@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { evaluatedBaseTransform } from '../core/evaluate';
 import { LayerPanel } from './LayerPanel';
 import { SkinPanel } from './SkinPanel';
+import { ConstraintPanel } from './ConstraintPanel';
 import { activeTracks, rotationProperty, quaternionFromEuler } from '../core/animation';
 import { type Command } from '../core/commands';
 import { type Clip, type Entity, type Project, type Vec3 } from '../core/model';
@@ -384,6 +385,7 @@ export function Inspector({
           ◇ 记录当前变换关键帧
         </button>
         <LayerPanel project={p} entity={e} frame={frame} send={send} />
+        <ConstraintPanel key={`constraints-${e.id}`} project={p} entity={e} send={send} />
         <SkinPanel key={e.id} project={p} entity={e} send={send} />
         {activeTracks(p, e.id).length > 0 && (
           <p className="muted">已有动画属性的修改会更新当前帧关键帧。</p>
@@ -598,6 +600,33 @@ export function Inspector({
             <h3>灯光</h3>
             {e.light.direction && (
               <p className="muted">光线沿对象局部 −Z 方向；旋转对象可改变照射方向。</p>
+            )}
+            {e.light.kind === 'directional' && (
+              <label className="check">
+                <input
+                  type="checkbox"
+                  aria-label="方向跟随对象 −Z"
+                  checked={!!e.light.direction}
+                  onChange={(event) =>
+                    send(
+                      [
+                        {
+                          type: 'entity.update',
+                          id: e.id,
+                          patch: {
+                            light: {
+                              ...e.light!,
+                              direction: event.target.checked ? 'local-negative-z' : undefined,
+                            },
+                          },
+                        },
+                      ],
+                      '切换平行光方向模式',
+                    )
+                  }
+                />
+                方向跟随对象 −Z
+              </label>
             )}
             <label className="field">
               类型

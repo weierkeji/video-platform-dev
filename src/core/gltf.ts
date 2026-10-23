@@ -18,11 +18,12 @@ import {
 import { checkedImage, imageInfo, sha256 } from './image';
 import { CommandSchema, type Command } from './commands';
 import { evaluatedTransform } from './evaluate';
+import { activeConstraints, matrixTransform, sceneEvaluator } from './constraints';
 import { animationSampler } from './animation-exchange';
 import { bakedProject, type BakeOptions } from './bake';
 import { normalizeQuaternion, validateTrack } from './animation';
 import { displayColor, linearColor, surfaceGeometry } from './surface';
-import { deformGeometry, normalizedInfluences, worldMatrices } from './skin';
+import { deformGeometry, normalizedInfluences } from './skin';
 
 // Independent bounded format mapping. No external URI requests and no runtime product dependency.
 const integer = z.number().int().nonnegative().max(100000000);
@@ -1121,6 +1122,11 @@ export function exportGLB(
   if (!scene) throw new Error('场景不存在');
   const entities = project.entities.filter((e) => e.sceneId === sceneId),
     byId = new Map(entities.map((e) => [e.id, e]));
+  if (animated && entities.some((e) => activeConstraints(e).length))
+    throw new Error(
+      '原始动画 GLB 无法保存约束；请使用“烘焙动画 GLB”采样约束结果，项目包保留可编辑约束',
+    );
+  const pose = animated ? undefined : sceneEvaluator(project, sceneId)(frame);
   if (animated && project.animationLayers?.some((l) => l.enabled && byId.has(l.entityId)))
     throw new Error(
       '原始动画 GLB 不包含动作层；请使用“烘焙动画 GLB”导出混合结果，或禁用层后导出原始动作（动作层烘焙需指定区间）',
@@ -1146,6 +1152,7 @@ export function exportGLB(
       : '仅导出当前帧的可见场景；动画曲线、时间轴、背景、环境光、阴影设置和工作流不属于此 GLB。',
     '位置、法线和 UV 以 Float32 编码。',
     ...bakeNotes,
+    ...(pose?.warnings.map((w) => `${byId.get(w.entityId)!.name}：${w.message}`) || []),
   ];
   if (entities.some((e) => !visible(e)))
     notes.push('隐藏对象的内容不导出；蒙皮需要的隐藏关节和祖先仍保留变换节点。');
@@ -1297,6 +1304,7 @@ export function exportGLB(
     );
   };
   const worldMatrix = (e: Entity): Matrix4 => {
+    if (pose) return pose.world.get(e.id)!;
     if (!world.has(e.id))
       world.set(
         e.id,
@@ -1307,7 +1315,11 @@ export function exportGLB(
     return world.get(e.id)!;
   };
   included.forEach((e) => {
-    const t = animated ? e.transform : evaluatedTransform(project, e, frame),
+    const t = animated
+        ? e.transform
+        : activeConstraints(e).length
+          ? matrixTransform(pose!.local.get(e.id)!, e.name)
+          : evaluatedTransform(project, e, frame),
       node: JSONRecord = {
         name: e.name,
         translation: t.position,
@@ -1336,7 +1348,7 @@ export function exportGLB(
           base.dispose();
         }
         g = {
-          ...deformGeometry(g, e.skin, worldMatrices(project, sceneId, frame)),
+          ...deformGeometry(g, e.skin, pose!.world),
           id: `${g.id}-${e.id}-pose`,
         };
       }
@@ -1590,7 +1602,7 @@ export function exportGLB(
   const json: JSONRecord = {
     asset: {
       version: '2.0',
-      generator: 'Frameforge Studio 0.12 scene exchange',
+      generator: 'Frameforge Studio 0.13 scene exchange',
       ...(scene.source?.copyright ? { copyright: scene.source.copyright } : {}),
     },
     scene: 0,
