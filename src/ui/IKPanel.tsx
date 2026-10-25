@@ -6,6 +6,7 @@ import { sceneEvaluator } from '../core/constraints';
 import { NumberInput } from './Inspector';
 import { IKLimits } from './IKLimits';
 import { IKAnimation } from './IKAnimation';
+import { IKMatch } from './IKMatch';
 
 export function IKPanel({
   project,
@@ -159,7 +160,7 @@ export function IKPanel({
             </label>
             {state && (
               <p role="status" className="ik-status">
-                成片帧 {frame}：末端距离目标 {state.appliedResidual.toPrecision(4)} 米；完整求解误差{' '}
+                场景帧 {frame}：末端距离目标 {state.appliedResidual.toPrecision(4)} 米；完整求解误差{' '}
                 {state.residual.toPrecision(4)} 米。
                 {state.method === 'geometric'
                   ? '双段几何解。'
@@ -181,6 +182,7 @@ export function IKPanel({
               angles={state?.limits}
             />
             <IKAnimation project={project} chain={c} frame={frame} send={send} />
+            <IKMatch project={project} chain={c} frame={frame} send={send} />
             <button onClick={() => send([{ type: 'ik.delete', id: c.id }], '移除 IK 链')}>
               移除 IK 链
             </button>

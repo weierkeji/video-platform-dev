@@ -1,6 +1,6 @@
 {
   "name": "frameforge-studio",
-  "version": "0.17.0",
+  "version": "0.18.0",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -30,7 +30,8 @@
     "smoke:ik": "tsx scripts/ik-smoke.ts",
     "smoke:ik-limits": "tsx scripts/ik-limits-smoke.ts",
     "smoke:ik-animation": "tsx scripts/ik-animation-smoke.ts",
-    "smoke:rest-pose": "tsx scripts/rest-pose-smoke.ts"
+    "smoke:rest-pose": "tsx scripts/rest-pose-smoke.ts",
+    "smoke:ik-match": "tsx scripts/ik-match-smoke.ts"
   },
   "dependencies": {
     "react": "19.1.1",

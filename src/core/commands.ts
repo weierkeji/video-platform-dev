@@ -39,6 +39,7 @@ import { sceneEvaluator } from './constraints';
 import { affineParts } from './affine';
 import { activeIKTracks } from './ik-animation';
 import { updateRestPose, captureRestPose, resetRestPose } from './rest-pose';
+import { planIKMatch, verifyIKMatch } from './ik-match';
 import { deleteElements, extrudeRegion, mergeVertices, transformVertices } from './mesh';
 
 const ID = z.string().min(1).max(80);
@@ -74,6 +75,15 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('layer.delete'), id: ID }).strict(),
   z.object({ type: z.literal('ik.put'), chain: IKChainSchema }).strict(),
   z.object({ type: z.literal('ik.delete'), id: ID }).strict(),
+  z
+    .object({
+      type: z.literal('ik.match'),
+      chainId: ID,
+      frame: z.number().finite().min(0).max(1e6),
+      mode: z.enum(['fk', 'ik']),
+      interpolation: z.enum(['constant', 'linear']),
+    })
+    .strict(),
   z
     .object({
       type: z.literal('ik.key.set'),
@@ -463,6 +473,12 @@ function apply(p: Project, c: Command) {
     case 'layer.add':
       (p.animationLayers ||= []).push(c.layer);
       break;
+    case 'ik.match': {
+      const plan = planIKMatch(p, c);
+      for (const command of plan.commands) apply(p, command);
+      verifyIKMatch(p, plan);
+      break;
+    }
     case 'ik.put': {
       const chains = (p.ikChains ||= []),
         index = chains.findIndex((chain) => chain.id === c.chain.id);

@@ -9,6 +9,7 @@ import { transformVertices, type MeshSelection } from '../core/mesh';
 import { MeshOverlay, MeshPicker } from '../render/mesh-edit';
 import { JointOverlay } from '../render/joints';
 import { activeConstraints, activeIK } from '../core/constraints';
+import { evaluatedIK } from '../core/ik-animation';
 
 export type ViewportProps = {
   project: Project;
@@ -392,8 +393,11 @@ export function Viewport(props: ViewportProps) {
               ? overlay?.vertices.length && Math.abs(overlay.mesh.matrixWorld.determinant()) > 1e-12
                 ? proxy
                 : undefined
-              : activeIK(p.project.ikChains, p.project.ikTracks).some((chain) =>
-                    chain.joints.includes(p.selected || ''),
+              : activeIK(p.project.ikChains, p.project.ikTracks).some(
+                    (chain) =>
+                      chain.joints.includes(p.selected || '') &&
+                      evaluatedIK(p.project, chain, p.frame, undefined, p.layersPreview).influence >
+                        0,
                   ) ||
                   p.project.entities.some(
                     (e) =>

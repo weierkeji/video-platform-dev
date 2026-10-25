@@ -1613,7 +1613,7 @@ export function exportGLB(
   const json: JSONRecord = {
     asset: {
       version: '2.0',
-      generator: 'Frameforge Studio 0.17 scene exchange',
+      generator: 'Frameforge Studio 0.18 scene exchange',
       ...(scene.source?.copyright ? { copyright: scene.source.copyright } : {}),
     },
     scene: 0,

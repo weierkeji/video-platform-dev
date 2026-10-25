@@ -62,8 +62,14 @@ export function solveIKPositions(
     const d = Math.min(total, Math.max(inner, distance)),
       a = lengths[0],
       b = lengths[1];
-    if (d < 1e-12) points[1].copy(root).addScaledVector(bend, a);
-    else {
+    if (d < 1e-12) {
+      // At a fully folded equal-length limb the tip gives no plane axis.
+      // Keep the pole/input elbow direction; use a deterministic perpendicular
+      // only for the otherwise undefined pole-angle rotation.
+      const folded = unit((pole || input[1]).clone().sub(root), input[1].clone().sub(root));
+      folded.applyAxisAngle(perpendicular(folded, new Vector3()), options.poleAngle);
+      points[1].copy(root).addScaledVector(folded, a);
+    } else {
       const along = (a * a - b * b + d * d) / (2 * d),
         height = Math.sqrt(Math.max(0, a * a - along * along));
       points[1].copy(root).addScaledVector(direction, along).addScaledVector(bend, height);

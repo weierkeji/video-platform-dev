@@ -1,0 +1,221 @@
+{
+  "checkedAt": "2026-10-25T08:23:05.145Z",
+  "projectId": "b8af40a4-9614-4872-9bac-1ad5e9708d88",
+  "importedProjectId": "f4c82f43-aa2c-4e40-9dee-8c5a65eeb1c7",
+  "jobId": "6f966d77-197b-4aaa-9099-e99f6405a30f",
+  "media": "verified",
+  "browser": "155.0.8059.82",
+  "format": 16,
+  "frames": 48,
+  "validator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 4,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/6"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/8"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/9"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/11"
+      }
+    ],
+    "truncated": false
+  },
+  "staticValidator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 4,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/6"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/8"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/9"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/11"
+      }
+    ],
+    "truncated": false
+  },
+  "staticDifference": 0.0006224279835390946,
+  "measurements": [
+    {
+      "frame": 0,
+      "difference": 0.0002469135802469136
+    },
+    {
+      "frame": 6.25,
+      "difference": 0.002235082304526749
+    },
+    {
+      "frame": 12,
+      "difference": 0.0019161522633744856
+    },
+    {
+      "frame": 24,
+      "difference": 0.0006198559670781893
+    },
+    {
+      "frame": 36,
+      "difference": 0.0006198559670781893
+    },
+    {
+      "frame": 36.5,
+      "difference": 0.00036265432098765433
+    },
+    {
+      "frame": 47,
+      "difference": 0.0012834362139917696
+    }
+  ],
+  "videoMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0.39959876543209877
+    },
+    {
+      "frame": 12,
+      "difference": 0.401141975308642
+    },
+    {
+      "frame": 24,
+      "difference": 0.3983667695473251
+    },
+    {
+      "frame": 36,
+      "difference": 0.3983667695473251
+    },
+    {
+      "frame": 47,
+      "difference": 0.42906893004115226
+    }
+  ],
+  "pageErrors": [],
+  "parameters": [
+    {
+      "frame": 0,
+      "influence": 1,
+      "poleAngle": 0,
+      "chainId": "9058fb8a-a7e5-4232-9d8b-1e04ff5f673f",
+      "residual": 2.220446049250313e-16,
+      "appliedResidual": 2.7194799110210365e-16,
+      "iterations": 0,
+      "reachable": true,
+      "converged": true,
+      "method": "geometric",
+      "stop": "converged",
+      "limits": []
+    },
+    {
+      "frame": 6.25,
+      "influence": 1,
+      "poleAngle": 0,
+      "chainId": "9058fb8a-a7e5-4232-9d8b-1e04ff5f673f",
+      "residual": 0,
+      "appliedResidual": 4.996003610813204e-16,
+      "iterations": 0,
+      "reachable": true,
+      "converged": true,
+      "method": "geometric",
+      "stop": "converged",
+      "limits": []
+    },
+    {
+      "frame": 12,
+      "influence": 0,
+      "poleAngle": 0
+    },
+    {
+      "frame": 24,
+      "influence": 0,
+      "poleAngle": 0
+    },
+    {
+      "frame": 36,
+      "influence": 1,
+      "poleAngle": 0,
+      "chainId": "9058fb8a-a7e5-4232-9d8b-1e04ff5f673f",
+      "residual": 0,
+      "appliedResidual": 2.482534153247273e-16,
+      "iterations": 0,
+      "reachable": true,
+      "converged": true,
+      "method": "geometric",
+      "stop": "converged",
+      "limits": []
+    },
+    {
+      "frame": 36.5,
+      "influence": 1,
+      "poleAngle": 0,
+      "chainId": "9058fb8a-a7e5-4232-9d8b-1e04ff5f673f",
+      "residual": 0,
+      "appliedResidual": 4.1540741810552243e-16,
+      "iterations": 0,
+      "reachable": true,
+      "converged": true,
+      "method": "geometric",
+      "stop": "converged",
+      "limits": []
+    },
+    {
+      "frame": 47,
+      "influence": 1,
+      "poleAngle": 0,
+      "chainId": "9058fb8a-a7e5-4232-9d8b-1e04ff5f673f",
+      "residual": 0,
+      "appliedResidual": 5.026748538604307e-16,
+      "iterations": 0,
+      "reachable": true,
+      "converged": true,
+      "method": "geometric",
+      "stop": "converged",
+      "limits": []
+    }
+  ],
+  "checks": [
+    "FK and IK buttons preserve full chain matrices in one transaction",
+    "zero-influence FK root supports actual world gizmo editing",
+    "undo redo reload and current-action keys retain rest bases and bindings",
+    "noninvertible IK layer rejects atomically even with viewport layers hidden",
+    "bake activation and undo, static and animated GLB UI reimport and pixel comparisons",
+    "fixed render snapshot while disabling IK",
+    "portable project preserves switching keys and independent rest basis"
+  ]
+}
