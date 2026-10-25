@@ -5,6 +5,7 @@ import { ikPath } from '../core/ik';
 import { sceneEvaluator } from '../core/constraints';
 import { NumberInput } from './Inspector';
 import { IKLimits } from './IKLimits';
+import { IKAnimation } from './IKAnimation';
 
 export function IKPanel({
   project,
@@ -39,9 +40,7 @@ export function IKPanel({
   );
   const pose = useMemo(
     () =>
-      chains.some((c) => c.enabled && c.influence > 0)
-        ? sceneEvaluator(project, entity.sceneId)(frame)
-        : undefined,
+      chains.some((c) => c.enabled) ? sceneEvaluator(project, entity.sceneId)(frame) : undefined,
     [project, entity.sceneId, entity.id, frame],
   );
   const put = (chain: IKChain) => send([{ type: 'ik.put', chain }], '编辑 IK 链');
@@ -181,6 +180,7 @@ export function IKPanel({
               send={send}
               angles={state?.limits}
             />
+            <IKAnimation project={project} chain={c} frame={frame} send={send} />
             <button onClick={() => send([{ type: 'ik.delete', id: c.id }], '移除 IK 链')}>
               移除 IK 链
             </button>

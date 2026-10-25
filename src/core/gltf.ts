@@ -1126,7 +1126,10 @@ export function exportGLB(
     throw new Error(
       '原始动画 GLB 无法保存约束；请使用“烘焙动画 GLB”采样约束结果，项目包保留可编辑约束',
     );
-  if (animated && activeIK(project.ikChains).some((chain) => chain.sceneId === sceneId))
+  if (
+    animated &&
+    activeIK(project.ikChains, project.ikTracks).some((chain) => chain.sceneId === sceneId)
+  )
     throw new Error(
       '原始动画 GLB 无法保存 IK；请使用“烘焙动画 GLB”采样链结果，项目包保留可编辑 IK',
     );
@@ -1606,7 +1609,7 @@ export function exportGLB(
   const json: JSONRecord = {
     asset: {
       version: '2.0',
-      generator: 'Frameforge Studio 0.15 scene exchange',
+      generator: 'Frameforge Studio 0.16 scene exchange',
       ...(scene.source?.copyright ? { copyright: scene.source.copyright } : {}),
     },
     scene: 0,

@@ -1,6 +1,7 @@
 import { affineParts, blendAffine } from './affine';
 import { Euler, Matrix4, Quaternion, Vector3 } from 'three';
-import type { Constraint, Entity, IKChain, Project, Vec3, Vec4 } from './model';
+import type { Constraint, Entity, IKChain, IKTrack, Project, Vec3, Vec4 } from './model';
+import { evaluatedIK } from './ik-animation';
 import { evaluatedTransform } from './evaluate';
 import { solveIK } from './ik';
 import { limitAngles, projectJointMatrix } from './joint-limits';
@@ -8,14 +9,19 @@ import { limitAngles, projectJointMatrix } from './joint-limits';
 export const activeConstraints = (e: Entity) =>
   (e.constraints || []).filter((c) => c.enabled && c.influence > 0);
 
-export const activeIK = (chains: IKChain[] = []) =>
-  chains.filter((c) => c.enabled && c.influence > 0);
+export const activeIK = (chains: IKChain[] = [], tracks: IKTrack[] = []) =>
+  chains.filter(
+    (c) =>
+      c.enabled &&
+      (c.influence > 0 ||
+        tracks.some((t) => t.chainId === c.id && t.property === 'influence' && t.keys.length)),
+  );
 export function drivenEntities(p: Project, sceneId?: string) {
   return new Set([
     ...p.entities
       .filter((e) => (!sceneId || e.sceneId === sceneId) && activeConstraints(e).length)
       .map((e) => e.id),
-    ...activeIK(p.ikChains)
+    ...activeIK(p.ikChains, p.ikTracks)
       .filter((c) => !sceneId || c.sceneId === sceneId)
       .flatMap((c) => c.joints),
   ]);
@@ -57,7 +63,11 @@ function sortedUnits(units: EvaluationUnit[], input: Map<string, Set<string>>) {
 }
 
 /** Chain members are one write group. Every outside reader waits for its final pose. */
-export function dependencyOrder(entities: Entity[], chains: IKChain[] = []) {
+export function dependencyOrder(
+  entities: Entity[],
+  chains: IKChain[] = [],
+  tracks: IKTrack[] = [],
+) {
   const byId = new Map(entities.map((e) => [e.id, e]));
   const dependencies = new Map<string, Set<string>>();
   for (const e of entities) {
@@ -97,7 +107,7 @@ export function dependencyOrder(entities: Entity[], chains: IKChain[] = []) {
         throw new Error('IK 限角轴和参考四元数不能为零');
     }
   }
-  const active = activeIK(chains);
+  const active = activeIK(chains, tracks);
   if (!active.length) return order;
   const membership = new Map<string, IKChain>();
   for (const chain of active)
@@ -218,6 +228,7 @@ export function sceneEvaluator(p: Project, sceneId: string) {
   const order = dependencyOrder(
     entities,
     p.ikChains?.filter((c) => c.sceneId === sceneId),
+    p.ikTracks,
   );
   const driven = drivenEntities(p, sceneId);
   return (frame?: number, actionId?: string | null, layers = true) => {
@@ -278,7 +289,9 @@ export function sceneEvaluator(p: Project, sceneId: string) {
         world.set(e.id, parent.clone().multiply(matrix));
       }
       if (unit.chain) {
-        const chain = unit.chain;
+        const chain =
+          frame === undefined ? unit.chain : evaluatedIK(p, unit.chain, frame, actionId, layers);
+        if (chain.influence <= 0) continue;
         try {
           const solution = solveIK(chain, byId, local, world);
           const changedLocal = new Map<string, Matrix4>(),

@@ -1,6 +1,6 @@
 {
   "name": "frameforge-studio",
-  "version": "0.15.0",
+  "version": "0.16.0",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -28,7 +28,8 @@
     "smoke:constraints": "tsx scripts/constraints-smoke.ts",
     "format": "prettier --write src server scripts tests index.html vite.config.ts tsconfig.json package.json .prettierrc.json",
     "smoke:ik": "tsx scripts/ik-smoke.ts",
-    "smoke:ik-limits": "tsx scripts/ik-limits-smoke.ts"
+    "smoke:ik-limits": "tsx scripts/ik-limits-smoke.ts",
+    "smoke:ik-animation": "tsx scripts/ik-animation-smoke.ts"
   },
   "dependencies": {
     "react": "19.1.1",

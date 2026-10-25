@@ -51,3 +51,7 @@
 - `limited-reach.glb`：0…48 帧、步长 0.5 烘焙，保留蒙皮和最终 TRS；限角元数据在项目包，帧间近似。
 - `limited-pose.glb`：第 24 帧静态姿态；静态/动画 GLB 均 0 错误、0 警告、4 个保留空节点信息。
 - 本轮未提供新的 `limited-reach.mp4`：Windows 代码完整性策略阻止当前 FFmpeg/ffprobe，待获准工具环境恢复后补跑实际影片。
+
+- `control-transition.ffstudio`：0.16 / 格式 v15，原创雕塑的 IK 影响从 0 到 1 再回到 0，极向角连续转动；根关节的 IK 参数层采用倒放/往返和淡入淡出。源场景可编辑单值曲线，另有重导入场景。
+- `control-transition.glb`：0…48 帧、步长 0.25 烘焙的蒙皮和最终 TRS；参数曲线/层元数据仅保存在项目包。
+- `control-pose.glb`：第 24 帧静态姿态；静态/动画 GLB 均 0 错误、0 警告、4 个空节点信息。没有新 MP4，当前媒体工具环境仍待修复。

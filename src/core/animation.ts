@@ -50,11 +50,19 @@ export function slerp(a: Vec4, b: Vec4, t: number): Vec4 {
 }
 
 export type Point = [number, number];
+/** Shared numeric curves; scalar parameters retain one component on disk. */
+export type CurveKey = Omit<Keyframe, 'value' | 'handles' | 'inTangent' | 'outTangent'> & {
+  value: number[];
+  handles?: KeyHandles[0][];
+  inTangent?: number[];
+  outTangent?: number[];
+};
+export type NumericCurve = { property: string; keys: CurveKey[] };
 export const cubic = (a: number, b: number, c: number, d: number, t: number) =>
   (1 - t) ** 3 * a + 3 * (1 - t) ** 2 * t * b + 3 * (1 - t) * t * t * c + t ** 3 * d;
 
 /** Local monotone Hermite tangent; independent design, not Blender's smoothing solver. */
-function tangent(track: AnimationTrack, index: number, axis: number) {
+function tangent(track: NumericCurve, index: number, axis: number) {
   const a = track.keys[index - 1],
     k = track.keys[index],
     b = track.keys[index + 1];
@@ -69,7 +77,7 @@ function tangent(track: AnimationTrack, index: number, axis: number) {
     w1 = h1 + 2 * h0;
   return (w0 + w1) / (w0 / left + w1 / right);
 }
-export function keyHandles(track: AnimationTrack, index: number, axis: number) {
+export function keyHandles(track: NumericCurve, index: number, axis: number) {
   const k = track.keys[index],
     a = track.keys[index - 1],
     b = track.keys[index + 1];
@@ -93,7 +101,7 @@ export function keyHandles(track: AnimationTrack, index: number, axis: number) {
 }
 /** Shorten crossing time handles proportionally, retaining their tangent directions. */
 export function segmentControls(
-  track: AnimationTrack,
+  track: NumericCurve,
   index: number,
   axis: number,
 ): [Point, Point, Point, Point] {
@@ -131,11 +139,18 @@ function intervalRoots(coefficients: number[]): number[] {
   if (c.length === 1) return [];
   const magnitude = Math.max(...c.map(Math.abs));
   const normalized = c.map((v) => v / magnitude);
-  const boundaries = [0, ...intervalRoots(normalized.slice(1).map((v, i) => v * (i + 1))), 1];
+  const boundaries = [
+    0,
+    ...intervalRoots(normalized.slice(1).map((v, i) => v * (i + 1))).filter((t) => t > 0 && t < 1),
+    1,
+  ];
   const roots = boundaries.filter((t) => Math.abs(polynomial(normalized, t)) < 1e-13);
   for (let i = 1; i < boundaries.length; i++) {
     let low = boundaries[i - 1],
       high = boundaries[i];
+    // Each interval is monotone. An endpoint already identified as a root cannot
+    // also bracket a distinct root; roundoff near a double root otherwise adds one.
+    if (roots.includes(low) || roots.includes(high)) continue;
     const sign = Math.sign(polynomial(normalized, low));
     if (sign * polynomial(normalized, high) >= 0) continue;
     for (let step = 0; step < 60; step++) {
@@ -147,7 +162,7 @@ function intervalRoots(coefficients: number[]): number[] {
   }
   return [...new Set(roots)].sort((a, b) => a - b);
 }
-function validateQuaternionSegment(a: Keyframe, b: Keyframe) {
+function validateQuaternionSegment(a: CurveKey, b: CurveKey) {
   const span = b.frame - a.frame;
   const coefficients = a.value.map((v, i) => {
     const outgoing = span * a.outTangent![i],
@@ -171,13 +186,51 @@ function validateQuaternionSegment(a: Keyframe, b: Keyframe) {
   )
     throw new Error('四元数 Hermite 段经过零长度旋转，请调整关键帧符号或切线');
 }
-export function validateTrack(track: AnimationTrack) {
+/** Scalar zero crossings, including tangencies, for baking influence activation. */
+export function scalarZeros(track: NumericCurve) {
+  const frames: number[] = [];
+  for (let i = 0; i + 1 < track.keys.length; i++) {
+    const a = track.keys[i],
+      b = track.keys[i + 1],
+      span = b.frame - a.frame;
+    if (a.interpolation === 'constant') continue;
+    const v = a.value[0],
+      delta = b.value[0] - v;
+    let coefficients: number[], controls: ReturnType<typeof segmentControls> | undefined;
+    if (a.interpolation === 'bezier') {
+      controls = segmentControls(track, i, 0);
+      const c = controls[1][1],
+        d = controls[2][1];
+      coefficients = [v, 3 * (c - v), 3 * (v - 2 * c + d), -v + 3 * c - 3 * d + b.value[0]];
+    } else if (a.interpolation === 'cubic') {
+      const out = span * a.outTangent![0],
+        incoming = span * b.inTangent![0];
+      coefficients = [v, out, 3 * delta - 2 * out - incoming, -2 * delta + out + incoming];
+    } else
+      coefficients =
+        a.interpolation === 'smooth' ? [v, 0, 3 * delta, -2 * delta] : [v, delta, 0, 0];
+    for (const t of intervalRoots(coefficients))
+      if (t > 0 && t < 1)
+        frames.push(
+          controls
+            ? cubic(controls[0][0], controls[1][0], controls[2][0], controls[3][0], t)
+            : a.frame + span * t,
+        );
+  }
+  return frames;
+}
+export function validateTrack(track: NumericCurve) {
   const ids = new Set<string>();
   for (let i = 0; i < track.keys.length; i++) {
     const k = track.keys[i];
     if (ids.has(k.id)) throw new Error('动画轨道内的关键帧 ID 重复');
     ids.add(k.id);
-    const width = track.property === 'quaternion' ? 4 : 3;
+    const width =
+      track.property === 'quaternion'
+        ? 4
+        : ['influence', 'poleAngle'].includes(track.property)
+          ? 1
+          : 3;
     if (
       k.value.length !== width ||
       [k.inTangent, k.outTangent].some((t) => t && t.length !== width)
@@ -210,24 +263,22 @@ export function validateTrack(track: AnimationTrack) {
     }
   }
 }
-export function prepareCubic(track: AnimationTrack) {
+export function prepareCubic(track: NumericCurve) {
   track.keys.forEach((k, i) => {
     if (k.interpolation !== 'cubic') return;
-    const zero = k.value.map(() => 0) as AnimationValue;
+    const zero = k.value.map(() => 0);
     k.inTangent ||= [...zero];
     k.outTangent ||= [...zero];
     const next = track.keys[i + 1];
     if (next) next.inTangent ||= [...zero];
   });
 }
-export type KeyEdit =
+export type KeyEdit<K extends CurveKey = Keyframe> =
   | {
       type: 'key.update';
       trackId: string;
       keyId: string;
-      patch: Partial<
-        Pick<Keyframe, 'frame' | 'value' | 'interpolation' | 'inTangent' | 'outTangent'>
-      >;
+      patch: Partial<Pick<K, 'frame' | 'value' | 'interpolation' | 'inTangent' | 'outTangent'>>;
     }
   | {
       type: 'key.handle';
@@ -245,7 +296,7 @@ export type KeyEdit =
       mode: KeyHandles[0]['mode'];
     };
 
-export function editTrack(track: AnimationTrack, edit: KeyEdit) {
+export function editTrack(track: NumericCurve, edit: KeyEdit<CurveKey>) {
   const index = track.keys.findIndex((k) => k.id === edit.keyId);
   if (index < 0) throw new Error('关键帧已不存在');
   const k = track.keys[index];
@@ -261,7 +312,8 @@ export function editTrack(track: AnimationTrack, edit: KeyEdit) {
     prepareCubic(track);
   } else {
     if (track.property === 'quaternion') throw new Error('四元数不能使用欧拉角 Bézier 手柄');
-    const handles = [0, 1, 2].map((axis) => keyHandles(track, index, axis)) as KeyHandles;
+    if (edit.axis < 0 || edit.axis >= k.value.length) throw new Error('曲线分量不存在');
+    const handles = k.value.map((_, axis) => keyHandles(track, index, axis));
     const h = handles[edit.axis];
     if (edit.type === 'key.handles') {
       h.mode = edit.mode;
@@ -287,6 +339,9 @@ function align(h: KeyHandles[0], side: 'left' | 'right') {
 }
 
 export function sampleTrack(track: AnimationTrack, frame: number): AnimationValue | undefined {
+  return sampleCurve(track, frame) as AnimationValue | undefined;
+}
+export function sampleCurve(track: NumericCurve, frame: number): number[] | undefined {
   const keys = track.keys;
   if (!keys.length) return;
   if (frame <= keys[0].frame) return [...keys[0].value];
@@ -314,12 +369,12 @@ export function sampleTrack(track: AnimationTrack, frame: number): AnimationValu
         (t3 - 2 * t2 + t) * span * a.outTangent![i] +
         (-2 * t3 + 3 * t2) * b.value[i] +
         (t3 - t2) * span * b.inTangent![i],
-    ) as AnimationValue;
+    );
     return track.property === 'quaternion' ? normalizeQuaternion(value) : value;
   }
   if (track.property === 'quaternion') return slerp(a.value as Vec4, b.value as Vec4, t);
   if (a.interpolation === 'bezier')
-    return [0, 1, 2].map((axis) => sampleBezier(segmentControls(track, low, axis), frame)) as Vec3;
+    return a.value.map((_, axis) => sampleBezier(segmentControls(track, low, axis), frame));
   if (a.interpolation === 'smooth') t = t * t * (3 - 2 * t);
-  return a.value.map((v, j) => v + (b.value[j] - v) * t) as Vec3;
+  return a.value.map((v, j) => v + (b.value[j] - v) * t);
 }

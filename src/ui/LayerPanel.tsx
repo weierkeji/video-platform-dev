@@ -122,11 +122,11 @@ export function LayerPanel({
               onChange={(weight) => update({ weight })}
             />
             <div className="button-row">
-              {(['position', 'rotation', 'scale'] as const).map((channel) => (
+              {(['position', 'rotation', 'scale', 'ik'] as const).map((channel) => (
                 <label className="check" key={channel}>
                   <input
                     type="checkbox"
-                    aria-label={`层${{ position: '位置', rotation: '旋转', scale: '缩放' }[channel]}`}
+                    aria-label={`层${{ position: '位置', rotation: '旋转', scale: '缩放', ik: 'IK 控制' }[channel]}`}
                     checked={layer.channels.includes(channel)}
                     disabled={layer.channels.length === 1 && layer.channels.includes(channel)}
                     onChange={(e) =>
@@ -137,7 +137,7 @@ export function LayerPanel({
                       })
                     }
                   />
-                  {{ position: '位置', rotation: '旋转', scale: '缩放' }[channel]}
+                  {{ position: '位置', rotation: '旋转', scale: '缩放', ik: 'IK 控制' }[channel]}
                 </label>
               ))}
             </div>

@@ -3,7 +3,7 @@ import { GenerationOptionsSchema, GenerationRequestSchema } from './generation';
 import { validateTrack } from './animation';
 import { dependencyOrder } from './constraints';
 
-export const PROJECT_VERSION = 14;
+export const PROJECT_VERSION = 15;
 
 export const id = () => crypto.randomUUID();
 const ID = z
@@ -313,6 +313,18 @@ export const AnimationTrackSchema = z
   })
   .strict();
 export type AnimationTrack = z.infer<typeof AnimationTrackSchema>;
+export const ScalarKeySchema = KeySchema.extend({
+  value: z.tuple([NumberValue]),
+  handles: z.tuple([HandleSchema]).optional(),
+  inTangent: z.tuple([NumberValue]).optional(),
+  outTangent: z.tuple([NumberValue]).optional(),
+});
+export const IKTrackSchema = AnimationTrackSchema.extend({
+  chainId: ID,
+  property: z.enum(['influence', 'poleAngle']),
+  keys: z.array(ScalarKeySchema).max(10000),
+});
+export type IKTrack = z.infer<typeof IKTrackSchema>;
 export const AnimationActionSchema = z.object({ id: ID, name: Name, sceneId: ID }).strict();
 export type AnimationAction = z.infer<typeof AnimationActionSchema>;
 export const AssetSchema = z
@@ -363,9 +375,9 @@ export const AnimationLayerSchema = z
     blend: z.enum(['replace', 'additive']),
     weight: z.number().finite().min(0).max(1),
     channels: z
-      .array(z.enum(['position', 'rotation', 'scale']))
+      .array(z.enum(['position', 'rotation', 'scale', 'ik']))
       .min(1)
-      .max(3),
+      .max(4),
     start: z.number().finite().min(0).max(1e6),
     duration: z.number().finite().min(1e-6).max(1e6),
     sourceIn: z.number().finite().min(-1e9).max(1e9),
@@ -508,6 +520,7 @@ export const ProjectSchema = z
     geometries: z.array(GeometrySchema).max(2000),
     materials: z.array(MaterialSchema).max(2000),
     animationTracks: z.array(AnimationTrackSchema).max(6000),
+    ikTracks: z.array(IKTrackSchema).max(6000).optional(),
     animationActions: z.array(AnimationActionSchema).max(1000).optional(),
     animationLayers: z.array(AnimationLayerSchema).max(512).optional(),
     ikChains: z.array(IKChainSchema).max(128).optional(),
@@ -565,6 +578,7 @@ export function parseProject(input: unknown): Project {
     ...p.geometries,
     ...p.materials,
     ...p.animationTracks,
+    ...(p.ikTracks || []),
     ...(p.animationActions || []),
     ...(p.animationLayers || []),
     ...(p.ikChains || []),
@@ -645,7 +659,7 @@ export function parseProject(input: unknown): Project {
       parentId = parent.parentId;
     }
   }
-  dependencyOrder(p.entities, p.ikChains);
+  dependencyOrder(p.entities, p.ikChains, p.ikTracks);
   const paths = new Set<string>();
   for (const e of p.entities)
     if (e.skin) {
@@ -700,6 +714,19 @@ export function parseProject(input: unknown): Project {
       track.keys.some((k) => k.value.some((v) => Math.abs(v) < 0.00001))
     )
       throw new Error('关键帧缩放不能为零');
+  }
+  for (const track of p.ikTracks || []) {
+    const chain = p.ikChains?.find((c) => c.id === track.chainId);
+    if (!chain || track.entityId !== chain.joints[0])
+      throw new Error('IK 轨道必须引用链及其根节点');
+    if (track.actionId && actions.get(track.actionId)?.sceneId !== chain.sceneId)
+      throw new Error('IK 轨道与动作必须属于同一场景');
+    const path = `ik:${track.actionId || ''}:${chain.id}:${track.property}`;
+    if (paths.has(path)) throw new Error('IK 属性不能有重复动画轨道');
+    paths.add(path);
+    validateTrack(track);
+    if (track.property === 'influence' && track.keys.some((k) => k.value[0] < 0 || k.value[0] > 1))
+      throw new Error('IK 影响关键帧必须在 0…1 之间');
   }
   const checkAction = (choice: ActionChoice | null | undefined, sceneId: string) => {
     if (choice?.actionId && actions.get(choice.actionId)?.sceneId !== sceneId)
@@ -780,7 +807,7 @@ export function migrateProject(input: unknown) {
     typeof input !== 'object' ||
     !input ||
     !('schemaVersion' in input) ||
-    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, PROJECT_VERSION].includes(
+    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, PROJECT_VERSION].includes(
       Number(input.schemaVersion),
     ) ||
     typeof input.schemaVersion !== 'number'

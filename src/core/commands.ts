@@ -21,6 +21,8 @@ import {
   VertexInfluencesSchema,
   ConstraintSchema,
   IKChainSchema,
+  IKTrackSchema,
+  ScalarKeySchema,
   id,
   identity,
   parseProject,
@@ -35,6 +37,7 @@ import { bindSkin, normalizedInfluences } from './skin';
 import { ikPath, suggestedPole } from './ik';
 import { sceneEvaluator } from './constraints';
 import { affineParts } from './affine';
+import { activeIKTracks } from './ik-animation';
 import { deleteElements, extrudeRegion, mergeVertices, transformVertices } from './mesh';
 
 const ID = z.string().min(1).max(80);
@@ -72,6 +75,31 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ik.delete'), id: ID }).strict(),
   z
     .object({
+      type: z.literal('ik.key.set'),
+      chainId: ID,
+      property: IKTrackSchema.shape.property,
+      key: ScalarKeySchema.extend({
+        id: ID.optional(),
+        interpolation: ScalarKeySchema.shape.interpolation.optional(),
+      }),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('ik.key.update'),
+      trackId: ID,
+      keyId: ID,
+      patch: ScalarKeySchema.pick({
+        frame: true,
+        value: true,
+        interpolation: true,
+        inTangent: true,
+        outTangent: true,
+      }).partial(),
+    })
+    .strict(),
+  z
+    .object({
       type: z.literal('ik.limit.capture'),
       chainId: ID,
       jointId: ID,
@@ -105,6 +133,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
       animationActions: z.array(AnimationActionSchema).max(1000).optional(),
       animationTracks: z.array(AnimationTrackSchema).max(6000).optional(),
       ikChains: z.array(IKChainSchema).max(128).optional(),
+      ikTracks: z.array(IKTrackSchema).max(6000).optional(),
     })
     .strict(),
   z
@@ -330,6 +359,7 @@ function apply(p: Project, c: Command) {
       p.assets.push(...(c.assets || []));
       if (c.animationActions?.length) (p.animationActions ||= []).push(...c.animationActions);
       p.animationTracks.push(...(c.animationTracks || []));
+      if (c.ikTracks?.length) (p.ikTracks ||= []).push(...c.ikTracks);
       break;
     case 'action.add': {
       const scene = get(p.scenes, c.action.sceneId);
@@ -339,6 +369,16 @@ function apply(p: Project, c: Command) {
         const targets = new Set(p.entities.filter((e) => e.sceneId === scene.id).map((e) => e.id));
         const tracks = p.animationTracks.filter(
           (t) => targets.has(t.entityId) && (t.actionId || null) === c.copyFrom,
+        );
+        (p.ikTracks ||= []).push(
+          ...(p.ikTracks || [])
+            .filter((t) => targets.has(t.entityId) && (t.actionId || null) === c.copyFrom)
+            .map((t) => ({
+              ...structuredClone(t),
+              id: id(),
+              actionId: c.action.id,
+              keys: t.keys.map((k) => ({ ...structuredClone(k), id: id() })),
+            })),
         );
         p.animationTracks.push(
           ...tracks.map((t) => ({
@@ -386,6 +426,7 @@ function apply(p: Project, c: Command) {
         throw new Error('动作仍被镜头或片段引用，请先改为跟随或选择其他动作');
       p.animationActions = p.animationActions?.filter((a) => a.id !== c.id);
       p.animationTracks = p.animationTracks.filter((t) => t.actionId !== c.id);
+      p.ikTracks = p.ikTracks?.filter((t) => t.actionId !== c.id);
       p.scenes.forEach((s) => {
         if (s.activeActionId === c.id) s.activeActionId = null;
       });
@@ -399,11 +440,14 @@ function apply(p: Project, c: Command) {
         index = chains.findIndex((chain) => chain.id === c.chain.id);
       if (index < 0) chains.push(c.chain);
       else chains[index] = c.chain;
+      for (const track of p.ikTracks || [])
+        if (track.chainId === c.chain.id) track.entityId = c.chain.joints[0];
       break;
     }
     case 'ik.delete':
       get(p.ikChains || [], c.id);
       p.ikChains = p.ikChains!.filter((chain) => chain.id !== c.id);
+      p.ikTracks = p.ikTracks?.filter((t) => t.chainId !== c.id);
       break;
     case 'ik.limit.capture': {
       const chain = get(p.ikChains || [], c.chainId);
@@ -580,6 +624,7 @@ function apply(p: Project, c: Command) {
         throw new Error('关节仍被蒙皮引用，请先解绑相关网格或一起删除');
       p.entities = p.entities.filter((e) => !removing.has(e.id));
       p.animationTracks = p.animationTracks.filter((t) => !removing.has(t.entityId));
+      p.ikTracks = p.ikTracks?.filter((t) => !removing.has(t.entityId));
       p.animationLayers = p.animationLayers?.filter((l) => !removing.has(l.entityId));
       p.geometries = p.geometries.filter((g) => p.entities.some((e) => e.geometryId === g.id));
       p.materials = p.materials.filter((m) => p.entities.some((e) => e.materialId === m.id));
@@ -746,16 +791,52 @@ function apply(p: Project, c: Command) {
       prepareCubic(t);
       break;
     }
+    case 'ik.key.set': {
+      const chain = get(p.ikChains || [], c.chainId),
+        actionId = get(p.scenes, chain.sceneId).activeActionId || undefined;
+      let t = activeIKTracks(p, chain.joints[0]).find(
+        (t) => t.chainId === chain.id && t.property === c.property,
+      );
+      if (!t) {
+        t = {
+          id: id(),
+          entityId: chain.joints[0],
+          chainId: chain.id,
+          property: c.property,
+          actionId,
+          keys: [],
+        };
+        (p.ikTracks ||= []).push(t);
+      }
+      const previous = t.keys.find((k) => k.frame === c.key.frame);
+      t.keys = t.keys.filter((k) => k.frame !== c.key.frame);
+      t.keys.push({
+        ...previous,
+        ...c.key,
+        id: previous?.id || c.key.id || id(),
+        interpolation: c.key.interpolation || previous?.interpolation || 'linear',
+      });
+      t.keys.sort((a, b) => a.frame - b.frame);
+      prepareCubic(t);
+      break;
+    }
+    case 'ik.key.update':
+      editTrack(get(p.ikTracks || [], c.trackId), { ...c, type: 'key.update' });
+      break;
     case 'key.update':
-    case 'key.handle':
-    case 'key.handles':
       editTrack(get(p.animationTracks, c.trackId), c);
       break;
+    case 'key.handle':
+    case 'key.handles':
+      editTrack(get([...p.animationTracks, ...(p.ikTracks || [])], c.trackId), c);
+      break;
     case 'key.delete': {
-      const t = get(p.animationTracks, c.trackId);
-      t.keys = t.keys.filter((k) => k.frame !== c.frame);
+      const t = get([...p.animationTracks, ...(p.ikTracks || [])], c.trackId);
+      const index = t.keys.findIndex((k) => k.frame === c.frame);
+      if (index >= 0) t.keys.splice(index, 1);
       prepareCubic(t);
       if (!t.keys.length) p.animationTracks = p.animationTracks.filter((x) => x.id !== t.id);
+      if (!t.keys.length) p.ikTracks = p.ikTracks?.filter((x) => x.id !== t.id);
       break;
     }
     case 'timeline.update':

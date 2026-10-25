@@ -13,9 +13,11 @@ import {
   normalizeQuaternion,
   quaternionFromEuler,
   sampleTrack,
+  scalarZeros,
   validateTrack,
 } from './animation';
 import { evaluatedTransform } from './evaluate';
+import { activeIKTracks } from './ik-animation';
 import { drivenEntities, matrixTransform, sceneEvaluator } from './constraints';
 
 export const BakeOptionsSchema = z
@@ -64,10 +66,19 @@ function frameEvents(p: Project, sceneId: string, options: BakeOptions) {
     if (events.size > MAX_SAMPLES) throw new Error('烘焙边界超过单轨 10000 键限制');
   };
   for (const entity of p.entities.filter((e) => e.sceneId === sceneId))
-    for (const track of activeTracks(p, entity.id, options.actionId))
+    for (const track of [
+      ...activeTracks(p, entity.id, options.actionId),
+      ...activeIKTracks(p, entity.id, options.actionId),
+    ]) {
       track.keys.forEach((key, i) =>
-        add(key.frame, i > 0 && track.keys[i - 1].interpolation === 'constant'),
+        add(
+          key.frame,
+          (i > 0 && track.keys[i - 1].interpolation === 'constant') ||
+            (track.property === 'influence' && key.value[0] === 0),
+        ),
       );
+      if (track.property === 'influence') for (const frame of scalarZeros(track)) add(frame, true);
+    }
   const entities = new Set(p.entities.filter((e) => e.sceneId === sceneId).map((e) => e.id));
   for (const layer of p.animationLayers || []) {
     if (!entities.has(layer.entityId) || !layer.enabled || !layer.weight) continue;
@@ -120,6 +131,18 @@ function frameEvents(p: Project, sceneId: string, options: BakeOptions) {
         mapped(key.frame, i > 0 && track.keys[i - 1].interpolation === 'constant'),
       );
     }
+    if (layer.channels.includes('ik'))
+      for (const track of activeIKTracks(p, layer.entityId, layer.actionId)) {
+        track.keys.forEach((key, i) =>
+          mapped(
+            key.frame,
+            (i > 0 && track.keys[i - 1].interpolation === 'constant') ||
+              (track.property === 'influence' && key.value[0] === 0),
+          ),
+        );
+        if (track.property === 'influence')
+          for (const frame of scalarZeros(track)) mapped(frame, true);
+      }
   }
   return [...events.values()];
 }
@@ -396,6 +419,7 @@ export function bakedProject(p: Project, sceneId: string, options: BakeOptions) 
         ...p.animationTracks.filter((t) => !targets.has(t.entityId)),
         ...baked.tracks,
       ],
+      ikTracks: p.ikTracks?.filter((t) => !targets.has(t.entityId)),
       animationLayers: (p.animationLayers || []).filter((l) => !targets.has(l.entityId)),
       scenes: p.scenes.map((s) =>
         s.id === sceneId ? { ...s, activeActionId: baked.action.id } : s,

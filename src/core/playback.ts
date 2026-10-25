@@ -36,7 +36,7 @@ export function actionRange(p: Project, sceneId: string, actionId: string | null
   const entities = new Set(p.entities.filter((e) => e.sceneId === sceneId).map((e) => e.id));
   let start = Infinity,
     end = -Infinity;
-  for (const track of p.animationTracks) {
+  for (const track of [...p.animationTracks, ...(p.ikTracks || [])]) {
     if (!entities.has(track.entityId) || (track.actionId || null) !== actionId) continue;
     for (const key of track.keys) {
       start = Math.min(start, key.frame);

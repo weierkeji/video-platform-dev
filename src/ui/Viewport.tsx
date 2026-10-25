@@ -383,7 +383,9 @@ export function Viewport(props: ViewportProps) {
           ? overlay?.vertices.length && Math.abs(overlay.mesh.matrixWorld.determinant()) > 1e-12
             ? proxy
             : undefined
-          : activeIK(p.project.ikChains).some((chain) => chain.joints.includes(p.selected || '')) ||
+          : activeIK(p.project.ikChains, p.project.ikTracks).some((chain) =>
+                chain.joints.includes(p.selected || ''),
+              ) ||
               p.project.entities.some(
                 (e) => e.id === p.selected && (e.skin || activeConstraints(e).length),
               ) ||

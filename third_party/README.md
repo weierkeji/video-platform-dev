@@ -45,3 +45,5 @@ glTF 解析/序列化由本仓库按公开格式独立实现；Three.js 负责�
 0.14 没有新增依赖或修改第三方源码。双段几何解、IK 链数据/命令、分组依赖、极向控制、矩阵重建和编辑整合由本仓库编写；多段求解采用 Aristidou / Lasenby 的公开 FABRIK 算法（Graphical Models 73，2011，243–260，[作者论文](https://andreasaristidou.com/publications/papers/FABRIK.pdf)），算法不归为本项目发明，没有复制第三方求解代码。Three.js 仍提供基础数学/显示；Blender 手册仅为公开行为参照。ik-reach 的控制器、曲线和摄影机沿用本仓库原创分段柱体/蒙皮，无外部素材或模型调用。
 
 0.15 没有新增依赖或修改第三方源码。参考姿态限角、摆动/扭转投影、可行初值、有限线搜索及 UI 为独立实现；CCD 是公开算法，参照 Ben Kenwright《Inverse Kinematics – Cyclic Coordinate Descent (CCD)》（Journal of Graphics Tools 16(4)，DOI 10.1080/2165347X.2013.823362），不归为本项目发明，未复制其求解源码。Blender 4.5 文档仅提供行为依据；Three.js 仍提供数学/渲染。limited-reach 复用自有雕塑/权重，合法姿态与目标曲线由本仓库编写，无外部素材或模型调用。
+
+0.16 没有新增依赖或修改第三方源码。单值 IK 轨道、动作/层路由、依赖激活、编辑命令与烘焙事件为本仓库实现，复用已有自主 Bézier/Hermite 曲线计算。Blender 4.5 约束/IK/曲线文档仅作行为参照；不是对其内部求解语义的复制。control-transition 的参数曲线与层由本仓库编写，沿用原创雕塑/权重/摄影机；无外部素材或模型调用。Three.js 数学、渲染、独立 GLTFLoader 检查和 gltf-validator 仍明确属于第三方。
