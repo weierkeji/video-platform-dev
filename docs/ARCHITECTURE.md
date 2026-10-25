@@ -9,6 +9,7 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 | `src/core/model.ts` | v17 模型、v1–v16 迁移、引用/层级/绑定/权重/时间轴/动作约束、工作流拓扑检查 |
 | `src/core/generation.ts` | 生成参数、模型系列限制、不可变请求规格 |
 | `src/core/commands.ts` | 有限结构化命令，复制状态、整批应用并校验 |
+| `src/core/key-editing.ts` / `ui/KeyBatchTools.tsx` | 原子多键时间变换/复制/删除、手柄和导数换算、共用拖动预演与批量 UI |
 | `src/core/geometry.ts` | 自主基本几何、共享边中点细分、三角面法向挤出、OBJ 交换 |
 | `src/core/mesh.ts` | 组件选择转换、仿射组变换、删除/合并、区域边界挤出 |
 | `src/render/mesh-spatial.ts` / `mesh-edit.ts` | 三角形包围层级、遮挡拾取、选中覆盖层；不进入输出渲染 |
@@ -196,7 +197,11 @@ v9 的 Shot.action 与镜头 Clip.action 可为 `{actionId: ID}` 指定动作、
 
 自由手柄独立；对齐手柄反向共线，拖动时保持另一侧长度；向量手柄朝邻键并取三分之一间距；自动限幅使用相邻割线的加权调和切线，极值处为零，末端为单边割线。它是本项目的局部算法，未复现 Blender 连续加速度求解。每轴左右共用类型；手动移动自动/向量手柄会转为自由。
 
-`key.update` 按 ID 改时间/值/插值，撞帧拒绝整批命令；`key.handle` / `key.handles` 编辑单轴手柄/类型。兼容的 `key.set` 按帧插入或更新，未指定插值时保留已有插值/手柄，新键默认线性。图形编辑器仅克隆当前轨道做拖动预演，松开后一次提交；Esc/pointercancel 丢弃，项目修订变化会取消未提交拖动。后台仍以 baseRevision 拒绝并发覆盖。三维属性、时间轴选择、曲线、逐帧渲染共用此模型。
+`key.update` 按 ID 改时间/值/插值，撞帧拒绝整批命令；`key.handle` / `key.handles` 编辑单轴手柄/类型。兼容的 `key.set` 按帧插入或更新，未指定插值时保留已有插值/手柄，新键默认线性。单键图形编辑器克隆当前轨道做预演；多键使用 key-editing 的最终集合变换，松开后一次提交；Esc/pointercancel 丢弃，项目修订变化会取消未提交拖动。后台仍以 baseRevision 拒绝并发覆盖。三维属性、时间轴选择、曲线、逐帧渲染共用此模型。
+
+0.22 的 `keys.transform` / `keys.duplicate` / `keys.delete` 以 trackId/keyId 引用任意变换或 IK 单值轨。每命令最多 20 万选择，每轨 10000 键；重复引用、缺失 ID、碰撞、越界、时间精度塌缩、非法四元数或导数溢出拒绝整个命令。计算全部最终键集合再校验，避免逐键移动的中间冲突；仅修改命中轨道，保留未选空轨与其他动作。复制新 ID 随命令显式记录，未选键不被覆盖。正倍率仿射时间变换令 Bézier Δframe 乘倍率、Hermite 导数除倍率；选中自动/向量手柄在原轨求值并固定为 free，手动 aligned 保留。只保证仍相邻的已选段，边界/交叉/复制插入会改变邻段。
+
+CurveEditor 和 Timeline 共用临时 KeyRef[] 选择，最后一个为活动键。框选按可见轴的键点，Shift 追加/增减；多键拖动只改时间，使用共用纯函数生成当前轨预演，最终服务端重算。单键数值/手柄编辑仍只作用于活动键。删除后按 ID 清理选择，复制成功后切换至新 ID；跨项目/动作切换清空。数据包不保存 UI 选择，无格式迁移。IK 批量仅命令入口，专用面板仍单选；没有最大规模性能达标声明。
 
 `POST /api/projects/:id/commands` 接收 `{baseRevision, actor, label, commands}`。服务检查来源，复制项目，应用整批命令并验证引用，然后在同一 SQLite 事务写入快照、撤销状态及审计。错误不写项目；版本冲突返回 409，客户端提示刷新，不自动覆盖。
 

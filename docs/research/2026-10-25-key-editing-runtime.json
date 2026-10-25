@@ -1,0 +1,231 @@
+{
+  "checkedAt": "2026-10-25T16:50:51.692Z",
+  "browser": "155.0.8059.82",
+  "projectId": "0fc68e0a-bb32-4a35-82af-04f51c8d834b",
+  "restoredProjectId": "3b9cf34f-91c3-48e1-8c5a-59843fd5b1ce",
+  "jobId": "d56e40be-0b3d-4ec7-8488-c6685baea9b3",
+  "revision": 14,
+  "sourceKeys": 12,
+  "finalSourceKeys": 24,
+  "frames": [
+    [
+      3,
+      12,
+      21,
+      30,
+      39,
+      48,
+      57,
+      66
+    ],
+    [
+      3,
+      12,
+      21,
+      30,
+      39,
+      48,
+      57,
+      66
+    ],
+    [
+      3,
+      12,
+      21,
+      30,
+      39,
+      48,
+      57,
+      66
+    ]
+  ],
+  "measurements": [
+    {
+      "source": 0,
+      "target": 3,
+      "difference": 0,
+      "duplicateDifference": 0
+    },
+    {
+      "source": 3,
+      "target": 7.5,
+      "difference": 0,
+      "duplicateDifference": 0
+    },
+    {
+      "source": 6,
+      "target": 12,
+      "difference": 0,
+      "duplicateDifference": 0
+    },
+    {
+      "source": 9,
+      "target": 16.5,
+      "difference": 0,
+      "duplicateDifference": 0
+    },
+    {
+      "source": 12,
+      "target": 21,
+      "difference": 0,
+      "duplicateDifference": 0
+    },
+    {
+      "source": 15,
+      "target": 25.5,
+      "difference": 0,
+      "duplicateDifference": 0
+    },
+    {
+      "source": 18,
+      "target": 30,
+      "difference": 0,
+      "duplicateDifference": 0
+    }
+  ],
+  "importedMeasurements": [
+    {
+      "frame": 3,
+      "difference": 0
+    },
+    {
+      "frame": 7.5,
+      "difference": 0.00010030864197530864
+    },
+    {
+      "frame": 12,
+      "difference": 0.000025720164609053497
+    },
+    {
+      "frame": 21,
+      "difference": 0
+    },
+    {
+      "frame": 30,
+      "difference": 0.0000720164609053498
+    },
+    {
+      "frame": 48,
+      "difference": 0.000025720164609053497
+    },
+    {
+      "frame": 66,
+      "difference": 0.0000720164609053498
+    }
+  ],
+  "videoMeasurements": [
+    {
+      "frame": 3,
+      "difference": 1.406113683127572
+    },
+    {
+      "frame": 12,
+      "difference": 1.4053292181069958
+    },
+    {
+      "frame": 21,
+      "difference": 1.4278600823045267
+    },
+    {
+      "frame": 30,
+      "difference": 1.4287191358024691
+    },
+    {
+      "frame": 39,
+      "difference": 1.4087011316872429
+    },
+    {
+      "frame": 48,
+      "difference": 1.4030787037037038
+    },
+    {
+      "frame": 57,
+      "difference": 1.426571502057613
+    },
+    {
+      "frame": 66,
+      "difference": 1.4074537037037036
+    }
+  ],
+  "validator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 0,
+    "numHints": 0,
+    "messages": [],
+    "truncated": false
+  },
+  "video": {
+    "index": 0,
+    "codec_name": "h264",
+    "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+    "profile": "High",
+    "codec_type": "video",
+    "codec_tag_string": "avc1",
+    "codec_tag": "0x31637661",
+    "mime_codec_string": "avc1.640015",
+    "width": 480,
+    "height": 270,
+    "coded_width": 480,
+    "coded_height": 270,
+    "has_b_frames": 2,
+    "pix_fmt": "yuv420p",
+    "level": 21,
+    "chroma_location": "left",
+    "field_order": "progressive",
+    "is_avc": "true",
+    "nal_length_size": "4",
+    "id": "0x1",
+    "r_frame_rate": "24/1",
+    "avg_frame_rate": "24/1",
+    "time_base": "1/12288",
+    "start_pts": 0,
+    "start_time": "0.000000",
+    "duration_ts": 36864,
+    "duration": "3.000000",
+    "bit_rate": "67962",
+    "bits_per_raw_sample": "8",
+    "nb_frames": "72",
+    "extradata_size": 46,
+    "disposition": {
+      "default": 1,
+      "dub": 0,
+      "original": 0,
+      "comment": 0,
+      "lyrics": 0,
+      "karaoke": 0,
+      "forced": 0,
+      "hearing_impaired": 0,
+      "visual_impaired": 0,
+      "clean_effects": 0,
+      "attached_pic": 0,
+      "timed_thumbnails": 0,
+      "non_diegetic": 0,
+      "captions": 0,
+      "descriptions": 0,
+      "metadata": 0,
+      "dependent": 0,
+      "still_image": 0,
+      "multilayer": 0
+    },
+    "tags": {
+      "language": "und",
+      "handler_name": "VideoHandler",
+      "encoder": "Lavc63.1.102 libx264"
+    }
+  },
+  "pageErrors": [],
+  "checks": [
+    "box selection and Shift toggles",
+    "external action change clears hidden selected keys",
+    "Timeline and curve multi-track selection",
+    "group drag cancels and commits one revision",
+    "collision rejects in UI and API",
+    "time scale updates Hermite tangent units",
+    "duplicate selects fresh IDs; delete and keyboard delete are atomic",
+    "undo/redo/reload retain all keys",
+    "retimed and duplicate PNG match source poses",
+    "native GLB reimport and saved project restore",
+    "actual H264 output matches edited preview"
+  ]
+}

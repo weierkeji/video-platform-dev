@@ -1,8 +1,26 @@
 # 持续开发恢复记录
 
-更新时间：2026-10-25。用户附件要求的完整 Blender + LibTV 功能目标保持 active；此处是 0.21 基础版本检查点，不是目标完成声明。下方旧版本段落仅保留历史证据。
+更新时间：2026-10-26。完整 Blender + LibTV 功能目标仍 active；0.22 是基础版本检查点，不是目标完成声明。旧段落保留历史证据。
 
-## 0.21 最新恢复入口
+## 0.22 最新恢复入口
+
+0.21 已提交并推送 198cce4。本轮 0.22 新增曲线多键选择与批量时间编辑，沿用项目 v17，无新迁移/依赖。HEAD/origin/main 以实际 Git 为准。用户授权普通开发、提交和推送，保留 .local/data 与原有数据。没有 Blender/bpy、LibTV 私有接口或外部模型调用。REA 文档/许可/要求已读，本地 6.7.0 保持；本机 Node 24.20.0 低于最新 main 24.22.1 要求，未运行额外引擎。
+
+core/key-editing.ts 新增 keys.transform / keys.duplicate / keys.delete；最多 20 万引用，轨道最多 10000 键。所有最终时刻一起验证，拒绝重复引用、未知 ID、撞帧、越界、精度塌缩、数值溢出与非法四元数；没有逐键临时冲突或部分保存。保持未选空轨及其他动作。正倍率仿射时间映射，Bézier Δframe 乘倍率、Hermite 导数除倍率；选中自动/向量手柄固定为 free，手动 aligned 保留。复制显式新 ID，保存/撤销走既有 SQLite 事务。影响的边界/插入段会改变，不是全动作保真保证。
+
+App / Timeline / CurveEditor 共用临时 KeyRef[] 选择，最后一个为活动键。框选/Shift 增减或追加、当前曲线/对象全选、A/Alt+A、中键平移；多键拖动只改时间，Alt 子帧，单键仍支持时间/值/手柄。一次拖动一次修订，Esc/pointercancel/修订变化取消。KeyBatchTools 提供首帧/范围中心/播放头/指定帧枢轴、正倍率/偏移、复制/删除。切换项目/动作清理选择；外部动作切换刷新也清理隐藏键。时间轴使用 data-timeline-key-id，避免旧曲线检查标记重名。
+
+11 项新增核心检查，完整 168/168，类型/构建通过；含密集采样、四种 Bézier 手柄、Hermite/四元数/STEP、IK 单值、冲突/上限/溢出、SQLite 重启与独立 GLTFLoader。主包 1101.58 KB / gzip 315.74 KB，大包提示保留。GUI 只在同对象当前动作的 TRS/四元数多选；IK 批量命令已有，专用 UI 仍单键。无负倍率/跨对象图形编辑/跨动作剪贴板/循环外推。
+
+开发/正式 smoke:keys 已完整运行。最终 2026-10-25T16:50:51.692Z，项目 0fc68e0a-bb32-4a35-82af-04f51c8d834b，重开 3b9cf34f-91c3-48e1-8c5a-59843fd5b1ce，任务 d56e40be-0b3d-4ec7-8488-c6685baea9b3，r14。12→24 键，三轨时间 3/12/21/30/39/48/57/66。七组原姿态/重定时/复制 PNG 差 0/255；GLB 0 错误/0 警告/0 信息，重导入最大均差 0.00010030864197530864/255。实际 H.264 480×270/24 FPS/72 帧/3 秒无音频，八帧均差 1.4030787037037038…1.4287191358024691/255，无 pageerror。影片任务自动登记产物会增加项目修订，后续编辑前刷新；GLB 不含背景/环境光，对照前恢复相同环境。
+
+研究 docs/research/2026-10-25-key-editing.md，*-key-editing-dev-runtime.json / *-key-editing-runtime.json。examples/key-editing.ffstudio/.glb/.mp4 可打开；源/重导入场景同名“主场景”，最终镜头用重导入场景。原始 PNG/截图在 .local/checks/key-editing。启动 npm.cmd run dev；正式 npm.cmd run build 后 npm.cmd start；新流程 npm.cmd run smoke:keys。旧 smoke:animation 后半段依赖 /src 开发模块，只在开发入口完整运行。后端改动需重启。不要运行 .local/checks/update-key-editing-docs.mjs / finalize-key-editing.mjs 或旧版本生成助手以免覆盖新文档。
+
+**下一项**：对象重设父级时保持世界变换，研究非均匀缩放/剪切、动画与约束/IK 的约定，实现同一命令和实际层级编辑。多对象选择、IK 图形多选、旋转解缠/循环、范围 FK/IK、完整绑定/建模/UV/材质/物理/媒体/合成/AI 等范围继续保留。
+
+收尾：旧 smoke:animation 在开发入口完整通过，2026-10-25T16:52:37.482Z，项目 8222deb6-0e01-4fc6-9880-10955de4a2c3，任务 4b3a9f9d-35c9-411e-80c0-9c46a1082281；记录 *-key-editing-animation-runtime.json。所有本轮开发/正式服务及浏览器已结束，4173 无监听，Node 仅剩原 Codex PID 11844，未触碰该进程。提交/推送继续使用原授权，最终以 Git 为准。
+
+## 0.21 历史恢复记录
 
 0.20 已提交并推送 87863be。本轮 0.21 新增自适应动画烘焙，沿用格式 v17，无新迁移/依赖。实际 HEAD/origin/main 以 Git 为准，完整 Blender + LibTV 目标仍 active。原 .local/data、备份与历史作品保留，没有外部模型调用或 Blender/bpy。重读用户附件、当前源码/约定与 REA README/安装要求/MIT；本机 6.7.0 保持，最新 main 的 Node 要求高于本机 24.20.0。Blender 官方 4.5 id 页面和另行标注的 Maya 2024 文档为行为参照，未运行参考产品或读取其求解源码。
 

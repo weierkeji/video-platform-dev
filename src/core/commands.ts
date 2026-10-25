@@ -31,6 +31,12 @@ import {
 } from './model';
 import { extrudeFace, primitive, subdivide, projectUV } from './geometry';
 import { editTrack, normalizeQuaternion, prepareCubic, activeTracks } from './animation';
+import {
+  editKeys,
+  TransformKeysSchema,
+  DuplicateKeysSchema,
+  DeleteKeysSchema,
+} from './key-editing';
 import { unwrappedSourceFrame } from './playback';
 import {
   bakeAnimation,
@@ -53,6 +59,9 @@ import { deleteElements, extrudeRegion, mergeVertices, transformVertices } from 
 const ID = z.string().min(1).max(80);
 const MeshIndices = z.array(z.number().int().nonnegative()).min(1).max(200000);
 export const CommandSchema = z.discriminatedUnion('type', [
+  TransformKeysSchema,
+  DuplicateKeysSchema,
+  DeleteKeysSchema,
   z.object({ type: z.literal('project.rename'), name: z.string().min(1).max(160) }).strict(),
   z.object({ type: z.literal('scene.add'), scene: SceneSchema }).strict(),
   z
@@ -928,6 +937,11 @@ function apply(p: Project, c: Command) {
       prepareCubic(t);
       break;
     }
+    case 'keys.transform':
+    case 'keys.duplicate':
+    case 'keys.delete':
+      editKeys(p, c);
+      break;
     case 'ik.key.update':
       editTrack(get(p.ikTracks || [], c.trackId), { ...c, type: 'key.update' });
       break;

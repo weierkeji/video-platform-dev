@@ -22,8 +22,10 @@ import {
   type KeyHandles,
 } from '../core/model';
 import { NumberInput } from './Inspector';
+import { editedKeyTracks, type KeyRef, type KeyBatch } from '../core/key-editing';
+import { KeyBatchTools } from './KeyBatchTools';
 
-export type KeySelection = { trackId: string; keyId: string } | null;
+export type KeySelection = KeyRef[] | null;
 type Props = {
   project: Project;
   entity?: Entity;
@@ -31,7 +33,7 @@ type Props = {
   selectedKey: KeySelection;
   selectKey: (key: KeySelection) => void;
   setFrame: (frame: number) => void;
-  send: (commands: Command[], label: string) => void;
+  send: (commands: Command[], label: string) => Promise<Project | undefined>;
   busy: boolean;
 };
 type View = { x: number; y: number; width: number; height: number };
@@ -42,7 +44,9 @@ type Drag = {
   start: Point;
   view: View;
   revision: number;
-  command?: KeyEdit;
+  command?: KeyEdit | KeyBatch;
+  keys?: KeyRef[];
+  box?: { end: Point; previous: KeyRef[]; add: boolean };
   moved: boolean;
   pan?: boolean;
 };
@@ -116,6 +120,7 @@ function Editor({
     [view, setView] = useState<View | null>(null);
   const [preview, setPreview] = useState<AnimationTrack | null>(null),
     [error, setError] = useState('');
+  const [box, setBox] = useState<{ start: Point; end: Point } | null>(null);
   const svg = useRef<SVGSVGElement>(null),
     drag = useRef<Drag | null>(null),
     clipId = useId();
@@ -131,9 +136,13 @@ function Editor({
   const quaternion = property === 'quaternion';
   const axisColors = quaternion ? colors : colors.slice(0, 3);
   const v = view || fit(track, axis, p.timeline.duration);
+  const activeKey = selectedKey?.at(-1);
+  const selectedIds = new Set(
+    selectedKey?.filter((k) => k.trackId === current?.id).map((k) => k.keyId),
+  );
   const selected =
-    track?.id === selectedKey?.trackId
-      ? track?.keys.find((k) => k.id === selectedKey?.keyId)
+    track?.id === activeKey?.trackId
+      ? track?.keys.find((k) => k.id === activeKey?.keyId)
       : undefined;
   const selectedIndex = selected && track ? track.keys.indexOf(selected) : -1;
   const handles = selectedIndex >= 0 && track ? keyHandles(track, selectedIndex, axis) : undefined;
@@ -146,11 +155,12 @@ function Editor({
   const cancel = () => {
     drag.current = null;
     setPreview(null);
+    setBox(null);
     setError('');
   };
   useEffect(() => {
     const t = activeTracks(p, entity.id).find(
-      (t) => t.id === selectedKey?.trackId && t.entityId === entity.id,
+      (t) => t.id === activeKey?.trackId && t.entityId === entity.id,
     );
     if (t && t.property !== property) {
       setProperty(t.property);
@@ -159,7 +169,7 @@ function Editor({
       setPreview(null);
       drag.current = null;
     }
-  }, [selectedKey?.trackId]);
+  }, [activeKey?.trackId]);
   useEffect(() => {
     if (drag.current && drag.current.revision !== p.revision) {
       cancel();
@@ -170,9 +180,16 @@ function Editor({
     const r = svg.current!.getBoundingClientRect();
     return [((event.clientX - r.left) / r.width) * 800, ((event.clientY - r.top) / r.height) * 320];
   };
-  const commit = (command: KeyEdit) => {
+  const commit = (command: KeyEdit | KeyBatch) => {
     setError('');
-    send([command], command.type === 'key.update' ? '编辑关键帧' : '编辑曲线手柄');
+    void send(
+      [command],
+      command.type === 'keys.transform'
+        ? '成组移动关键帧'
+        : command.type === 'key.update'
+          ? '编辑关键帧'
+          : '编辑曲线手柄',
+    );
   };
   const update = (patch: Extract<KeyEdit, { type: 'key.update' }>['patch']) => {
     if (current && selected)
@@ -187,8 +204,21 @@ function Editor({
     event.stopPropagation();
     event.preventDefault();
     svg.current!.focus();
+    const ref = { trackId: current.id, keyId };
+    if (event.shiftKey && !side) {
+      selectKey(
+        selectedIds.has(keyId)
+          ? selectedKey!.filter((k) => k.trackId !== current.id || k.keyId !== keyId)
+          : [...(selectedKey || []), ref],
+      );
+      return;
+    }
+    const keys =
+      !side && selectedIds.has(keyId)
+        ? [...selectedKey!.filter((k) => k.trackId !== current.id || k.keyId !== keyId), ref]
+        : [ref];
     svg.current!.setPointerCapture(event.pointerId);
-    selectKey({ trackId: current.id, keyId });
+    selectKey(keys);
     setView(v);
     setError('');
     drag.current = {
@@ -199,6 +229,7 @@ function Editor({
       view: v,
       revision: p.revision,
       moved: false,
+      keys,
     };
   };
   const move = (event: PointerEvent) => {
@@ -209,8 +240,32 @@ function Editor({
       dy = (-(point[1] - d.start[1]) / 274) * d.view.height;
     if (Math.hypot(point[0] - d.start[0], point[1] - d.start[1]) < 2 && !d.moved) return;
     d.moved = true;
+    if (d.box) {
+      d.box.end = point;
+      setBox({ start: d.start, end: point });
+      return;
+    }
     if (d.pan) {
       setView({ ...d.view, x: d.view.x - dx, y: d.view.y - dy });
+      return;
+    }
+    if (!d.side && d.keys && d.keys.length > 1) {
+      const command: KeyBatch = {
+        type: 'keys.transform',
+        keys: d.keys,
+        pivot: 0,
+        scale: 1,
+        offset: event.altKey ? dx : Math.round(dx),
+      };
+      try {
+        setPreview(editedKeyTracks(p, command).get(current!.id) as AnimationTrack);
+        d.command = command;
+        setError('');
+      } catch (e) {
+        setError((e as Error).message);
+        d.command = undefined;
+        setPreview(null);
+      }
       return;
     }
     const index = d.track.keys.findIndex((k) => k.id === d.keyId),
@@ -259,9 +314,36 @@ function Editor({
     const d = drag.current;
     drag.current = null;
     setPreview(null);
+    setBox(null);
     if (svg.current?.hasPointerCapture(event.pointerId))
       svg.current.releasePointerCapture(event.pointerId);
-    if (d?.command && d.moved && d.revision === p.revision) commit(d.command);
+    if (!d || d.revision !== p.revision) return;
+    if (d.box) {
+      if (d.moved) {
+        const [a, b] = [d.start, d.box.end];
+        const found = d.track.keys
+          .filter(
+            (k) =>
+              x(k.frame) >= Math.max(60, Math.min(a[0], b[0])) &&
+              x(k.frame) <= Math.min(780, Math.max(a[0], b[0])) &&
+              y(k.value[axis]) >= Math.max(16, Math.min(a[1], b[1])) &&
+              y(k.value[axis]) <= Math.min(290, Math.max(a[1], b[1])),
+          )
+          .map((k) => ({ trackId: d.track.id, keyId: k.id }));
+        const previous = d.box.add ? d.box.previous : [];
+        selectKey([
+          ...previous,
+          ...found.filter(
+            (k) => !previous.some((v) => v.trackId === k.trackId && v.keyId === k.keyId),
+          ),
+        ]);
+      } else if (!d.box.add) {
+        selectKey(null);
+        setFrame(
+          clamp(Math.round(v.x + ((d.start[0] - 60) / 720) * v.width), 0, p.timeline.duration - 1),
+        );
+      }
+    } else if (d.command && d.moved) commit(d.command);
   };
   const curve = (component: number) => {
     if (!track?.keys.length) return '';
@@ -307,6 +389,21 @@ function Editor({
           event.preventDefault();
           event.stopPropagation();
           cancel();
+          return;
+        }
+        if ((event.target as HTMLElement).matches('input, select, textarea')) return;
+        if (event.key.toLowerCase() === 'a' && !event.metaKey) {
+          event.preventDefault();
+          event.stopPropagation();
+          selectKey(
+            event.altKey
+              ? null
+              : current?.keys.map((k) => ({ trackId: current.id, keyId: k.id })) || null,
+          );
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          selectKey(null);
         }
       }}
     >
@@ -376,6 +473,23 @@ function Editor({
           记录当前帧
         </button>
         <span className="spacer" />
+        <button
+          disabled={busy || !current?.keys.length}
+          onClick={() =>
+            selectKey(current!.keys.map((k) => ({ trackId: current!.id, keyId: k.id })))
+          }
+        >
+          选择当前曲线全部键
+        </button>
+        <button
+          disabled={busy || !tracks.length}
+          onClick={() =>
+            selectKey(tracks.flatMap((t) => t.keys.map((k) => ({ trackId: t.id, keyId: k.id }))))
+          }
+        >
+          选择对象全部键
+        </button>
+        <button onClick={() => selectKey(null)}>取消键选择</button>
         <button onClick={() => setView(fit(current, axis, p.timeline.duration))}>适配曲线</button>
         <button aria-label="放大曲线" onClick={() => zoom(0.7)}>
           ＋
@@ -393,9 +507,10 @@ function Editor({
         role="img"
         aria-label="动画曲线图"
         onPointerDown={(event) => {
-          if (event.button !== 0 || busy) return;
+          if (![0, 1].includes(event.button) || busy) return;
+          event.preventDefault();
           event.currentTarget.focus();
-          if (event.shiftKey) {
+          if (event.button === 1) {
             event.currentTarget.setPointerCapture(event.pointerId);
             drag.current = {
               track: current || { id: '', entityId: entity.id, property, keys: [] },
@@ -408,13 +523,17 @@ function Editor({
             };
           } else {
             const point = localPoint(event);
-            setFrame(
-              clamp(
-                Math.round(v.x + ((point[0] - 60) / 720) * v.width),
-                0,
-                p.timeline.duration - 1,
-              ),
-            );
+            event.currentTarget.setPointerCapture(event.pointerId);
+            setView(v);
+            drag.current = {
+              track: current || { id: '', entityId: entity.id, property, keys: [] },
+              keyId: '',
+              start: point,
+              view: v,
+              revision: p.revision,
+              moved: false,
+              box: { end: point, previous: selectedKey || [], add: event.shiftKey },
+            };
           }
         }}
         onPointerMove={move}
@@ -505,22 +624,44 @@ function Editor({
                 aria-label={`关键帧 ${k.frame}`}
                 cx={x(k.frame)}
                 cy={y(k.value[axis])}
-                r={selected?.id === k.id ? 6 : 4.5}
-                fill={selected?.id === k.id ? '#fff0c4' : colors[axis]}
+                data-selected={selectedIds.has(k.id)}
+                r={selectedIds.has(k.id) ? 6 : 4.5}
+                fill={selectedIds.has(k.id) ? '#fff0c4' : colors[axis]}
                 stroke="#18212d"
                 className="curve-point"
                 onPointerDown={(event) => begin(event, k.id)}
               />
             ))}
+          {box && (
+            <rect
+              x={Math.min(box.start[0], box.end[0])}
+              y={Math.min(box.start[1], box.end[1])}
+              width={Math.abs(box.end[0] - box.start[0])}
+              height={Math.abs(box.end[1] - box.start[1])}
+              fill="#8bd7a922"
+              stroke="#8bd7a9"
+              pointerEvents="none"
+            />
+          )}
         </g>
       </svg>
       <div className="curve-hint">
-        拖动圆点调整时间和值，Alt 拖动不吸附整帧；Shift 拖动空白处平移。松开提交，Esc
-        取消。四元数修改后归一化，线性段使用球面插值。
+        空白处拖动框选，Shift 点击增减或框选追加，A 全选当前曲线，Alt+A
+        清空。多键拖动只改时间；单键拖动改时间和值。Alt 拖动保留子帧，中键平移。松开提交，Esc
+        取消拖动。
       </div>
+      <KeyBatchTools
+        project={p}
+        keys={selectedKey || []}
+        frame={frame}
+        busy={busy || !!preview || !!box}
+        send={send}
+        selectKeys={selectKey}
+      />
       <fieldset disabled={busy || !!preview} className="curve-fields">
         {selected && handles ? (
           <>
+            {(selectedKey?.length || 0) > 1 && <strong>活动键 · 以下仅编辑此键</strong>}
             <NumberInput
               label="关键帧时间"
               value={selected.frame}

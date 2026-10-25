@@ -103,14 +103,20 @@ export function App() {
     );
     setSelected((s) => (next.project.entities.some((e) => e.id === s) ? s : null));
     setSelectedClip((s) => (next.project.timeline.clips.some((c) => c.id === s) ? s : null));
-    setSelectedKey((s) =>
-      s &&
-      next.project.animationTracks.some(
-        (t) => t.id === s.trackId && t.keys.some((k) => k.id === s.keyId),
-      )
-        ? s
-        : null,
-    );
+    setSelectedKey((s) => {
+      if (!s?.length || previous?.id !== next.project.id) return null;
+      const wanted = new Set(s.map((k) => k.trackId));
+      const scenes = new Map(next.project.entities.map((e) => [e.id, e.sceneId]));
+      const actions = new Map(
+        next.project.scenes.map((scene) => [scene.id, scene.activeActionId || undefined]),
+      );
+      const keys = new Map(
+        next.project.animationTracks
+          .filter((t) => wanted.has(t.id) && t.actionId === actions.get(scenes.get(t.entityId)!))
+          .map((t) => [t.id, new Set(t.keys.map((k) => k.id))]),
+      );
+      return s.filter((key) => keys.get(key.trackId)?.has(key.keyId));
+    });
     setFrame((f) => Math.min(f, next.project.timeline.duration - 1));
   }, []);
   const refreshList = useCallback(async () => setProjects(await api<Summary[]>('/projects')), []);
@@ -282,12 +288,8 @@ export function App() {
               '删除网格组件',
             );
         } else if (workspace === 'curves') {
-          const track = projectRef.current?.animationTracks.find(
-            (t) => t.id === selectedKey?.trackId,
-          );
-          const key = track?.keys.find((k) => k.id === selectedKey?.keyId);
-          if (track && key)
-            void send([{ type: 'key.delete', trackId: track.id, frame: key.frame }], '删除关键帧');
+          if (selectedKey?.length)
+            void send([{ type: 'keys.delete', keys: selectedKey }], '删除所选关键帧');
         } else if (selectedClip) void send([{ type: 'clip.delete', id: selectedClip }], '删除片段');
         else if (selected) void send([{ type: 'entity.delete', id: selected }], '删除对象');
       } else if (['g', 'r', 's'].includes(e.key.toLowerCase()))
@@ -395,9 +397,10 @@ export function App() {
   const selectKey = (s: KeySelection) => {
     setMeshSelection(null);
     setSelectedKey(s);
-    if (!s) return;
-    const track = projectRef.current?.animationTracks.find((t) => t.id === s.trackId);
-    const key = track?.keys.find((k) => k.id === s.keyId);
+    const active = s?.at(-1);
+    if (!active) return;
+    const track = projectRef.current?.animationTracks.find((t) => t.id === active.trackId);
+    const key = track?.keys.find((k) => k.id === active.keyId);
     if (track && key) {
       setSelected(track.entityId);
       setSelectedClip(null);
@@ -531,7 +534,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.21</small>
+            FRAMEFORGE<small>创作工作台 · 0.22</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -984,7 +987,7 @@ export function App() {
                 setPlaying(false);
                 setFrame(f);
               }}
-              send={(c, l) => void send(c, l)}
+              send={(c, l) => send(c, l)}
             />
           ) : (
             <WorkflowPanel

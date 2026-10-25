@@ -143,11 +143,24 @@ export function Timeline({
                     key={k.id}
                     className={
                       'keyframe ' +
-                      (selectedKey?.trackId === t.id && selectedKey.keyId === k.id ? 'active' : '')
+                      (selectedKey?.some((s) => s.trackId === t.id && s.keyId === k.id)
+                        ? 'active'
+                        : '')
                     }
-                    title={`帧 ${k.frame} · ${k.interpolation}；右键删除`}
+                    title={`帧 ${k.frame} · ${k.interpolation}；Shift 增减选择；右键删除`}
+                    data-track-id={t.id}
+                    data-timeline-key-id={k.id}
                     style={{ left: `${(k.frame / p.timeline.duration) * 100}%` }}
-                    onClick={() => selectKey({ trackId: t.id, keyId: k.id })}
+                    onClick={(e) => {
+                      const ref = { trackId: t.id, keyId: k.id };
+                      selectKey(
+                        e.shiftKey
+                          ? selectedKey?.some((s) => s.trackId === t.id && s.keyId === k.id)
+                            ? selectedKey.filter((s) => s.trackId !== t.id || s.keyId !== k.id)
+                            : [...(selectedKey || []), ref]
+                          : [ref],
+                      );
+                    }}
                     onContextMenu={(e) => {
                       e.preventDefault();
                       send([{ type: 'key.delete', trackId: t.id, frame: k.frame }], '删除关键帧');

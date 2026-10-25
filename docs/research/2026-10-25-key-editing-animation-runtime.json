@@ -1,0 +1,59 @@
+{
+  "checkedAt": "2026-10-25T16:52:37.482Z",
+  "browser": "155.0.8059.82",
+  "projectId": "8222deb6-0e01-4fc6-9880-10955de4a2c3",
+  "importedProjectId": "3d27bea2-f086-4024-817f-4f2ee9542b32",
+  "jobId": "4b3a9f9d-35c9-411e-80c0-9c46a1082281",
+  "trackId": "4170e9d6-6884-49c9-949c-220a391c4dac",
+  "format": 17,
+  "frames": 36,
+  "checks": [
+    "UI records keys and edits interpolation/handles/time",
+    "key and handle drags each persist one transaction",
+    "key drag undo/redo",
+    "Escape discards pending handle drag",
+    "reload preserves curve selection targets and controls",
+    "inspector uses shared evaluator",
+    "rotation degrees persist as radians; Delete removes only the selected key and is undoable",
+    "real preview and encoded object positions match curve",
+    "portable project reimport preserves all curves"
+  ],
+  "measurements": [
+    {
+      "frame": 0,
+      "worldX": -2,
+      "expectedPixelX": 116.04415587728428,
+      "previewPixelX": 114.43602362204724,
+      "exportedPixelX": 114.44257425742575
+    },
+    {
+      "frame": 6,
+      "worldX": 0.8222876260712159,
+      "expectedPixelX": 177.36660145129434,
+      "previewPixelX": 178.46563192904657,
+      "exportedPixelX": 178.52597402597402
+    },
+    {
+      "frame": 12,
+      "worldX": 1.6646341993501181,
+      "expectedPixelX": 195.6690421441502,
+      "previewPixelX": 197.07918781725888,
+      "exportedPixelX": 197.57186544342508
+    },
+    {
+      "frame": 24,
+      "worldX": 2.147044194031726,
+      "expectedPixelX": 206.15080891021225,
+      "previewPixelX": 207.55905511811022,
+      "exportedPixelX": 207.6914175506268
+    },
+    {
+      "frame": 35,
+      "worldX": 2.161145435045319,
+      "expectedPixelX": 206.45719957592402,
+      "previewPixelX": 207.63501483679525,
+      "exportedPixelX": 208.1304347826087
+    }
+  ],
+  "pageErrors": []
+}
