@@ -1,7 +1,9 @@
+import { affineParts, blendAffine } from './affine';
 import { Euler, Matrix4, Quaternion, Vector3 } from 'three';
 import type { Constraint, Entity, IKChain, Project, Vec3, Vec4 } from './model';
 import { evaluatedTransform } from './evaluate';
 import { solveIK } from './ik';
+import { limitAngles, projectJointMatrix } from './joint-limits';
 
 export const activeConstraints = (e: Entity) =>
   (e.constraints || []).filter((c) => c.enabled && c.influence > 0);
@@ -85,6 +87,15 @@ export function dependencyOrder(entities: Entity[], chains: IKChain[] = []) {
     for (let i = 1; i < chain.joints.length; i++)
       if (byId.get(chain.joints[i])!.parentId !== chain.joints[i - 1])
         throw new Error('IK 链必须沿直接父子关系连续排列');
+    const seen = new Set<string>();
+    for (const limit of chain.limits || []) {
+      if (!chain.joints.slice(0, -1).includes(limit.jointId) || seen.has(limit.jointId))
+        throw new Error('IK 限角必须唯一引用链内非末端节点');
+      seen.add(limit.jointId);
+      if (limit.min > limit.max) throw new Error('IK 限角下限不能大于上限');
+      if (Math.hypot(...limit.axis) < 1e-8 || Math.hypot(...limit.reference) < 1e-8)
+        throw new Error('IK 限角轴和参考四元数不能为零');
+    }
   }
   const active = activeIK(chains);
   if (!active.length) return order;
@@ -133,43 +144,6 @@ export function transformMatrix(t: Entity['transform']) {
       : new Quaternion().setFromEuler(new Euler(...t.rotation, 'XYZ')),
     new Vector3(...t.scale),
   );
-}
-
-/** QR decomposition retains affine shear. The reflection sign belongs to Z. */
-function affineParts(m: Matrix4) {
-  const x = new Vector3().setFromMatrixColumn(m, 0),
-    y = new Vector3().setFromMatrixColumn(m, 1),
-    z = new Vector3().setFromMatrixColumn(m, 2);
-  const sx = x.length();
-  if (sx < 1e-12) return null;
-  x.divideScalar(sx);
-  const xy = x.dot(y);
-  y.addScaledVector(x, -xy);
-  const sy = y.length();
-  if (sy < 1e-12) return null;
-  y.divideScalar(sy);
-  const basisZ = new Vector3().crossVectors(x, y),
-    sz = basisZ.dot(z);
-  if (Math.abs(sz) < 1e-12) return null;
-  return {
-    position: new Vector3().setFromMatrixPosition(m),
-    rotation: new Quaternion()
-      .setFromRotationMatrix(new Matrix4().makeBasis(x, y, basisZ))
-      .normalize(),
-    upper: [sx, sy, sz, xy, x.dot(z), y.dot(z)],
-  };
-}
-
-function blendAffine(from: Matrix4, to: Matrix4, influence: number) {
-  if (influence === 1) return to.clone();
-  const a = affineParts(from),
-    b = affineParts(to);
-  if (!a || !b) throw new Error('部分影响的复制变换遇到退化矩阵；该约束本帧未应用');
-  const u = a.upper.map((v, i) => v + (b.upper[i] - v) * influence);
-  return new Matrix4()
-    .makeRotationFromQuaternion(a.rotation.slerp(b.rotation, influence))
-    .multiply(new Matrix4().set(u[0], u[3], u[4], 0, 0, u[1], u[5], 0, 0, 0, u[2], 0, 0, 0, 0, 1))
-    .setPosition(a.position.lerp(b.position, influence));
 }
 
 const axes = { x: new Vector3(1, 0, 0), y: new Vector3(0, 1, 0), z: new Vector3(0, 0, 1) };
@@ -255,8 +229,11 @@ export function sceneEvaluator(p: Project, sceneId: string) {
       residual: number;
       appliedResidual: number;
       iterations: number;
-      reachable: boolean;
+      reachable: boolean | null;
       converged: boolean;
+      method: string;
+      stop: string;
+      limits: { jointId: string; swing: number; twist: number }[];
     }[] = [];
     for (const unit of order) {
       for (const e of unit.entities) {
@@ -307,18 +284,20 @@ export function sceneEvaluator(p: Project, sceneId: string) {
           const changedLocal = new Map<string, Matrix4>(),
             changedWorld = new Map<string, Matrix4>();
           for (const e of unit.entities) {
-            const matrix = blendAffine(
-              local.get(e.id)!,
-              solution.matrices.get(e.id)!,
-              chain.influence,
+            const matrix = projectJointMatrix(
+              blendAffine(local.get(e.id)!, solution.matrices.get(e.id)!, chain.influence),
+              chain.limits?.find((l) => l.jointId === e.id),
             );
             const parent = e.parentId
               ? changedWorld.get(e.parentId) || world.get(e.parentId)!
               : new Matrix4();
             if (matrix.elements.some((v) => !Number.isFinite(v)))
               throw new Error('IK 混合产生非有限矩阵；本帧保留输入姿态');
+            const candidateWorld = parent.clone().multiply(matrix);
+            if (candidateWorld.elements.some((v) => !Number.isFinite(v)))
+              throw new Error('IK 世界矩阵非有限；本帧保留输入姿态');
             changedLocal.set(e.id, matrix);
-            changedWorld.set(e.id, parent.clone().multiply(matrix));
+            changedWorld.set(e.id, candidateWorld);
           }
           changedLocal.forEach((m, id) => local.set(id, m));
           changedWorld.forEach((m, id) => world.set(id, m));
@@ -332,12 +311,20 @@ export function sceneEvaluator(p: Project, sceneId: string) {
             iterations: solution.iterations,
             reachable: solution.reachable,
             converged: solution.converged,
+            method: solution.method,
+            stop: solution.stop,
+            limits: (chain.limits || [])
+              .filter((l) => l.enabled)
+              .map((l) => {
+                const angles = limitAngles(affineParts(local.get(l.jointId)!)!.rotation, l);
+                return { jointId: l.jointId, swing: angles.swing, twist: angles.twist };
+              }),
           });
           if (!solution.converged)
             warnings.push({
               entityId: chain.joints[0],
               constraintId: chain.id,
-              message: `IK“${chain.name}”${solution.reachable ? '已达迭代上限' : '目标超出可达范围'}，求解末端误差 ${solution.residual.toPrecision(4)} 米`,
+              message: `IK“${chain.name}”${solution.reachable === false ? '目标超出可达范围' : solution.stop === 'stalled' ? '受限求解停止改善' : '已达迭代上限'}，求解末端误差 ${solution.residual.toPrecision(4)} 米${solution.reachable === null ? '；未收敛不等于目标不可达' : ''}`,
             });
         } catch (error) {
           warnings.push({

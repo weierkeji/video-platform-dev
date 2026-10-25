@@ -3,7 +3,7 @@ import { GenerationOptionsSchema, GenerationRequestSchema } from './generation';
 import { validateTrack } from './animation';
 import { dependencyOrder } from './constraints';
 
-export const PROJECT_VERSION = 13;
+export const PROJECT_VERSION = 14;
 
 export const id = () => crypto.randomUUID();
 const ID = z
@@ -216,6 +216,19 @@ export const ConstraintSchema = z.discriminatedUnion('type', [
     .strict(),
 ]);
 export type Constraint = z.infer<typeof ConstraintSchema>;
+export const IKLimitSchema = z
+  .object({
+    jointId: ID,
+    enabled: z.boolean(),
+    kind: z.enum(['hinge', 'cone']),
+    reference: Vec4Schema,
+    axis: Vec3Schema,
+    min: z.number().finite().min(-Math.PI).max(Math.PI),
+    max: z.number().finite().min(-Math.PI).max(Math.PI),
+    swing: z.number().finite().min(0).max(Math.PI),
+  })
+  .strict();
+export type IKLimit = z.infer<typeof IKLimitSchema>;
 export const IKChainSchema = z
   .object({
     id: ID,
@@ -229,6 +242,7 @@ export const IKChainSchema = z
     iterations: z.number().int().min(1).max(64),
     tolerance: z.number().finite().min(1e-6).max(1),
     poleAngle: NumberValue,
+    limits: z.array(IKLimitSchema).max(32).optional(),
   })
   .strict();
 export type IKChain = z.infer<typeof IKChainSchema>;
@@ -766,7 +780,7 @@ export function migrateProject(input: unknown) {
     typeof input !== 'object' ||
     !input ||
     !('schemaVersion' in input) ||
-    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, PROJECT_VERSION].includes(
+    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, PROJECT_VERSION].includes(
       Number(input.schemaVersion),
     ) ||
     typeof input.schemaVersion !== 'number'

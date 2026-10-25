@@ -1,5 +1,6 @@
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import type { Entity, IKChain } from './model';
+import { solveLimitedIK } from './ik-limited';
 
 export function ikPath(entities: Entity[], rootId: string, tipId: string) {
   const byId = new Map(entities.map((e) => [e.id, e]));
@@ -184,7 +185,22 @@ export function solveIK(
     solvedWorld.set(id, desired);
   }
   matrices.set(chain.joints.at(-1)!, local.get(chain.joints.at(-1)!)!.clone());
-  return { ...result, matrices };
+  if (chain.limits?.some((l) => l.enabled)) {
+    const root = entities.get(chain.joints[0])!;
+    return solveLimitedIK(
+      chain,
+      local,
+      root.parentId ? world.get(root.parentId)! : new Matrix4(),
+      position(world.get(chain.targetId)!),
+      matrices,
+    );
+  }
+  return {
+    ...result,
+    matrices,
+    method: chain.joints.length === 3 ? 'geometric' : 'fabrik',
+    stop: result.converged ? 'converged' : result.reachable ? 'iteration-limit' : 'unreachable',
+  };
 }
 
 export function suggestedPole(points: Vector3[]) {

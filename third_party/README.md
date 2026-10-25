@@ -43,3 +43,5 @@ glTF 解析/序列化由本仓库按公开格式独立实现；Three.js 负责�
 0.13 没有新增依赖或修改第三方源码。约束模型/命令、依赖拓扑排序、空间转换、朝向差值、QR 仿射混合和烘焙整合为本仓库根据公开数学独立实现；Matrix4/Quaternion/Vector3 基础运算与 WebGL 显示仍来自 Three.js。Blender 4.5 的公开约束文档只作为行为参照，不执行其程序或复制求解代码；glTF 格式规则来自 Khronos。`target-study` 的目标运动/摄影机控制由本仓库编写，沿用原创分段柱体和关节，无外部角色、素材或模型生成。
 
 0.14 没有新增依赖或修改第三方源码。双段几何解、IK 链数据/命令、分组依赖、极向控制、矩阵重建和编辑整合由本仓库编写；多段求解采用 Aristidou / Lasenby 的公开 FABRIK 算法（Graphical Models 73，2011，243–260，[作者论文](https://andreasaristidou.com/publications/papers/FABRIK.pdf)），算法不归为本项目发明，没有复制第三方求解代码。Three.js 仍提供基础数学/显示；Blender 手册仅为公开行为参照。ik-reach 的控制器、曲线和摄影机沿用本仓库原创分段柱体/蒙皮，无外部素材或模型调用。
+
+0.15 没有新增依赖或修改第三方源码。参考姿态限角、摆动/扭转投影、可行初值、有限线搜索及 UI 为独立实现；CCD 是公开算法，参照 Ben Kenwright《Inverse Kinematics – Cyclic Coordinate Descent (CCD)》（Journal of Graphics Tools 16(4)，DOI 10.1080/2165347X.2013.823362），不归为本项目发明，未复制其求解源码。Blender 4.5 文档仅提供行为依据；Three.js 仍提供数学/渲染。limited-reach 复用自有雕塑/权重，合法姿态与目标曲线由本仓库编写，无外部素材或模型调用。

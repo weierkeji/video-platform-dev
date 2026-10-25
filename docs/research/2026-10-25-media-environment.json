@@ -1,0 +1,20 @@
+{
+  "observedAt": "2026-10-25T04:10:19Z",
+  "tool": "FFmpeg / ffprobe 9.0.2-full_build-shared (existing Gyan WinGet installation)",
+  "exitCode": 3236495362,
+  "hexExitCode": "0xC0E90002",
+  "eventLog": "Microsoft-Windows-CodeIntegrity/Operational",
+  "eventIds": [3077, 3033],
+  "blockedModule": "avdevice-63.dll",
+  "observedReason": "did not meet the Enterprise signing level requirements or violated code integrity policy",
+  "policyId": "0283ac0f-fff1-49ae-ada1-8a933130cad6",
+  "affectedChecks": [
+    "existing generation.test.ts completed remote fixture: media probing cannot finish",
+    "ik-limits-smoke.ts initial PNG decoding via FFmpeg failed before video submission",
+    "direct elevated ffprobe on examples/motion-study.mp4 also failed"
+  ],
+  "tests": {"total":99,"passed":98,"failed":1,"failureClassification":"confirmed external media-tool environment"},
+  "action": "Security policy unchanged. Requested an already approved installation path; continued editor, PNG, GLB, persistence and migration checks. Browser Canvas decodes PNG. No new video export claimed.",
+  "evidenceOnHost": ".local/checks/ffmpeg-code-integrity.json",
+  "next": "Once an approved FFmpeg/ffprobe environment is available, run npm.cmd test and npm.cmd run smoke:ik-limits without --no-media."
+}

@@ -4,6 +4,7 @@ import type { Entity, IKChain, Project } from '../core/model';
 import { ikPath } from '../core/ik';
 import { sceneEvaluator } from '../core/constraints';
 import { NumberInput } from './Inspector';
+import { IKLimits } from './IKLimits';
 
 export function IKPanel({
   project,
@@ -161,11 +162,25 @@ export function IKPanel({
               <p role="status" className="ik-status">
                 成片帧 {frame}：末端距离目标 {state.appliedResidual.toPrecision(4)} 米；完整求解误差{' '}
                 {state.residual.toPrecision(4)} 米。
-                {c.joints.length === 3 ? '双段几何解。' : `迭代 ${state.iterations} 次。`}
-                {state.reachable ? '' : '目标超出可达范围。'}
+                {state.method === 'geometric'
+                  ? '双段几何解。'
+                  : `${state.method === 'limited-ccd' ? '受限求解，' : ''}迭代 ${state.iterations} 次。`}
+                {state.reachable === false
+                  ? '目标超出可达范围。'
+                  : state.reachable === null
+                    ? '受限解未达到容差；不能据此判定不可达。'
+                    : ''}
               </p>
             )}
             {!!warnings?.length && <p role="status">{warnings.map((w) => w.message).join('；')}</p>}
+            <IKLimits
+              chain={c}
+              entities={scene}
+              frame={frame}
+              put={put}
+              send={send}
+              angles={state?.limits}
+            />
             <button onClick={() => send([{ type: 'ik.delete', id: c.id }], '移除 IK 链')}>
               移除 IK 链
             </button>
@@ -204,7 +219,7 @@ export function IKPanel({
       )}
       <p className="muted">
         求解按世界骨段长度，支持普通中间父级。部分影响混合原姿态与
-        IK；非均匀缩放下可能产生局部剪切。GLB 请烘焙；关节限角、末端旋转和伸长尚未支持。
+        IK；非均匀缩放下可能产生局部剪切。GLB 请烘焙；末端旋转和伸长尚未支持。
       </p>
     </details>
   );

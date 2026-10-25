@@ -1,0 +1,252 @@
+{
+  "checkedAt": "2026-10-25T04:16:12.638Z",
+  "projectId": "86bed665-d9e3-42af-bdd1-891116e855eb",
+  "importedProjectId": "91871549-b351-4646-9eb6-8534ca552aa2",
+  "media": "not run (--no-media); FFmpeg environment requires repair",
+  "browser": "155.0.8059.82",
+  "format": 14,
+  "frames": 48,
+  "validator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 4,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/6"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/8"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/9"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/11"
+      }
+    ],
+    "truncated": false
+  },
+  "staticValidator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 4,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/6"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/8"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/9"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/11"
+      }
+    ],
+    "truncated": false
+  },
+  "staticDifference": 0.000028292181069958848,
+  "measurements": [
+    {
+      "frame": 0,
+      "difference": 0.00022890946502057612
+    },
+    {
+      "frame": 6.25,
+      "difference": 0.0009233539094650206
+    },
+    {
+      "frame": 12,
+      "difference": 0.0001646090534979424
+    },
+    {
+      "frame": 24,
+      "difference": 0.000025720164609053497
+    },
+    {
+      "frame": 36.5,
+      "difference": 0
+    },
+    {
+      "frame": 47,
+      "difference": 0
+    }
+  ],
+  "videoMeasurements": [],
+  "pageErrors": [],
+  "limits": [
+    {
+      "frame": 0,
+      "chainId": "2fc2306d-f57c-4124-91a3-4be3839e6a35",
+      "residual": 6.906901238795285e-16,
+      "appliedResidual": 5.238750013840907e-16,
+      "iterations": 0,
+      "reachable": true,
+      "converged": true,
+      "method": "limited-ccd",
+      "stop": "converged",
+      "limits": [
+        {
+          "jointId": "a2328c5e-880b-46be-9b75-1da56d82520e",
+          "swing": 0.6222619261454803,
+          "twist": 0.0191316436127389
+        },
+        {
+          "jointId": "b1373f01-5602-49ce-8146-567b4ae5e458",
+          "swing": 0,
+          "twist": 0.5235987755982996
+        }
+      ]
+    },
+    {
+      "frame": 6.25,
+      "chainId": "2fc2306d-f57c-4124-91a3-4be3839e6a35",
+      "residual": 5.978733960281817e-16,
+      "appliedResidual": 1.0295784775289034e-15,
+      "iterations": 0,
+      "reachable": true,
+      "converged": true,
+      "method": "limited-ccd",
+      "stop": "converged",
+      "limits": [
+        {
+          "jointId": "a2328c5e-880b-46be-9b75-1da56d82520e",
+          "swing": 0.881934603478444,
+          "twist": 0.004517594550795094
+        },
+        {
+          "jointId": "b1373f01-5602-49ce-8146-567b4ae5e458",
+          "swing": 0,
+          "twist": 1.4921432712694191
+        }
+      ]
+    },
+    {
+      "frame": 12,
+      "chainId": "2fc2306d-f57c-4124-91a3-4be3839e6a35",
+      "residual": 2.2887833992611187e-16,
+      "appliedResidual": 3.1432500083045447e-16,
+      "iterations": 0,
+      "reachable": true,
+      "converged": true,
+      "method": "limited-ccd",
+      "stop": "converged",
+      "limits": [
+        {
+          "jointId": "a2328c5e-880b-46be-9b75-1da56d82520e",
+          "swing": 0.7427482922829857,
+          "twist": -0.08372043995242602
+        },
+        {
+          "jointId": "b1373f01-5602-49ce-8146-567b4ae5e458",
+          "swing": 0,
+          "twist": 1.901289074011791
+        }
+      ]
+    },
+    {
+      "frame": 24,
+      "chainId": "2fc2306d-f57c-4124-91a3-4be3839e6a35",
+      "residual": 2.237726045655905e-16,
+      "appliedResidual": 3.3306690738754696e-16,
+      "iterations": 0,
+      "reachable": true,
+      "converged": true,
+      "method": "limited-ccd",
+      "stop": "converged",
+      "limits": [
+        {
+          "jointId": "a2328c5e-880b-46be-9b75-1da56d82520e",
+          "swing": 0.35510079369247316,
+          "twist": -0.20867938721521245
+        },
+        {
+          "jointId": "b1373f01-5602-49ce-8146-567b4ae5e458",
+          "swing": 0,
+          "twist": 1.7453292519943298
+        }
+      ]
+    },
+    {
+      "frame": 36.5,
+      "chainId": "2fc2306d-f57c-4124-91a3-4be3839e6a35",
+      "residual": 2.2247786310271853e-16,
+      "appliedResidual": 3.1432500083045447e-16,
+      "iterations": 0,
+      "reachable": true,
+      "converged": true,
+      "method": "limited-ccd",
+      "stop": "converged",
+      "limits": [
+        {
+          "jointId": "a2328c5e-880b-46be-9b75-1da56d82520e",
+          "swing": 0.14769483013974188,
+          "twist": -0.04448737541322858
+        },
+        {
+          "jointId": "b1373f01-5602-49ce-8146-567b4ae5e458",
+          "swing": 0,
+          "twist": 1.6336354750952689
+        }
+      ]
+    },
+    {
+      "frame": 47,
+      "chainId": "2fc2306d-f57c-4124-91a3-4be3839e6a35",
+      "residual": 3.188872858294072e-16,
+      "appliedResidual": 3.188872858294072e-16,
+      "iterations": 0,
+      "reachable": true,
+      "converged": true,
+      "method": "limited-ccd",
+      "stop": "converged",
+      "limits": [
+        {
+          "jointId": "a2328c5e-880b-46be-9b75-1da56d82520e",
+          "swing": 0.20604868026667505,
+          "twist": 0.04133504514784306
+        },
+        {
+          "jointId": "b1373f01-5602-49ce-8146-567b4ae5e458",
+          "swing": 0,
+          "twist": 1.122389917634301
+        }
+      ]
+    }
+  ],
+  "checks": [
+    "hinge/cone parameter edit and actual limited residual",
+    "limit enable remove add reference recapture undo redo reload",
+    "invalid limits reject UI transaction without revision change",
+    "bake activation retains limits and disables IK then undo restores source",
+    "static and baked GLB validation UI reimport and pixel comparison",
+    "portable project preserves editable limits and reference orientations"
+  ]
+}

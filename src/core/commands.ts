@@ -34,6 +34,7 @@ import { displayColor } from './surface';
 import { bindSkin, normalizedInfluences } from './skin';
 import { ikPath, suggestedPole } from './ik';
 import { sceneEvaluator } from './constraints';
+import { affineParts } from './affine';
 import { deleteElements, extrudeRegion, mergeVertices, transformVertices } from './mesh';
 
 const ID = z.string().min(1).max(80);
@@ -69,6 +70,15 @@ export const CommandSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('layer.delete'), id: ID }).strict(),
   z.object({ type: z.literal('ik.put'), chain: IKChainSchema }).strict(),
   z.object({ type: z.literal('ik.delete'), id: ID }).strict(),
+  z
+    .object({
+      type: z.literal('ik.limit.capture'),
+      chainId: ID,
+      jointId: ID,
+      frame: z.number().finite().min(0).max(1e6),
+      kind: z.enum(['hinge', 'cone']).optional(),
+    })
+    .strict(),
   z
     .object({
       type: z.literal('ik.create'),
@@ -395,6 +405,36 @@ function apply(p: Project, c: Command) {
       get(p.ikChains || [], c.id);
       p.ikChains = p.ikChains!.filter((chain) => chain.id !== c.id);
       break;
+    case 'ik.limit.capture': {
+      const chain = get(p.ikChains || [], c.chainId);
+      if (!chain.joints.slice(0, -1).includes(c.jointId))
+        throw new Error('只能设置链内非末端关节限角');
+      const scope = {
+        ...p,
+        ikChains: p.ikChains!.map((item) =>
+          item.id === chain.id ? { ...item, enabled: false } : item,
+        ),
+      };
+      const matrix = sceneEvaluator(scope, chain.sceneId)(c.frame).local.get(c.jointId)!;
+      const parts = affineParts(matrix);
+      if (!parts) throw new Error('输入姿态退化，无法记录限角参考');
+      const existing = chain.limits?.find((l) => l.jointId === c.jointId),
+        kind = c.kind || existing?.kind || 'hinge';
+      const limit = {
+        jointId: c.jointId,
+        enabled: true,
+        kind,
+        axis: (kind === 'hinge' ? [0, 0, 1] : [0, 1, 0]) as [number, number, number],
+        min: kind === 'hinge' ? 0 : -Math.PI / 4,
+        max: kind === 'hinge' ? (Math.PI * 5) / 6 : Math.PI / 4,
+        swing: Math.PI / 2,
+        ...existing,
+        reference: parts.rotation.toArray() as [number, number, number, number],
+      };
+      if (c.kind) limit.kind = c.kind;
+      chain.limits = [...(chain.limits || []).filter((l) => l.jointId !== c.jointId), limit];
+      break;
+    }
     case 'ik.create': {
       const root = get(p.entities, c.rootId),
         joints = ikPath(p.entities, root.id, c.tipId);

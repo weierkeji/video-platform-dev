@@ -1,8 +1,30 @@
 # 持续开发恢复记录
 
-更新时间：2026-10-24。用户附件要求的完整 Blender + LibTV 功能目标保持 active；此处是 0.14 基础版本检查点，不是目标完成声明。下方旧版本段落仅保留历史证据。
+更新时间：2026-10-25。用户附件要求的完整 Blender + LibTV 功能目标保持 active；此处是 0.15 基础版本检查点，不是目标完成声明。下方旧版本段落仅保留历史证据。
 
-## 0.14 最新恢复入口
+## 0.15 最新恢复入口
+
+0.14 已提交并推送 97dce53。本轮 0.15 新增参考姿态、单轴铰链、摆动锥/扭转限角及受限 IK，项目格式 v14；实际 HEAD/origin/main 以 Git 核查为准。完整 Blender + LibTV 目标仍 active，不能把此检查点计为目标完成。没有新依赖、第三方源码修改、Blender/bpy 调用或外部生成。Blender 4.5 文档作行为参照；CCD 算法来自公开技术/Ben Kenwright 论文，代码、限角规格和可行初值独立编写；Three.js 仍提供数学/渲染。REA 沿用已记录 6.7.0，没有新增分析引擎。
+
+IKChain.limits 可选，每条最多 32 个非末端成员；记录 jointId、开关、hinge/cone、reference 四元数、axis、min/max、swing 弧度。校验唯一成员、非零轴/四元数、有序 [-π,π] 区间、[0,π] 锥角。ik.limit.capture 临时排除本链 IK，按当前帧取得动画/层/普通约束/其他链后的局部 QR 旋转，走统一事务，不改蒙皮绑定。IKLimits 面板编辑、启停、删除、重记参考并显示实际角度；角度上下限相等可锁定。
+
+affine.ts 提取原 constraints.ts 的 QR/混合代码，供 joint-limits.ts 和 ik-limited.ts 复用。reference × swing × twist 分解，铰链清 swing，锥限制 swing，twist 夹有符号区间；四元数统一半球，180° swing 的未定义 twist 取零。受限链保留输入局部位置/上三角伸缩剪切，后续投影 CCD 比较真实世界末端误差；无有效限角保持原几何/FABRIK。部分影响混合后再限角，正影响强制守限，零影响或停用不限制。
+
+修复了单侧铰链的直链局部停滞：先比较输入/投影自由解、三组固定比例铰链候选及双段几何候选，并调整根朝向，选择最小残差起点。不是无限重启或全局保证。随后最多 chain.iterations 次全链 CCD，有限线搜索/坐标候选投影后仅接受残差下降；converged/stalled/iteration-limit 明示，未收敛时 reachable=null，不能据此判定不可达。极向只参与初始偏好，限角优先。非均匀父级下世界段长可变，连续性和全局最优仍不保证。
+
+**运行依据**：99 项检查中 98 通过；包括新限角、三段真实迭代、参考捕获、部分影响、非均匀反射父级、非法数据、采样烘焙、独立 GLTFLoader 对摄像机和蒙皮顶点对照，以及原有约束/蒙皮/动画核心检查。1 项既有供应商下载/探测协议夹具失败，确认是下述媒体环境问题，不能宣称全套通过。类型检查、正式构建通过：148 模块，bundle 1030.62 KB / gzip 292.86 KB，worker 119.50 KB；仍有体积提示。原创作品 97 时刻/16 轨/1552 键，1728 次探测最大位置分量差 0.00293437 米、旋转 0.228925°，不是全区间误差上界。
+
+开发和正式入口均实际通过 npm.cmd run smoke:ik-limits -- --no-media。正式 2026-10-25T04:16:12.638Z，Chrome 155.0.8059.82、软件 WebGL，无 pageerror。范围修改、未达到容差提示、实际限角读数、启停/删除/新增、重记参考、撤销重做/重载、非法区间拒绝且修订未变、烘焙启用/撤销、项目包恢复正常。静态/动画 GLB 0 错误/0 警告/4 空节点信息；六帧 PNG 重导入差 0…0.000923354/255，静态差 0.0000282922/255。PNG 用浏览器 Canvas 解码。已查看真实界面和图像。没有新视频成功证据，没有重跑全部历史媒体脚本。
+
+**外部环境问题，继续其他单元**：2026-10-25 Windows CodeIntegrity/Operational 事件 3077/3033，现有 Gyan FFmpeg/ffprobe 9.0.2-full_build-shared 的 avdevice-63.dll（日志也有 swresample-7.dll）被企业签名/代码完整性策略拦截，退出码 3236495362 / 0xC0E90002；沙箱外直接 ffprobe 同样失败。没有关闭/绕过策略。已用异步问题询问用户是否有已经获准运行的安装路径，目前未收到路径。研究 docs/research/2026-10-25-media-environment.json；原始日志 .local/checks/ffmpeg-code-integrity.json。不要通过复制被拦截文件、改策略或换壳规避。若用户提供已获准安装，用已有 STUDIO_FFMPEG_PATH / STUDIO_FFPROBE_PATH 配置并重启，先核查版本/许可，再补 npm.cmd test、npm.cmd run smoke:ik-limits（不带 --no-media）以及必要媒体回归。没有路径时继续非媒体工作，不能把整个长期目标标 blocked。
+
+**迁移与作品**：v13→v14 的 143 项目、860 撤销历史、1119 版本、93 任务快照仅格式号变化、游标未变；完整备份 before-schema-v14-1792901372261.sqlite。审计 research/2026-10-25-v14-migration.json，本机脚本 .local/checks/audit-v14.mjs。保护 .local/data。研究 research/2026-10-25-ik-limits.md，开发/正式 *-ik-limits-dev-runtime.json / *-ik-limits-runtime.json。examples/limited-reach.ffstudio/.glb 及 limited-pose.glb 可打开；源场景保留限角/参考/控制器，另有重导入场景。没有 limited-reach.mp4。原创雕塑/蒙皮/目标运动由 scripts/ik-limits-fixture.ts 建立。
+
+**下一项**：IK 影响与极向角动画及控制过渡，先研究参数曲线、启用依赖、镜头/动作/层语义和边界采样，再接入统一命令、求值与烘焙；随后绑定姿态编辑、重定向。刚度/阻尼、自动拉伸、末端旋转、共享节点/闭环、完整约束/驱动和专业性能仍缺；完整三维、媒体、合成与 AI 范围保持。Seedance 仍缺凭据/预算，无真实生成。
+
+本轮开发/正式服务均已停止，核查 4173 无监听、无本项目 Node 进程。按既有授权及时提交/推送，恢复先读本节并查 Git、端口和 FFmpeg 实际状态；继续已有项目。
+
+## 0.14 历史恢复记录
 
 0.13 已推送 a6192f3。0.14 新增 IK 链、目标/极向控制器、分组依赖求值和烘焙整合，项目格式 v13；最新提交以实际 git log/status 为准。没有新增依赖或修改第三方源码、Blender 程序调用或外部生成。公开行为参照 Blender 4.5 IK 文档；多段算法归 Aristidou/Lasenby 的 FABRIK 论文，求解代码由本仓库独立编写，Three.js 仍提供数学/显示。REA 沿用已有 6.7.0，未新增分析引擎，未声称读取完整论文、捕获原生 UI 或取得内部实现。
 
