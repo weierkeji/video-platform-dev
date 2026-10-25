@@ -5,10 +5,12 @@ export function ActionPanel({
   project: p,
   sceneId,
   send,
+  onReduce,
 }: {
   project: Project;
   sceneId: string;
   send: (commands: Command[], label: string) => void;
+  onReduce: () => void;
 }) {
   const scene = p.scenes.find((s) => s.id === sceneId)!;
   if (!scene) return null;
@@ -86,6 +88,7 @@ export function ActionPanel({
           </button>
         )}
       </div>
+      <button onClick={onReduce}>精简动作</button>
       <p className="muted">场景默认动作；镜头或片段可覆盖选择。场景编辑使用此动作。</p>
     </div>
   );

@@ -215,15 +215,18 @@ export function Viewport(props: ViewportProps) {
         }
         return selected;
       };
+      const container = host.current!;
       observer = new ResizeObserver(() => {
-        const r = host.current!.getBoundingClientRect();
+        // Ref detachment precedes passive cleanup when changing workspaces.
+        if (!container.isConnected) return;
+        const r = container.getBoundingClientRect();
         renderer.renderer.setSize(
           Math.max(1, Math.floor(r.width)),
           Math.max(1, Math.floor(r.height)),
           false,
         );
       });
-      observer.observe(host.current!);
+      observer.observe(container);
       const start = (e: PointerEvent) => {
         if (e.button !== 0 || current.current.busy || current.current.playing) return;
         syncSelection();

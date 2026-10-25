@@ -27,6 +27,7 @@ export function NumberInput({
   step = 0.1,
   min,
   max,
+  precision = 4,
 }: {
   label: string;
   value: number;
@@ -34,6 +35,7 @@ export function NumberInput({
   step?: number;
   min?: number;
   max?: number;
+  precision?: number;
 }) {
   return (
     <label className="field">
@@ -45,9 +47,9 @@ export function NumberInput({
         min={min}
         max={max}
         key={String(value)}
-        defaultValue={Number(value.toFixed(4))}
+        defaultValue={Number(value.toFixed(precision))}
         onBlur={(e) => {
-          if (e.target.value === String(Number(value.toFixed(4)))) return;
+          if (e.target.value === String(Number(value.toFixed(precision)))) return;
           const v = Number(e.target.value);
           if (Number.isFinite(v) && v !== value) onChange(v);
         }}

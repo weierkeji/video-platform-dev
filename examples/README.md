@@ -73,3 +73,11 @@
 - [retargeted-pose.glb](retargeted-pose.glb)：第 24 帧冻结姿态。
 - [retargeted-performance.mp4](retargeted-performance.mp4)：实际 H.264、480×270、24 FPS、48 帧/2 秒，无音轨。源自提交时快照，提交后修改映射及目标默认动作不影响该影片。
 - 来源：[scripts/retarget-fixture.ts](../scripts/retarget-fixture.ts) 原创几何/两套骨架/权重与动作，MIT。独立 GLTFLoader、格式校验、界面重导入 PNG 和固定快照影片均有记录；无足底/手部接触保证。
+
+## 0.20 误差约束关键帧精简
+
+- [reduced-performance.ffstudio](reduced-performance.ffstudio)：v17，保留原创源/目标骨架、重定向映射、2377 键密集动作和 154 键精简动作，以及 GLB 重导入场景。Target performance 中选择 Dense target motion 或“精简目标 0–48”可继续编辑；左侧“精简动作”可换容差另存。默认镜头使用重导入的精简动作。
+- [reduced-performance.glb](reduced-performance.glb)：原生可编辑动画，包含原目标动作、密集动作和精简 clip。选择“精简目标 0–48”播放，154 键；不包含本项目重定向/驱动元数据。
+- [reduced-pose.glb](reduced-pose.glb)：第 24 帧冻结姿态。
+- [reduced-performance.mp4](reduced-performance.mp4)：实际 H.264、480×270、24 FPS、48 帧/2 秒、无音轨；任务提交后切换动作不改变固定快照输出。
+- 来源：[scripts/reduce-fixture.ts](../scripts/reduce-fixture.ts)，MIT，原创几何/权重/骨架及动作。局部通道容差不代表任意作品的世界空间或画面误差界。

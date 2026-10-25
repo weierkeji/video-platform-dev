@@ -53,3 +53,5 @@ glTF 解析/序列化由本仓库按公开格式独立实现；Three.js 负责�
 0.18 没有新增依赖或修改第三方源码。FK/IK 匹配、层反算、控制器转换、事务姿态验收及完全折叠双段语义由本仓库按公开矩阵/四元数数学独立实现，不复制 Rigify 控制器/求解源码。Blender 4.5 IK 与另行标注的 Rigify 5.1 文档仅提供公开行为参照；Three.js 仍提供数学/渲染与独立 GLTFLoader/AnimationMixer，gltf-validator 用于格式检查。matched-controls 沿用原创雕塑/权重，自行编写基础偏移与 FK/IK 接续关键帧，无外部角色、动作资产或模型生成。
 
 0.19 没有新增依赖或修改第三方源码。骨架映射、参考坐标转换、QR 方向转移、根位移与命令/UI 由本仓库按通用矩阵/四元数数学独立实现，不复制 Unreal/Blender 的重定向器或私有代码。Epic 公开参考姿态/映射说明仅作另行标注的行为参照；Blender 4.5 指定页面直取失败已记录。Three.js 提供基础数学/渲染与独立加载对照，gltf-validator 检查格式。retargeted-performance/retargeted-pose 使用原创分段柱体、权重、两套骨架与自编动作；无下载角色、动捕或 AI 生成资产。REA 本机 6.7.0 MIT 保留，当前 main 的更高 Node 要求单独记录，未升级工具或安装原生分析引擎。
+
+0.20 没有新增依赖或修改第三方源码。曲线分段、Bernstein 差界、四元数区间界、保护规则与事务/worker/UI 由本仓库按通用数学独立编写；Blender 3.6 / 5.3 dev 与 main 官方说明仅用于识别用户行为，没有复制或调用其精简器。glTF 2.0 规范用于交换语义，Three.js 提供基础数学/渲染及独立加载对照。reduced-performance/reduced-pose 继续使用原创柱体、骨架/权重/动作，添加自主摄影机曲线；无下载资产或 AI 生成。REA 本机 6.7.0 MIT 保持，最新 main 环境要求单独记录，本单元未运行其分析引擎。

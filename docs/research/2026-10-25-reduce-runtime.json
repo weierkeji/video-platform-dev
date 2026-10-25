@@ -1,0 +1,263 @@
+{
+  "checkedAt": "2026-10-25T11:04:52.784Z",
+  "projectId": "e903e4bd-34ff-484c-a62c-b45822b0ea80",
+  "importedProjectId": "2cfbb22e-b290-40c2-a68a-d720d1351efd",
+  "jobId": "2a092607-8287-4d8e-b85b-36b51a71520d",
+  "media": "verified",
+  "browser": "155.0.8059.82",
+  "format": 17,
+  "frames": 48,
+  "validator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 1,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/7"
+      }
+    ],
+    "truncated": false
+  },
+  "staticValidator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 2,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/6"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/7"
+      }
+    ],
+    "truncated": false
+  },
+  "staticDifference": 0.006396604938271605,
+  "measurements": [
+    {
+      "frame": 0,
+      "difference": 0.0008616255144032922
+    },
+    {
+      "frame": 6.25,
+      "difference": 0.000529835390946502
+    },
+    {
+      "frame": 12,
+      "difference": 0.009711934156378601
+    },
+    {
+      "frame": 24,
+      "difference": 0.0013580246913580246
+    },
+    {
+      "frame": 36,
+      "difference": 0.0018621399176954733
+    },
+    {
+      "frame": 36.5,
+      "difference": 0.0011574074074074073
+    },
+    {
+      "frame": 47,
+      "difference": 0.005632716049382716
+    }
+  ],
+  "videoMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0.41445216049382716
+    },
+    {
+      "frame": 12,
+      "difference": 0.41233281893004115
+    },
+    {
+      "frame": 24,
+      "difference": 0.40743312757201644
+    },
+    {
+      "frame": 36,
+      "difference": 0.41503343621399175
+    },
+    {
+      "frame": 47,
+      "difference": 0.4585159465020576
+    }
+  ],
+  "pageErrors": [],
+  "options": {
+    "actionId": "38459a40-f9e5-471d-8bd0-8116fb36d211",
+    "start": 0,
+    "end": 48,
+    "position": 0.001,
+    "rotationDegrees": 0.1,
+    "scale": 0.001,
+    "influence": 0.001
+  },
+  "stats": {
+    "inputKeys": 2377,
+    "outputKeys": 154,
+    "removed": 2223,
+    "tracks": 13,
+    "checks": 266010,
+    "exhausted": false,
+    "details": [
+      {
+        "entityId": "105e8439-2b6f-432c-a74f-7481d1262229",
+        "property": "position",
+        "before": 197,
+        "after": 9,
+        "bound": 4.9455364062831465e-14,
+        "reason": ""
+      },
+      {
+        "entityId": "105e8439-2b6f-432c-a74f-7481d1262229",
+        "property": "quaternion",
+        "before": 197,
+        "after": 28,
+        "bound": 0.09999984727037615,
+        "reason": ""
+      },
+      {
+        "entityId": "105e8439-2b6f-432c-a74f-7481d1262229",
+        "property": "scale",
+        "before": 197,
+        "after": 8,
+        "bound": 4.9227844771419234e-14,
+        "reason": ""
+      },
+      {
+        "entityId": "4042863d-9b65-4d15-8973-6b656ede945e",
+        "property": "position",
+        "before": 197,
+        "after": 8,
+        "bound": 4.9227844771419234e-14,
+        "reason": ""
+      },
+      {
+        "entityId": "4042863d-9b65-4d15-8973-6b656ede945e",
+        "property": "quaternion",
+        "before": 197,
+        "after": 8,
+        "bound": 6.055266750690097e-11,
+        "reason": ""
+      },
+      {
+        "entityId": "4042863d-9b65-4d15-8973-6b656ede945e",
+        "property": "scale",
+        "before": 197,
+        "after": 8,
+        "bound": 4.9227844771419234e-14,
+        "reason": ""
+      },
+      {
+        "entityId": "1137fee1-91aa-4772-907d-c96bf81d5f2c",
+        "property": "position",
+        "before": 197,
+        "after": 8,
+        "bound": 5.556789459438151e-14,
+        "reason": ""
+      },
+      {
+        "entityId": "1137fee1-91aa-4772-907d-c96bf81d5f2c",
+        "property": "quaternion",
+        "before": 197,
+        "after": 43,
+        "bound": 0.0999999589212476,
+        "reason": ""
+      },
+      {
+        "entityId": "1137fee1-91aa-4772-907d-c96bf81d5f2c",
+        "property": "scale",
+        "before": 197,
+        "after": 8,
+        "bound": 4.922784477141924e-14,
+        "reason": ""
+      },
+      {
+        "entityId": "67f13af0-b0af-4e3a-bb55-8e6e09aced52",
+        "property": "position",
+        "before": 197,
+        "after": 8,
+        "bound": 4.9227844771419234e-14,
+        "reason": ""
+      },
+      {
+        "entityId": "67f13af0-b0af-4e3a-bb55-8e6e09aced52",
+        "property": "quaternion",
+        "before": 197,
+        "after": 8,
+        "bound": 6.06145517423305e-11,
+        "reason": ""
+      },
+      {
+        "entityId": "67f13af0-b0af-4e3a-bb55-8e6e09aced52",
+        "property": "scale",
+        "before": 197,
+        "after": 8,
+        "bound": 4.9227844771419234e-14,
+        "reason": ""
+      },
+      {
+        "entityId": "c2799425-849f-4a40-83a0-013dbb4f238b",
+        "property": "position",
+        "before": 13,
+        "after": 2,
+        "bound": 2.9295732659974334e-13,
+        "reason": ""
+      }
+    ]
+  },
+  "sourceMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0
+    },
+    {
+      "frame": 6.25,
+      "difference": 0.010779320987654321
+    },
+    {
+      "frame": 12,
+      "difference": 0
+    },
+    {
+      "frame": 24,
+      "difference": 0
+    },
+    {
+      "frame": 36,
+      "difference": 0
+    },
+    {
+      "frame": 36.5,
+      "difference": 0.01172067901234568
+    },
+    {
+      "frame": 47,
+      "difference": 0.012481995884773663
+    }
+  ],
+  "sourceActionId": "38459a40-f9e5-471d-8bd0-8116fb36d211",
+  "targetActionId": "e6ae20fe-ed6e-414f-be6f-3bd5d085eb8c",
+  "checks": [
+    "actual precision, analysis, worker cancellation and invalid-range rejection without revisions",
+    "one new action transaction preserves every source key and rig setting; undo redo and reload",
+    "native reduced clip retains reduced accessor counts and survives UI reimport",
+    "original versus reduced, animated reimport and static pose PNG comparisons",
+    "fixed render snapshot survives later action switch",
+    "portable project retains dense source, reduced action, rig and all source metadata"
+  ]
+}

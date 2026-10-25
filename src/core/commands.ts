@@ -42,6 +42,7 @@ import { activeIKTracks } from './ik-animation';
 import { updateRestPose, captureRestPose, resetRestPose } from './rest-pose';
 import { planIKMatch, verifyIKMatch } from './ik-match';
 import { retargetAnimation, activateRetarget } from './retarget';
+import { reduceAction, ReduceOptionsSchema } from './reduce-curves';
 import { deleteElements, extrudeRegion, mergeVertices, transformVertices } from './mesh';
 
 const ID = z.string().min(1).max(80);
@@ -58,6 +59,14 @@ export const CommandSchema = z.discriminatedUnion('type', [
     .strict(),
   z.object({ type: z.literal('action.rename'), id: ID, name: z.string().min(1).max(160) }).strict(),
   z.object({ type: z.literal('action.delete'), id: ID }).strict(),
+  z
+    .object({
+      type: z.literal('action.reduce'),
+      action: AnimationActionSchema,
+      options: ReduceOptionsSchema,
+      activate: z.boolean(),
+    })
+    .strict(),
   z.object({ type: z.literal('retarget.put'), profile: RetargetProfileSchema }).strict(),
   z.object({ type: z.literal('retarget.delete'), id: ID }).strict(),
   z
@@ -445,6 +454,14 @@ function apply(p: Project, c: Command) {
     case 'action.rename':
       get(p.animationActions || [], c.id).name = c.name;
       break;
+    case 'action.reduce': {
+      const result = reduceAction(p, c.action.sceneId, c.options, c.action);
+      (p.animationActions ||= []).push(result.action);
+      p.animationTracks.push(...result.tracks);
+      if (result.ikTracks.length) (p.ikTracks ||= []).push(...result.ikTracks);
+      if (c.activate) get(p.scenes, c.action.sceneId).activeActionId = c.action.id;
+      break;
+    }
     case 'retarget.put': {
       const profiles = (p.retargetProfiles ||= []),
         index = profiles.findIndex((x) => x.id === c.profile.id);

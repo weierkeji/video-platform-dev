@@ -23,6 +23,7 @@ import { convertSelection, sameTopology, type MeshMode, type MeshSelection } fro
 import { WorkflowPanel } from './WorkflowPanel';
 import { SceneExchange } from './SceneExchange';
 import { RetargetPanel } from './RetargetPanel';
+import { ReducePanel } from './ReducePanel';
 import { restProject, rigNodes } from '../core/rest-pose';
 import { RestPosePanel } from './RestPosePanel';
 
@@ -69,6 +70,7 @@ export function App() {
     [newDialog, setNewDialog] = useState(false),
     [exchangeOpen, setExchangeOpen] = useState(false),
     [retargetOpen, setRetargetOpen] = useState(false),
+    [reduceOpen, setReduceOpen] = useState(false),
     [commandText, setCommandText] = useState(
       '[\n  { "type": "project.rename", "name": "新作品" }\n]',
     ),
@@ -253,7 +255,7 @@ export function App() {
   }, [playing, envelope?.project.timeline.fps, envelope?.project.timeline.duration]);
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
-      if (exchangeOpen || retargetOpen || newDialog) return;
+      if (exchangeOpen || retargetOpen || reduceOpen || newDialog) return;
       if ((e.target as HTMLElement).closest('input,textarea,select,[contenteditable]')) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
@@ -321,6 +323,7 @@ export function App() {
     frame,
     exchangeOpen,
     retargetOpen,
+    reduceOpen,
     newDialog,
   ]);
   const projectId = envelope?.project.id;
@@ -528,7 +531,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.19</small>
+            FRAMEFORGE<small>创作工作台 · 0.20</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -656,6 +659,10 @@ export function App() {
           <ActionPanel
             project={p}
             sceneId={sceneId}
+            onReduce={() => {
+              setPlaying(false);
+              setReduceOpen(true);
+            }}
             send={(commands, label) => {
               setSelectedKey(null);
               void send(commands, label);
@@ -1278,6 +1285,24 @@ export function App() {
           event.target.value = '';
         }}
       />
+      {reduceOpen && (
+        <ReducePanel
+          key={p.id + sceneId}
+          project={p}
+          sceneId={sceneId}
+          busy={busy}
+          saveError={error}
+          send={send}
+          onClose={() => setReduceOpen(false)}
+          onActivated={() => {
+            setSelectedKey(null);
+            setRestEditing(false);
+            setView('scene');
+            setWorkspace('curves');
+            setPlaying(false);
+          }}
+        />
+      )}
       {retargetOpen && (
         <RetargetPanel
           key={p.id}

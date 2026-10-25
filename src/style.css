@@ -1090,6 +1090,39 @@ pre {
 .retarget-panel label:has(input[type='checkbox']) {
   justify-content: flex-start;
 }
+.reduce-panel fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.reduce-panel label {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin: 12px 0;
+}
+.reduce-panel label.check {
+  justify-content: flex-start;
+}
+.reduce-panel .field select,
+.reduce-panel .field input:not([type='number']) {
+  max-width: 70%;
+}
+.reduce-results {
+  max-height: 320px;
+  overflow: auto;
+}
+.reduce-results table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+.reduce-results th,
+.reduce-results td {
+  padding: 8px;
+  border-bottom: 1px solid #405266;
+  text-align: left;
+}
 .exchange-modal p,
 .exchange-modal li {
   line-height: 1.6;
