@@ -6,7 +6,7 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 
 | 模块 | 职责 |
 | --- | --- |
-| `src/core/model.ts` | v16 模型、v1–v15 迁移、引用/层级/绑定/权重/时间轴/动作约束、工作流拓扑检查 |
+| `src/core/model.ts` | v17 模型、v1–v16 迁移、引用/层级/绑定/权重/时间轴/动作约束、工作流拓扑检查 |
 | `src/core/generation.ts` | 生成参数、模型系列限制、不可变请求规格 |
 | `src/core/commands.ts` | 有限结构化命令，复制状态、整批应用并校验 |
 | `src/core/geometry.ts` | 自主基本几何、共享边中点细分、三角面法向挤出、OBJ 交换 |
@@ -20,6 +20,7 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 | `src/core/skin.ts` / `ui/SkinPanel.tsx` | 基础姿态绑定、权重归一化、世界变形、绑定与组件权重 UI |
 | `src/core/affine.ts` / `joint-limits.ts` / `ik-limited.ts` | 共用 QR 仿射分解、参考姿态摆动/扭转投影、受限 CCD 与停止诊断 |
 | `src/core/ik.ts` / `ui/IKPanel.tsx` | IK 链路径、双段几何解、多段 FABRIK、极向控制、世界姿态反算与编辑 UI |
+| `src/core/retarget-profile.ts` / `retarget.ts` / `ui/RetargetPanel.tsx` / `retarget.worker.ts` | 映射引用与子树、固定基础父级、QR 方向转移、根位移、完整 TRS 新动作、误差分析与统一事务 |
 | `src/core/ik-match.ts` / `ui/IKMatch.tsx` | 当前帧双向匹配、控制器局部转换、层反算、输入记键和完整矩阵事务验收 |
 | `src/core/ik-animation.ts` / `ui/IKAnimation.tsx` | 单值 IK 曲线、动作选择、根对象层参数混合与编辑 |
 | `src/core/constraints.ts` / `ui/ConstraintPanel.tsx` | 对象依赖拓扑排序、有序约束、仿射矩阵求值、退化诊断、TRS 转换检查与编辑 UI |
@@ -52,8 +53,16 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 - 几何：本地顶点/三角面，v5 允许无面、孤立顶点及空网格。边是三角面的规范化索引对；没有独立线段或多边形数据。修改几何后，预览和导出读取相同数据。线性四分三角形不是平滑曲面细分。
 - 素材：SHA-256 内容寻址，ffprobe 读取真实流信息；便携包 base64 嵌入素材并校验哈希。没有压缩包或缺失媒体重定位流程。
 - 画幅：Clip.fit 为 contain/cover/stretch。默认 contain 保持完整画面、空白处显示低轨；cover 居中裁切源画面；stretch 拉伸。预览和导出共用矩形计算。
-- 数据版本：schemaVersion=16；显式拒绝未知格式。v1 在副本上升级，每个旧片段设为 stretch，保留音量；v2–v15 保留已有设置。v1–v3 关键帧按轨道内原时间派生 `legacy-key-<frame>`，在历史/任务快照间保持一致；v4 及以上的键 ID 原样保留。v6–v16 新字段均可选；v11→v12→v13→v14→v15→v16 修改格式号，并沿用机器精度绑定矩阵末行规范化。新关键帧为 UUID，ID 在轨道内唯一；完整身份是 `(trackId,keyId)`。复制动作创建新轨道/键 ID。不改原项目文件。数据库启动时先校验全部待迁移数据，`VACUUM INTO` 备份完整库，再在事务内升级项目、撤销历史、版本与任务快照，并写入 `schema_migrations` 的版本、备份名和计数；不增加用户编辑修订。夹具覆盖升级、原库备份和历史恢复。
+- 数据版本：schemaVersion=17；显式拒绝未知格式。v1 在副本上升级，每个旧片段设为 stretch，保留音量；v2–v16 保留已有设置。v1–v3 关键帧按轨道内原时间派生 `legacy-key-<frame>`，在历史/任务快照间保持一致；v4 及以上的键 ID 原样保留。v6–v17 新字段均可选；v11→v12→v13→v14→v15→v16→v17 修改格式号，并沿用机器精度绑定矩阵末行规范化。新关键帧为 UUID，ID 在轨道内唯一；完整身份是 `(trackId,keyId)`。复制动作创建新轨道/键 ID。不改原项目文件。数据库启动时先校验全部待迁移数据，`VACUUM INTO` 备份完整库，再在事务内升级项目、撤销历史、版本与任务快照，并写入 `schema_migrations` 的版本、备份名和计数；不增加用户编辑修订。夹具覆盖升级、原库备份和历史恢复。
 - 生成：工作流节点保存参数和首尾帧 Asset ID，通过统一命令编辑并验证引用；被引用图片不可删除。提交时保存解析后的 GenerationRequest、Project 快照、工作流/输出节点和 requestKey；后续编辑不影响已提交请求。
+
+## 骨架动作重定向（0.19）
+
+Project.retargetProfiles 保存源根/目标根、显式对应、方向对齐和位移比例；节点引用必须在各自不交叠子树内，目标唯一、根对根强制，可复用源节点。模型加载与每批命令均验证引用。retarget.put/delete/bake 由统一事务执行；映射最多 128 份/每份 512 对。输出范围/源动作记录在命令审计，映射编辑不反向修改已生成动作。
+
+参考使用已记录的 R（忽略偏移启用开关），无 R 时使用实体基础 TRS。源最终矩阵转换到固定的源根基础父级坐标，再取 QR 方向；相对参考的旋转变化经 C×D×inverse(C) 映射到目标参考方向。目标父先子后，inverse(parent)×desiredRotation 经 QR 取局部旋转，保留基础局部位置/规范尺度，根位移可旋转与缩放。目标外部父级继续作用于生成的局部动画。模型、皮肤绑定和原曲线不变；不承诺位置接触与源伸缩转移。
+
+复用 bake.samplingGrid 的事件/Float32 时间及源场景完整求值，输出目标整个子树的 position/quaternion/scale，四元数连续符号。分开报告平滑/跳变邻域误差；10000 样本、20 万键、200 万次节点采样估算上限。浏览器 worker 可取消/60 秒超时，服务提交重新计算并原子保存。启用仅停用目标子树的基础偏移/层/约束及完整 IK 链，部分链跨界拒绝；外部跟随者保留，目标场景默认动作切换仍有场景范围影响。项目包保留映射，GLB 输出动作，不输出映射配置。
 
 ## FK/IK 当前帧匹配（0.18）
 

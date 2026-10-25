@@ -23,6 +23,7 @@ import {
   IKChainSchema,
   IKTrackSchema,
   ScalarKeySchema,
+  RetargetProfileSchema,
   id,
   identity,
   parseProject,
@@ -40,6 +41,7 @@ import { affineParts } from './affine';
 import { activeIKTracks } from './ik-animation';
 import { updateRestPose, captureRestPose, resetRestPose } from './rest-pose';
 import { planIKMatch, verifyIKMatch } from './ik-match';
+import { retargetAnimation, activateRetarget } from './retarget';
 import { deleteElements, extrudeRegion, mergeVertices, transformVertices } from './mesh';
 
 const ID = z.string().min(1).max(80);
@@ -56,6 +58,17 @@ export const CommandSchema = z.discriminatedUnion('type', [
     .strict(),
   z.object({ type: z.literal('action.rename'), id: ID, name: z.string().min(1).max(160) }).strict(),
   z.object({ type: z.literal('action.delete'), id: ID }).strict(),
+  z.object({ type: z.literal('retarget.put'), profile: RetargetProfileSchema }).strict(),
+  z.object({ type: z.literal('retarget.delete'), id: ID }).strict(),
+  z
+    .object({
+      type: z.literal('retarget.bake'),
+      profileId: ID,
+      action: AnimationActionSchema,
+      options: BakeOptionsSchema,
+      activate: z.boolean(),
+    })
+    .strict(),
   z
     .object({
       type: z.literal('action.bake'),
@@ -432,6 +445,25 @@ function apply(p: Project, c: Command) {
     case 'action.rename':
       get(p.animationActions || [], c.id).name = c.name;
       break;
+    case 'retarget.put': {
+      const profiles = (p.retargetProfiles ||= []),
+        index = profiles.findIndex((x) => x.id === c.profile.id);
+      if (index < 0) profiles.push(c.profile);
+      else profiles[index] = c.profile;
+      break;
+    }
+    case 'retarget.delete':
+      get(p.retargetProfiles || [], c.id);
+      p.retargetProfiles = p.retargetProfiles?.filter((profile) => profile.id !== c.id);
+      break;
+    case 'retarget.bake': {
+      const profile = get(p.retargetProfiles || [], c.profileId),
+        result = retargetAnimation(p, profile, c.options, c.action);
+      (p.animationActions ||= []).push(result.action);
+      p.animationTracks.push(...result.tracks);
+      if (c.activate) activateRetarget(p, profile, result.action);
+      break;
+    }
     case 'action.bake': {
       const result = bakeAnimation(p, c.action.sceneId, c.options, c.action);
       (p.animationActions ||= []).push(result.action);

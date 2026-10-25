@@ -147,7 +147,7 @@ function frameEvents(p: Project, sceneId: string, options: BakeOptions) {
   return [...events.values()];
 }
 
-function samplingGrid(p: Project, sceneId: string, options: BakeOptions) {
+export function samplingGrid(p: Project, sceneId: string, options: BakeOptions) {
   const fps = p.timeline.fps,
     offset = options.rebase ? options.start : 0;
   const times = new Map<number, { source: number; event: boolean }>();

@@ -51,3 +51,5 @@ glTF 解析/序列化由本仓库按公开格式独立实现；Three.js 负责�
 0.17 没有新增依赖或修改第三方源码。基础姿态/固定频道参考、绑定补偿、编辑命令与 UI 为自主实现；补偿关系来自通用矩阵代数与 Khronos 公开线性蒙皮公式，不归为本项目发明。Blender 4.5 骨架编辑/摆姿说明仅作行为参照，未复制其内部实现。Three.js 提供基础数学/渲染，GLTFLoader/AnimationMixer 与 gltf-validator 用于独立读取/检查。rest-sculpture 沿用原创分段柱体/权重，自行编写基础姿态和摄影机约束；无外部素材、角色或模型生成。
 
 0.18 没有新增依赖或修改第三方源码。FK/IK 匹配、层反算、控制器转换、事务姿态验收及完全折叠双段语义由本仓库按公开矩阵/四元数数学独立实现，不复制 Rigify 控制器/求解源码。Blender 4.5 IK 与另行标注的 Rigify 5.1 文档仅提供公开行为参照；Three.js 仍提供数学/渲染与独立 GLTFLoader/AnimationMixer，gltf-validator 用于格式检查。matched-controls 沿用原创雕塑/权重，自行编写基础偏移与 FK/IK 接续关键帧，无外部角色、动作资产或模型生成。
+
+0.19 没有新增依赖或修改第三方源码。骨架映射、参考坐标转换、QR 方向转移、根位移与命令/UI 由本仓库按通用矩阵/四元数数学独立实现，不复制 Unreal/Blender 的重定向器或私有代码。Epic 公开参考姿态/映射说明仅作另行标注的行为参照；Blender 4.5 指定页面直取失败已记录。Three.js 提供基础数学/渲染与独立加载对照，gltf-validator 检查格式。retargeted-performance/retargeted-pose 使用原创分段柱体、权重、两套骨架与自编动作；无下载角色、动捕或 AI 生成资产。REA 本机 6.7.0 MIT 保留，当前 main 的更高 Node 要求单独记录，未升级工具或安装原生分析引擎。

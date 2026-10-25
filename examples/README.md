@@ -65,3 +65,11 @@
 - `matched-controls.ffstudio`：0.18 / 格式 v16，原创雕塑在第 12 帧匹配至 FK、第 36 帧匹配回 IK；源 Matched controls 场景保留基础偏移、关节/控制器/影响键与绑定，可继续用匹配按钮和曲线编辑。另含 GLB 重导入场景，镜头默认引用烘焙场景。
 - `matched-controls.glb`：0…48 帧、步长 0.25 烘焙，保存最终摄影机/关节 TRS 和蒙皮；原控制语义在项目包。`matched-pose.glb` 为第 24 帧静态姿态。两者均 0 错误、0 警告、4 个空节点信息；帧间仍是采样近似。
 - `matched-controls.mp4`：实际 H.264 后台影片，480×270、48 帧、24 FPS、2 秒，无音轨；固定快照、检查帧画面对照已运行。无外部素材或模型生成。
+
+## 0.19 骨架动作重定向
+
+- [retargeted-performance.ffstudio](retargeted-performance.ffstudio)：格式 v17。Source gesture 场景保留原创 FK/IK 源动作；Target performance 场景保留更高、不同基础轴向和额外父节点的目标、补偿绑定、原动作及新生成动作。点击“重定向”可修改保存的三组对应、方向与位移比例，重新生成动作；默认镜头使用 GLB 重导入场景。
+- [retargeted-performance.glb](retargeted-performance.glb)：目标 0–48 帧、步长 0.5 的可编辑蒙皮动画；不包含本项目映射元数据。
+- [retargeted-pose.glb](retargeted-pose.glb)：第 24 帧冻结姿态。
+- [retargeted-performance.mp4](retargeted-performance.mp4)：实际 H.264、480×270、24 FPS、48 帧/2 秒，无音轨。源自提交时快照，提交后修改映射及目标默认动作不影响该影片。
+- 来源：[scripts/retarget-fixture.ts](../scripts/retarget-fixture.ts) 原创几何/两套骨架/权重与动作，MIT。独立 GLTFLoader、格式校验、界面重导入 PNG 和固定快照影片均有记录；无足底/手部接触保证。

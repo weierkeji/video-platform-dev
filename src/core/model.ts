@@ -2,8 +2,9 @@ import { z } from 'zod';
 import { GenerationOptionsSchema, GenerationRequestSchema } from './generation';
 import { validateTrack } from './animation';
 import { dependencyOrder } from './constraints';
+import { validateRetargetProfile } from './retarget-profile';
 
-export const PROJECT_VERSION = 16;
+export const PROJECT_VERSION = 17;
 
 export const id = () => crypto.randomUUID();
 const ID = z
@@ -505,6 +506,23 @@ export type Revision = {
   command: unknown;
   createdAt: string;
 };
+export const RetargetProfileSchema = z
+  .object({
+    id: ID,
+    name: Name,
+    sourceRootId: ID,
+    targetRootId: ID,
+    mappings: z
+      .array(z.object({ sourceId: ID, targetId: ID }).strict())
+      .min(1)
+      .max(512),
+    rootMotion: z.enum(['scaled', 'none']),
+    motionScale: z.number().finite().min(0.001).max(1000),
+    alignment: Vec4Schema,
+  })
+  .strict();
+export type RetargetProfile = z.infer<typeof RetargetProfileSchema>;
+
 export const ProjectSchema = z
   .object({
     format: z.literal('frameforge-project'),
@@ -532,6 +550,7 @@ export const ProjectSchema = z
     animationActions: z.array(AnimationActionSchema).max(1000).optional(),
     animationLayers: z.array(AnimationLayerSchema).max(512).optional(),
     ikChains: z.array(IKChainSchema).max(128).optional(),
+    retargetProfiles: z.array(RetargetProfileSchema).max(128).optional(),
     assets: z.array(AssetSchema).max(10000),
     shots: z.array(ShotSchema).max(10000),
     timeline: TimelineSchema,
@@ -590,6 +609,7 @@ export function parseProject(input: unknown): Project {
     ...(p.animationActions || []),
     ...(p.animationLayers || []),
     ...(p.ikChains || []),
+    ...(p.retargetProfiles || []),
     ...p.assets,
     ...p.shots,
     p.timeline,
@@ -675,6 +695,7 @@ export function parseProject(input: unknown): Project {
     }
   }
   dependencyOrder(p.entities, p.ikChains, p.ikTracks);
+  for (const profile of p.retargetProfiles || []) validateRetargetProfile(p, profile);
   const paths = new Set<string>();
   for (const e of p.entities)
     if (e.skin) {
@@ -822,7 +843,7 @@ export function migrateProject(input: unknown) {
     typeof input !== 'object' ||
     !input ||
     !('schemaVersion' in input) ||
-    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, PROJECT_VERSION].includes(
+    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, PROJECT_VERSION].includes(
       Number(input.schemaVersion),
     ) ||
     typeof input.schemaVersion !== 'number'

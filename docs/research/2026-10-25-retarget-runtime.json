@@ -1,0 +1,139 @@
+{
+  "checkedAt": "2026-10-25T09:25:19.090Z",
+  "projectId": "ccbf33b3-5195-4a49-99f0-295f3888bf7a",
+  "importedProjectId": "8f23fc75-577a-425c-a83f-7ace6d863a50",
+  "jobId": "ada2d15d-bd04-44b7-ab7b-df845ed7d2cd",
+  "media": "verified",
+  "browser": "155.0.8059.82",
+  "format": 17,
+  "frames": 48,
+  "validator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 1,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/7"
+      }
+    ],
+    "truncated": false
+  },
+  "staticValidator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 2,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/6"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/7"
+      }
+    ],
+    "truncated": false
+  },
+  "staticDifference": 0.006229423868312757,
+  "measurements": [
+    {
+      "frame": 0,
+      "difference": 0.0008564814814814815
+    },
+    {
+      "frame": 6.25,
+      "difference": 0.00051440329218107
+    },
+    {
+      "frame": 12,
+      "difference": 0.009233539094650205
+    },
+    {
+      "frame": 24,
+      "difference": 0.0011574074074074073
+    },
+    {
+      "frame": 36,
+      "difference": 0.0019007201646090534
+    },
+    {
+      "frame": 36.5,
+      "difference": 0.001388888888888889
+    },
+    {
+      "frame": 47,
+      "difference": 0.0061805555555555555
+    }
+  ],
+  "videoMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0.4129758230452675
+    },
+    {
+      "frame": 12,
+      "difference": 0.4119264403292181
+    },
+    {
+      "frame": 24,
+      "difference": 0.412363683127572
+    },
+    {
+      "frame": 36,
+      "difference": 0.4193827160493827
+    },
+    {
+      "frame": 47,
+      "difference": 0.46512345679012346
+    }
+  ],
+  "pageErrors": [],
+  "profile": {
+    "id": "98ce9c34-e20c-4441-8a51-d11b52720fad",
+    "name": "不同骨长与基础姿态",
+    "sourceRootId": "1d518ca3-3b4c-4513-97e0-3d376e4583b9",
+    "targetRootId": "04351a0a-1f0a-416c-841a-4275b88c0c49",
+    "mappings": [
+      {
+        "sourceId": "1d518ca3-3b4c-4513-97e0-3d376e4583b9",
+        "targetId": "04351a0a-1f0a-416c-841a-4275b88c0c49"
+      },
+      {
+        "sourceId": "2f9676cc-e72e-426b-95c4-a24863eeab2e",
+        "targetId": "91da9484-4ebf-43d2-a420-f765f4a1c4af"
+      },
+      {
+        "sourceId": "c92aa76d-78a8-4f2b-9299-92c98250c2ef",
+        "targetId": "25fcc821-c695-4269-9f47-61899effc2b4"
+      }
+    ],
+    "rootMotion": "scaled",
+    "motionScale": 1.4,
+    "alignment": [
+      0,
+      0,
+      0,
+      1
+    ]
+  },
+  "sourceActionId": "ba804068-9810-43af-96ab-56bea0104fa3",
+  "targetActionId": "733eee6c-e485-4e7d-9cab-3b82b03f7b57",
+  "checks": [
+    "actual mapping editor persists different names, proportions, rest axes and extra unmapped parent",
+    "worker error analysis and real cancellation do not write revisions",
+    "overlapping roots reject before mutation",
+    "new action activation, undo redo and reload preserve source channels, rig and bindings",
+    "static and animated GLB UI reimport and fractional PNG comparisons",
+    "fixed render snapshot survives profile edits and target action switch",
+    "portable project retains mapping, source, target, outputs and reference poses"
+  ]
+}

@@ -1065,6 +1065,31 @@ pre {
   max-height: 85vh;
   overflow-y: auto;
 }
+.retarget-panel fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.retarget-panel .retarget-mapping {
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 12px 0;
+  padding: 8px;
+  border: 1px solid #405266;
+}
+.retarget-panel label {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin: 12px 0;
+}
+.retarget-panel .field select,
+.retarget-panel .field input:not([type='number']) {
+  max-width: 70%;
+}
+.retarget-panel label:has(input[type='checkbox']) {
+  justify-content: flex-start;
+}
 .exchange-modal p,
 .exchange-modal li {
   line-height: 1.6;

@@ -22,6 +22,7 @@ import { MeshPanel } from './MeshPanel';
 import { convertSelection, sameTopology, type MeshMode, type MeshSelection } from '../core/mesh';
 import { WorkflowPanel } from './WorkflowPanel';
 import { SceneExchange } from './SceneExchange';
+import { RetargetPanel } from './RetargetPanel';
 import { restProject, rigNodes } from '../core/rest-pose';
 import { RestPosePanel } from './RestPosePanel';
 
@@ -67,6 +68,7 @@ export function App() {
     [newName, setNewName] = useState(''),
     [newDialog, setNewDialog] = useState(false),
     [exchangeOpen, setExchangeOpen] = useState(false),
+    [retargetOpen, setRetargetOpen] = useState(false),
     [commandText, setCommandText] = useState(
       '[\n  { "type": "project.rename", "name": "新作品" }\n]',
     ),
@@ -251,7 +253,7 @@ export function App() {
   }, [playing, envelope?.project.timeline.fps, envelope?.project.timeline.duration]);
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
-      if (exchangeOpen || newDialog) return;
+      if (exchangeOpen || retargetOpen || newDialog) return;
       if ((e.target as HTMLElement).closest('input,textarea,select,[contenteditable]')) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
@@ -318,6 +320,7 @@ export function App() {
     meshSelection,
     frame,
     exchangeOpen,
+    retargetOpen,
     newDialog,
   ]);
   const projectId = envelope?.project.id;
@@ -525,7 +528,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.18</small>
+            FRAMEFORGE<small>创作工作台 · 0.19</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -691,6 +694,15 @@ export function App() {
               }}
             >
               glTF
+            </button>
+            <button
+              disabled={busy}
+              onClick={() => {
+                setPlaying(false);
+                setRetargetOpen(true);
+              }}
+            >
+              重定向
             </button>
           </div>
           <div className="entity-list">
@@ -1266,6 +1278,27 @@ export function App() {
           event.target.value = '';
         }}
       />
+      {retargetOpen && (
+        <RetargetPanel
+          key={p.id}
+          project={p}
+          busy={busy}
+          saveError={error}
+          send={send}
+          onClose={() => setRetargetOpen(false)}
+          onActivated={(s) => {
+            setSceneId(s);
+            setSelected(null);
+            setSelectedClip(null);
+            setSelectedKey(null);
+            setMeshSelection(null);
+            setWorkspace('studio');
+            setRestEditing(false);
+            setView('scene');
+            setPlaying(false);
+          }}
+        />
+      )}
       {exchangeOpen && (
         <SceneExchange
           key={p.id}
