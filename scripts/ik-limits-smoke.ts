@@ -356,7 +356,7 @@ try {
     projectId: p.id,
     importedProjectId: restored.project.id,
     jobId: job?.id,
-    media: media ? 'verified' : 'not run (--no-media); FFmpeg environment requires repair',
+    media: media ? 'verified' : 'not run (--no-media)',
     browser: browser.version(),
     format: p.schemaVersion,
     frames: 48,

@@ -1,6 +1,7 @@
 import { Matrix4, Vector3 } from 'three';
 import type { Entity, Geometry, Project, Skin, Vec3, VertexInfluences } from './model';
 import { sceneEvaluator } from './constraints';
+import { restWorld } from './rest-pose';
 export { transformMatrix } from './constraints';
 
 /** Ordinary intermediate parents and invisible joints participate in evaluation. */
@@ -35,7 +36,7 @@ export function bindSkin(
   if (e.kind !== 'mesh') throw new Error('只能绑定网格对象');
   if (new Set(joints).size !== joints.length || !joints.length)
     throw new Error('请选择不重复的关节');
-  const world = worldMatrices(p, e.sceneId),
+  const world = restWorld(p, e.sceneId),
     meshWorld = world.get(e.id)!;
   const inverseBindMatrices = joints.map((id) => {
     const matrix = world.get(id);

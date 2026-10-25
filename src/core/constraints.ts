@@ -19,7 +19,11 @@ export const activeIK = (chains: IKChain[] = [], tracks: IKTrack[] = []) =>
 export function drivenEntities(p: Project, sceneId?: string) {
   return new Set([
     ...p.entities
-      .filter((e) => (!sceneId || e.sceneId === sceneId) && activeConstraints(e).length)
+      .filter(
+        (e) =>
+          (!sceneId || e.sceneId === sceneId) &&
+          (activeConstraints(e).length || e.restPose?.enabled),
+      )
       .map((e) => e.id),
     ...activeIK(p.ikChains, p.ikTracks)
       .filter((c) => !sceneId || c.sceneId === sceneId)
@@ -156,6 +160,14 @@ export function transformMatrix(t: Entity['transform']) {
   );
 }
 
+/** Preserve authored channel coordinates while editing their rest basis. */
+export function restDelta(e: Entity) {
+  if (!e.restPose?.enabled) return new Matrix4();
+  const reference = transformMatrix(e.restPose.reference);
+  if (Math.abs(reference.determinant()) < 1e-12) throw new Error('基础姿态的频道参考不可逆');
+  return transformMatrix(e.restPose.transform).multiply(reference.invert());
+}
+
 const axes = { x: new Vector3(1, 0, 0), y: new Vector3(0, 1, 0), z: new Vector3(0, 0, 1) };
 function projectedUp(forward: Vector3, up: Vector3) {
   const projected = up.clone().addScaledVector(forward, -up.dot(forward));
@@ -231,6 +243,9 @@ export function sceneEvaluator(p: Project, sceneId: string) {
     p.ikTracks,
   );
   const driven = drivenEntities(p, sceneId);
+  const restMatrices = new Map(
+    entities.filter((e) => e.restPose?.enabled).map((e) => [e.id, restDelta(e)]),
+  );
   return (frame?: number, actionId?: string | null, layers = true) => {
     const local = new Map<string, Matrix4>(),
       world = new Map<string, Matrix4>();
@@ -252,6 +267,7 @@ export function sceneEvaluator(p: Project, sceneId: string) {
         let matrix = transformMatrix(
           frame === undefined ? e.transform : evaluatedTransform(p, e, frame, actionId, layers),
         );
+        if (e.restPose?.enabled) matrix.premultiply(restMatrices.get(e.id)!);
         for (const c of activeConstraints(e)) {
           try {
             const worldSpace = c.type === 'aim' || c.ownerSpace === 'world';

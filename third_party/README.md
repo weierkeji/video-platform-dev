@@ -47,3 +47,5 @@ glTF 解析/序列化由本仓库按公开格式独立实现；Three.js 负责�
 0.15 没有新增依赖或修改第三方源码。参考姿态限角、摆动/扭转投影、可行初值、有限线搜索及 UI 为独立实现；CCD 是公开算法，参照 Ben Kenwright《Inverse Kinematics – Cyclic Coordinate Descent (CCD)》（Journal of Graphics Tools 16(4)，DOI 10.1080/2165347X.2013.823362），不归为本项目发明，未复制其求解源码。Blender 4.5 文档仅提供行为依据；Three.js 仍提供数学/渲染。limited-reach 复用自有雕塑/权重，合法姿态与目标曲线由本仓库编写，无外部素材或模型调用。
 
 0.16 没有新增依赖或修改第三方源码。单值 IK 轨道、动作/层路由、依赖激活、编辑命令与烘焙事件为本仓库实现，复用已有自主 Bézier/Hermite 曲线计算。Blender 4.5 约束/IK/曲线文档仅作行为参照；不是对其内部求解语义的复制。control-transition 的参数曲线与层由本仓库编写，沿用原创雕塑/权重/摄影机；无外部素材或模型调用。Three.js 数学、渲染、独立 GLTFLoader 检查和 gltf-validator 仍明确属于第三方。
+
+0.17 没有新增依赖或修改第三方源码。基础姿态/固定频道参考、绑定补偿、编辑命令与 UI 为自主实现；补偿关系来自通用矩阵代数与 Khronos 公开线性蒙皮公式，不归为本项目发明。Blender 4.5 骨架编辑/摆姿说明仅作行为参照，未复制其内部实现。Three.js 提供基础数学/渲染，GLTFLoader/AnimationMixer 与 gltf-validator 用于独立读取/检查。rest-sculpture 沿用原创分段柱体/权重，自行编写基础姿态和摄影机约束；无外部素材、角色或模型生成。

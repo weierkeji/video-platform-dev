@@ -6,7 +6,7 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 
 | 模块 | 职责 |
 | --- | --- |
-| `src/core/model.ts` | v15 模型、v1–v14 迁移、引用/层级/绑定/权重/时间轴/动作约束、工作流拓扑检查 |
+| `src/core/model.ts` | v16 模型、v1–v15 迁移、引用/层级/绑定/权重/时间轴/动作约束、工作流拓扑检查 |
 | `src/core/generation.ts` | 生成参数、模型系列限制、不可变请求规格 |
 | `src/core/commands.ts` | 有限结构化命令，复制状态、整批应用并校验 |
 | `src/core/geometry.ts` | 自主基本几何、共享边中点细分、三角面法向挤出、OBJ 交换 |
@@ -16,6 +16,7 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 | `src/core/evaluate.ts` | 组合变换动画、片段激活区间与源帧映射 |
 | `src/core/layers.ts` | 对象动作层、通道过滤、有序替换/基础姿态增量、权重包络与层源时间 |
 | `src/core/bake.ts` / `ui/bake.worker.ts` | 采样区间、映射边界、Float32 时间、误差探测、新动作结果；GUI 可取消计算 |
+| `src/core/rest-pose.ts` / `ui/RestPosePanel.tsx` | 独立基础视图、固定频道参考、绑定补偿、复制/重置与专用字段/手柄 |
 | `src/core/skin.ts` / `ui/SkinPanel.tsx` | 基础姿态绑定、权重归一化、世界变形、绑定与组件权重 UI |
 | `src/core/affine.ts` / `joint-limits.ts` / `ik-limited.ts` | 共用 QR 仿射分解、参考姿态摆动/扭转投影、受限 CCD 与停止诊断 |
 | `src/core/ik.ts` / `ui/IKPanel.tsx` | IK 链路径、双段几何解、多段 FABRIK、极向控制、世界姿态反算与编辑 UI |
@@ -50,8 +51,18 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 - 几何：本地顶点/三角面，v5 允许无面、孤立顶点及空网格。边是三角面的规范化索引对；没有独立线段或多边形数据。修改几何后，预览和导出读取相同数据。线性四分三角形不是平滑曲面细分。
 - 素材：SHA-256 内容寻址，ffprobe 读取真实流信息；便携包 base64 嵌入素材并校验哈希。没有压缩包或缺失媒体重定位流程。
 - 画幅：Clip.fit 为 contain/cover/stretch。默认 contain 保持完整画面、空白处显示低轨；cover 居中裁切源画面；stretch 拉伸。预览和导出共用矩形计算。
-- 数据版本：schemaVersion=15；显式拒绝未知格式。v1 在副本上升级，每个旧片段设为 stretch，保留音量；v2–v14 保留已有设置。v1–v3 关键帧按轨道内原时间派生 `legacy-key-<frame>`，在历史/任务快照间保持一致；v4 及以上的键 ID 原样保留。v6–v15 新字段均可选；v11→v12→v13→v14→v15 修改格式号，并沿用机器精度绑定矩阵末行规范化。新关键帧为 UUID，ID 在轨道内唯一；完整身份是 `(trackId,keyId)`。复制动作创建新轨道/键 ID。不改原项目文件。数据库启动时先校验全部待迁移数据，`VACUUM INTO` 备份完整库，再在事务内升级项目、撤销历史、版本与任务快照，并写入 `schema_migrations` 的版本、备份名和计数；不增加用户编辑修订。夹具覆盖升级、原库备份和历史恢复。
+- 数据版本：schemaVersion=16；显式拒绝未知格式。v1 在副本上升级，每个旧片段设为 stretch，保留音量；v2–v15 保留已有设置。v1–v3 关键帧按轨道内原时间派生 `legacy-key-<frame>`，在历史/任务快照间保持一致；v4 及以上的键 ID 原样保留。v6–v16 新字段均可选；v11→v12→v13→v14→v15→v16 修改格式号，并沿用机器精度绑定矩阵末行规范化。新关键帧为 UUID，ID 在轨道内唯一；完整身份是 `(trackId,keyId)`。复制动作创建新轨道/键 ID。不改原项目文件。数据库启动时先校验全部待迁移数据，`VACUUM INTO` 备份完整库，再在事务内升级项目、撤销历史、版本与任务快照，并写入 `schema_migrations` 的版本、备份名和计数；不增加用户编辑修订。夹具覆盖升级、原库备份和历史恢复。
 - 生成：工作流节点保存参数和首尾帧 Asset ID，通过统一命令编辑并验证引用；被引用图片不可删除。提交时保存解析后的 GenerationRequest、Project 快照、工作流/输出节点和 requestKey；后续编辑不影响已提交请求。
+
+## 基础姿态编辑（0.17）
+
+v16 的 Entity.restPose 包含 enabled、transform（R）与 reference（B）。首次编辑 B 取原 Entity.transform，此后保持；R 可修改。动画/层仍按原频道计算 A，局部矩阵为 R × inverse(B) × A，随后普通约束与 IK；旧项目没有 restPose 时行为不变。R/B 必须可逆，数值有限、四元数归一。该模型是本平台的固定参考语义，不是 Blender 内部骨架模型的复制。
+
+restProject 生成只供读取的基础视图：使用 R 或无偏移时的原 transform，清空动画/层并禁用约束/IK。skin.bind 也使用此视图，新绑定不再包含约束或静态 IK；已存绑定不自动重算。rig.rest.update/reset/capture 接受同场景骨架成员与祖先，走统一命令/历史。选择补偿时，所有受影响蒙皮逐关节使用 inverse(JnewRestWorld) × JoldRestWorld × oldInverseBind；保留每个线性加权贡献、原几何与权重，支持共享关节和反射/非均匀父级。不补偿时保留绑定。只保证基础视图外形，普通附件及其它动画时刻可变。
+
+capture 使用当前场景默认动作、完整层/约束/IK 的最终局部 TRS，任何求解诊断或局部剪切均拒绝；只是把局部变换复制为新 R，不清除曲线、不固化网格，也不改变限角参考。reset 删除基础偏移，可继续补偿绑定。临时基础视口停止播放，用专用字段/手柄写入 R；一次拖动一次事务、Escape 取消。普通姿态手柄对启用偏移的对象隐藏，原频道数值/曲线编辑仍可用；输出始终正常求值。
+
+启用偏移的对象属于完整 TRS 烘焙目标。激活烘焙动作禁用偏移但保留 R/B 源数据；临时 GLB 项目同样禁用，避免重复偏移。原始动画 GLB 无法表达独立参考而拒绝并引导烘焙；静态输出固化最终姿态。矩阵求值保留剪切，但 TRS 采样输出仍明确拒绝不可表达的局部矩阵。无完整骨骼 roll/镜像/自动 FK-IK 匹配/重定向，也无大型骨架性能保证。
 
 ## IK 参数动画（0.16）
 

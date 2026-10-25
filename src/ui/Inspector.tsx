@@ -342,6 +342,11 @@ export function Inspector({
           显示对象
         </label>
         <h3>变换</h3>
+        {e.restPose?.enabled && (
+          <p className="muted">
+            这里编辑固定参考下的动画频道。基础姿态偏移在频道求值后应用；使用“基础姿态”调整骨架基础及绑定外形。
+          </p>
+        )}
         {p.animationLayers?.some((l) => l.entityId === e.id) && (
           <p className="muted">
             这里编辑场景动作的原始变换；混合结果见预览。关闭“预览动作层”可用空间手柄编辑源动作。

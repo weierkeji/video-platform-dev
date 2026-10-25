@@ -38,6 +38,7 @@ import { ikPath, suggestedPole } from './ik';
 import { sceneEvaluator } from './constraints';
 import { affineParts } from './affine';
 import { activeIKTracks } from './ik-animation';
+import { updateRestPose, captureRestPose, resetRestPose } from './rest-pose';
 import { deleteElements, extrudeRegion, mergeVertices, transformVertices } from './mesh';
 
 const ID = z.string().min(1).max(80);
@@ -180,6 +181,31 @@ export const CommandSchema = z.discriminatedUnion('type', [
     })
     .strict(),
   z.object({ type: z.literal('skin.unbind'), entityId: ID }).strict(),
+  z
+    .object({
+      type: z.literal('rig.rest.update'),
+      updates: z
+        .array(z.object({ entityId: ID, transform: TransformSchema }).strict())
+        .min(1)
+        .max(2000),
+      preserveShape: z.boolean(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('rig.rest.capture'),
+      entityIds: z.array(ID).min(1).max(2000),
+      frame: z.number().finite().min(0).max(1e6),
+      preserveShape: z.boolean(),
+    })
+    .strict(),
+  z
+    .object({
+      type: z.literal('rig.rest.reset'),
+      entityIds: z.array(ID).min(1).max(2000),
+      preserveShape: z.boolean(),
+    })
+    .strict(),
   z
     .object({
       type: z.literal('skin.weights'),
@@ -408,8 +434,10 @@ function apply(p: Project, c: Command) {
         for (const layer of p.animationLayers || [])
           if (targets.has(layer.entityId)) layer.enabled = false;
         for (const entity of p.entities)
-          if (targets.has(entity.id))
+          if (targets.has(entity.id)) {
             for (const constraint of entity.constraints || []) constraint.enabled = false;
+            if (entity.restPose) entity.restPose.enabled = false;
+          }
         for (const chain of p.ikChains || [])
           if (chain.sceneId === c.action.sceneId) chain.enabled = false;
       }
@@ -582,6 +610,15 @@ function apply(p: Project, c: Command) {
     }
     case 'entity.update':
       Object.assign(get(p.entities, c.id), c.patch);
+      break;
+    case 'rig.rest.update':
+      updateRestPose(p, c.updates, c.preserveShape);
+      break;
+    case 'rig.rest.capture':
+      captureRestPose(p, c.entityIds, c.frame, c.preserveShape);
+      break;
+    case 'rig.rest.reset':
+      resetRestPose(p, c.entityIds, c.preserveShape);
       break;
     case 'entity.delete': {
       get(p.entities, c.id);

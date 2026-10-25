@@ -3,7 +3,7 @@ import { GenerationOptionsSchema, GenerationRequestSchema } from './generation';
 import { validateTrack } from './animation';
 import { dependencyOrder } from './constraints';
 
-export const PROJECT_VERSION = 15;
+export const PROJECT_VERSION = 16;
 
 export const id = () => crypto.randomUUID();
 const ID = z
@@ -246,6 +246,13 @@ export const IKChainSchema = z
   })
   .strict();
 export type IKChain = z.infer<typeof IKChainSchema>;
+export const RestPoseSchema = z
+  .object({
+    enabled: z.boolean(),
+    transform: TransformSchema,
+    reference: TransformSchema,
+  })
+  .strict();
 export const EntitySchema = z
   .object({
     id: ID,
@@ -254,6 +261,7 @@ export const EntitySchema = z
     parentId: ID.nullable(),
     kind: z.enum(['mesh', 'camera', 'light', 'group']),
     transform: TransformSchema,
+    restPose: RestPoseSchema.optional(),
     visible: z.boolean(),
     geometryId: ID.optional(),
     materialId: ID.optional(),
@@ -649,6 +657,13 @@ export function parseProject(input: unknown): Project {
     if (e.transform.scale.some((v) => Math.abs(v) < 0.00001)) throw new Error('缩放不能为零');
     if (e.transform.quaternion && Math.abs(Math.hypot(...e.transform.quaternion) - 1) > 0.001)
       throw new Error('对象四元数必须归一化');
+    for (const t of e.restPose ? [e.restPose.transform, e.restPose.reference] : []) {
+      if (t.scale.some((v) => Math.abs(v) < 0.00001)) throw new Error('基础姿态和参考缩放不能为零');
+      if (Math.abs(t.scale.reduce((a, b) => a * b, 1)) < 1e-12)
+        throw new Error('基础姿态和参考变换不可逆');
+      if (t.quaternion && Math.abs(Math.hypot(...t.quaternion) - 1) > 0.001)
+        throw new Error('基础姿态和参考四元数必须归一化');
+    }
     const ancestors = new Set([e.id]);
     let parentId = e.parentId;
     while (parentId) {
@@ -807,7 +822,7 @@ export function migrateProject(input: unknown) {
     typeof input !== 'object' ||
     !input ||
     !('schemaVersion' in input) ||
-    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, PROJECT_VERSION].includes(
+    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, PROJECT_VERSION].includes(
       Number(input.schemaVersion),
     ) ||
     typeof input.schemaVersion !== 'number'

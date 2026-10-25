@@ -1,8 +1,32 @@
 # 持续开发恢复记录
 
-更新时间：2026-10-25。用户附件要求的完整 Blender + LibTV 功能目标保持 active；此处是 0.16 基础版本检查点，不是目标完成声明。下方旧版本段落仅保留历史证据。
+更新时间：2026-10-25。用户附件要求的完整 Blender + LibTV 功能目标保持 active；此处是 0.17 基础版本检查点，不是目标完成声明。下方旧版本段落仅保留历史证据。
 
-## 0.16 最新恢复入口
+## 0.17 最新恢复入口
+
+0.16 已提交并推送 db6a989。本轮 0.17 新增独立基础姿态、固定频道参考、可选蒙皮外形补偿、复制/重置与专用编辑视图/手柄，格式 v16。实际 HEAD/origin/main 以 Git 核查为准。完整目标仍 active，没有新依赖、第三方源码修改、Blender/bpy 调用或外部生成。Blender 4.5 骨架编辑/摆姿文档仅作行为参照，Khronos 蒙皮公式与通用矩阵运算作为独立规格依据；REA 沿用已核对的 6.7.0。
+
+Entity.restPose 保存 enabled、transform（R）、reference（B）；首次编辑 B 取原 Entity.transform，此后固定。既有曲线/动作层仍求频道 A，局部矩阵按 R×inverse(B)×A，再经过普通约束/IK。保留原键、权重、共享几何；R/B 必须可逆且四元数归一。restProject/restWorld 排除动画、层、约束与 IK，使用 R 或无偏移时的原 transform。新 skin.bind 也使用此独立基础，旧保存绑定不自动重算。
+
+rig.rest.update/reset/capture 通过统一命令批次与历史。节点限同场景骨架成员/祖先；补偿所有受影响蒙皮的绑定为 inverse(JnewRestWorld)×JoldRestWorld×oldInverseBind，支持多个网格共用关节及非均匀/反射父级。只保证基础视图外形；不补偿则让网格随新基础变化。capture 复制当前场景默认动作、完整层/约束/IK 的局部 TRS，任何求解诊断或局部剪切均拒绝；不会清除动画、固化几何或重记限角参考，运动偏移会再次叠加。reset 删除偏移，可继续保形。
+
+工具栏“基础姿态”停止播放并展示独立基础，字段与真实手柄修改 R，一次拖动一次事务、Escape 取消；复制/重置可包含骨架子节点。原频道属性/曲线仍可编辑；有基础偏移的普通姿态手柄隐藏。PNG、GLB 和 MP4 保持正常求值，界面明确区分。烘焙把启用偏移对象列入完整 TRS，激活新动作/临时 GLB 副本停用偏移防止重复，R/B 源数据保留。原始动画 GLB 拒绝无法表达的独立参考并引导烘焙；静态输出保存最终姿态。
+
+**运行依据**：新增 7 项、全套 114/114 核心检查通过。多蒙皮/反射非均匀父级、位置/法线/切线保形、原几何/权重/曲线不变、固定参考与 IK/跟随求值、剪切/奇异拒绝、实际 SQLite 重启和撤销恢复、独立 GLTFLoader/AnimationMixer 摄影机/全部三角顶点对照均通过。类型与正式构建通过：152 模块、主包 1048.18 KB / gzip 298.22 KB、worker 122.27 KB；仍有包体积提示。开发/正式入口完整 smoke:rest-pose 均通过实际字段/手柄、补偿开关、复制/重置、保存/重载/项目包、烘焙与静态/动画 GLB 重导入、固定快照影片。
+
+正式时间 2026-10-25T07:36:32.978Z，Chrome 155.0.8059.82、软件 WebGL、无 pageerror。动画/静态 GLB 均 0 错误、0 警告，分别 1/2 个空节点信息；六帧 PNG 平均通道差 0…0.000745885/255，静态 0.000565844/255。新 MP4 为 H.264 480×270、48 帧、24 FPS、2 秒、无音轨；四个检查帧与 PNG 差 0.397986…0.415278/255，提交后修改基础姿态不影响快照。已查看真实面板与源画面。
+
+**媒体环境最新事实**：同一路径 Gyan FFmpeg/ffprobe 9.0.2 已可执行，原因未确认；本轮没有修改系统策略或替换二进制。此前 0.15/0.16 代码完整性失败记录保持原状。除新单元完整影片外，已在 0.17 正式入口补跑 smoke:ik-limits 和 smoke:ik-animation，两者包括固定快照 MP4 全通过，无 pageerror，GLB 仍 0 错误/0 警告。新证据 research/2026-10-25-media-recheck.json、*-v17-ik-limits-runtime.json、*-v17-ik-animation-runtime.json；limited-reach.mp4 和 control-transition.mp4 已补入 examples。没有重跑全部历史媒体脚本，不把本地协议夹具等同真实供应商生成。Seedance 仍缺凭据/预算。
+
+**数据保护**：真实 v15→v16 的 152 项目、895 撤销历史、1229 版本、93 任务快照仅格式号变化，历史游标不变，绑定余差规范化 0 项。备份 before-schema-v16-1792912985646.sqlite；research/2026-10-25-v16-migration.json，本机只读脚本 .local/checks/audit-v16.mjs。保护 .local/data，不能清理旧项目/历史/产物。
+
+研究 research/2026-10-25-rest-pose.md；开发/正式 *-rest-pose-dev-runtime.json / *-rest-pose-runtime.json。可打开 examples/rest-sculpture.ffstudio/.glb/.mp4、rest-pose.glb；源 Rest editing 场景保留 R/B、补偿绑定和原曲线，另含 GLB 重导入场景。scripts/rest-pose-fixture.ts 使用原创分段柱体/权重，新基础与摄影机约束自主编写，无外部素材。
+
+**下一项**：FK/IK 姿态匹配，先研究显式保持当前帧姿态时的目标/极向放置、退化、基础偏移和限角输入、记键及事务，再实现双向匹配；随后重定向。不把影响曲线或基础姿态复制当作自动匹配。尚无完整骨骼 roll/镜像/专业绑定、普通约束与限角参数动画、刚度/阻尼、伸长、末端旋转、共享链、权重绘制或 GPU 性能证据。完整建模/UV/材质/仿真/合成/媒体/AI 范围继续保留。
+
+启动 npm.cmd run dev，或 npm.cmd run build 后 npm.cmd start；后端变更需重启。检查服务已停止，4173 无监听，只余 Codex 自身 Node PID 11844，没有结束其它进程。按既有授权提交/推送；恢复先读本节、附件与实际 Git 状态，不重开项目，不将增量单元标为整个目标完成。
+
+## 0.16 历史恢复记录
 
 0.15 已提交并推送 36f39e8。本轮 0.16 新增 IK 影响/极向角单值动画、动作/层/镜头路由、保守激活依赖、烘焙事件和编辑 UI，格式 v15。实际 HEAD/origin/main 以 Git 核查为准。完整 Blender + LibTV 目标仍 active；没有新依赖、第三方源码修改、Blender/bpy 调用或外部生成。Blender 4.5 约束/IK/曲线文档仅作行为参照；沿用已记录 REA 6.7.0，没有新增分析引擎。
 

@@ -39,7 +39,7 @@ export function SkinPanel({
         </>
       ) : (
         <p className="muted">
-          先添加关节并设置父子层级。绑定使用对象基础姿态，动画曲线不作为绑定姿态。
+          先添加关节并设置父子层级。绑定使用基础姿态，不包含动画、动作层、约束或 IK。
         </p>
       )}
       <div className="skin-joints" aria-label="绑定关节选择">

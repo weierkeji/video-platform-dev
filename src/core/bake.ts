@@ -404,8 +404,12 @@ export function bakedProject(p: Project, sceneId: string, options: BakeOptions) 
     project: {
       ...p,
       entities: p.entities.map((e) =>
-        targets.has(e.id) && e.constraints
-          ? { ...e, constraints: e.constraints.map((c) => ({ ...c, enabled: false })) }
+        targets.has(e.id)
+          ? {
+              ...e,
+              constraints: e.constraints?.map((c) => ({ ...c, enabled: false })),
+              restPose: e.restPose ? { ...e.restPose, enabled: false } : undefined,
+            }
           : e,
       ),
       ikChains: p.ikChains?.map((chain) =>

@@ -16,6 +16,8 @@ export type ViewportProps = {
   frame: number;
   playing: boolean;
   layersPreview: boolean;
+  restEditing: boolean;
+  restEditable: boolean;
   selected: string | null;
   select: (id: string) => void;
   mode: 'translate' | 'rotate' | 'scale';
@@ -78,6 +80,7 @@ export function Viewport(props: ViewportProps) {
         revision: number;
         frame: number;
         layersPreview: boolean;
+        restEditing: boolean;
         selection: MeshSelection | null;
         world: THREE.Matrix4;
         start: THREE.Matrix4;
@@ -112,6 +115,7 @@ export function Viewport(props: ViewportProps) {
             revision: p.project.revision,
             frame: p.frame,
             layersPreview: p.layersPreview,
+            restEditing: p.restEditing,
             selection: p.meshSelection,
             world: overlay?.mesh.matrixWorld.clone() || new THREE.Matrix4(),
             start: proxy.matrixWorld.clone(),
@@ -128,6 +132,7 @@ export function Viewport(props: ViewportProps) {
             p.project.revision === pending.revision &&
             p.frame === pending.frame &&
             p.layersPreview === pending.layersPreview &&
+            p.restEditing === pending.restEditing &&
             p.meshSelection === pending.selection;
           if (pending.geometry && overlay) {
             overlay.preview(pending.geometry.positions, true);
@@ -368,6 +373,7 @@ export function Viewport(props: ViewportProps) {
           (p.project.revision !== drag.revision ||
             p.frame !== drag.frame ||
             p.layersPreview !== drag.layersPreview ||
+            p.restEditing !== drag.restEditing ||
             p.meshSelection !== drag.selection ||
             p.playing)
         )
@@ -379,20 +385,25 @@ export function Viewport(props: ViewportProps) {
           proxy.scale.set(1, 1, 1);
           proxy.updateMatrixWorld(true);
         }
-        const target = p.meshSelection
-          ? overlay?.vertices.length && Math.abs(overlay.mesh.matrixWorld.determinant()) > 1e-12
-            ? proxy
-            : undefined
-          : activeIK(p.project.ikChains, p.project.ikTracks).some((chain) =>
-                chain.joints.includes(p.selected || ''),
-              ) ||
-              p.project.entities.some(
-                (e) => e.id === p.selected && (e.skin || activeConstraints(e).length),
-              ) ||
-              (p.layersPreview &&
-                p.project.animationLayers?.some((l) => l.entityId === p.selected && l.enabled))
+        const target =
+          p.restEditing && !p.restEditable
             ? undefined
-            : selected;
+            : p.meshSelection
+              ? overlay?.vertices.length && Math.abs(overlay.mesh.matrixWorld.determinant()) > 1e-12
+                ? proxy
+                : undefined
+              : activeIK(p.project.ikChains, p.project.ikTracks).some((chain) =>
+                    chain.joints.includes(p.selected || ''),
+                  ) ||
+                  p.project.entities.some(
+                    (e) =>
+                      e.id === p.selected &&
+                      (e.skin || e.restPose?.enabled || activeConstraints(e).length),
+                  ) ||
+                  (p.layersPreview &&
+                    p.project.animationLayers?.some((l) => l.entityId === p.selected && l.enabled))
+                ? undefined
+                : selected;
         if (target && gizmo.object !== target) gizmo.attach(target);
         else if (!target) gizmo.detach();
         gizmo.enabled =
@@ -493,6 +504,7 @@ export function Viewport(props: ViewportProps) {
         ref={canvas}
         tabIndex={0}
         data-mesh-mode={props.meshSelection?.mode || 'object'}
+        data-rest-pose={props.restEditing ? 'true' : 'false'}
         aria-label={props.view === 'scene' ? '三维编辑视图' : '成片预览'}
       />
       {box && (
@@ -502,7 +514,11 @@ export function Viewport(props: ViewportProps) {
         />
       )}
       <div className="viewport-tag">
-        {props.view === 'scene' ? '透视视图 · 米 · Y 向上' : '成片预览 · 与后台共用逐帧渲染'}
+        {props.restEditing
+          ? '基础姿态 · 不随动画帧变化 · 导出仍使用动画'
+          : props.view === 'scene'
+            ? '透视视图 · 米 · Y 向上'
+            : '成片预览 · 与后台共用逐帧渲染'}
         <span>
           {props.project.entities.length} 对象 · 帧 {props.frame}
         </span>
@@ -535,6 +551,7 @@ export function Viewport(props: ViewportProps) {
             </>
           )}
           <button
+            disabled={props.restEditing}
             onClick={() => {
               const cam = camera.current;
               if (cam)

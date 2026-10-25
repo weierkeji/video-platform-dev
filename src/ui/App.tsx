@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { applyCommands, type Command } from '../core/commands';
 import { evaluatedBaseTransform } from '../core/evaluate';
 import { activeTracks, rotationProperty, quaternionFromEuler } from '../core/animation';
@@ -22,6 +22,8 @@ import { MeshPanel } from './MeshPanel';
 import { convertSelection, sameTopology, type MeshMode, type MeshSelection } from '../core/mesh';
 import { WorkflowPanel } from './WorkflowPanel';
 import { SceneExchange } from './SceneExchange';
+import { restProject, rigNodes } from '../core/rest-pose';
+import { RestPosePanel } from './RestPosePanel';
 
 type Envelope = { project: Project; canUndo: boolean; canRedo: boolean };
 type Summary = { id: string; name: string; revision: number };
@@ -51,6 +53,8 @@ export function App() {
     [frame, setFrame] = useState(0),
     [playing, setPlaying] = useState(false),
     [layersPreview, setLayersPreview] = useState(true);
+  const [restEditing, setRestEditing] = useState(false),
+    [preserveRestShape, setPreserveRestShape] = useState(true);
   const [mode, setMode] = useState<'translate' | 'rotate' | 'scale'>('translate'),
     [view, setView] = useState<'scene' | 'sequence'>('scene'),
     [workspace, setWorkspace] = useState<'studio' | 'curves' | 'workflow'>('studio'),
@@ -74,6 +78,7 @@ export function App() {
     objInput = useRef<HTMLInputElement>(null);
   const accept = useCallback((next: Envelope) => {
     const previous = projectRef.current;
+    if (previous?.id !== next.project.id) setRestEditing(false);
     setMeshSelection((selection) => {
       if (!selection || previous?.id !== next.project.id) return null;
       const old = previous.geometries.find((g) => g.id === selection.geometryId),
@@ -368,6 +373,7 @@ export function App() {
     setSelectedKey(null);
   };
   const selectClip = (id: string) => {
+    setRestEditing(false);
     const project = projectRef.current,
       selectedClip = project?.timeline.clips.find((c) => c.id === id),
       shot =
@@ -412,6 +418,7 @@ export function App() {
     }
   };
   const meshMode = (mode: MeshMode | 'object') => {
+    setRestEditing(false);
     if (mode === 'object') {
       setMeshSelection(null);
       return;
@@ -495,6 +502,11 @@ export function App() {
       fail(e);
     }
   };
+  const restActive = restEditing && view === 'scene' && workspace === 'studio';
+  const displayedProject = useMemo(
+    () => (envelope && restActive ? restProject(envelope.project) : envelope?.project),
+    [envelope, restActive],
+  );
   if (!envelope)
     return (
       <main className="loading">
@@ -513,7 +525,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.16</small>
+            FRAMEFORGE<small>创作工作台 · 0.17</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -863,18 +875,36 @@ export function App() {
                       type="checkbox"
                       aria-label="预览动作层"
                       checked={layersPreview}
+                      disabled={restActive}
                       onChange={(event) => setLayersPreview(event.target.checked)}
                     />
                     预览动作层
                   </label>
                 )}
+                {view === 'scene' && (
+                  <button
+                    className={restActive ? 'active' : ''}
+                    aria-pressed={restActive}
+                    onClick={() => {
+                      setRestEditing(!restActive);
+                      setMeshSelection(null);
+                      setPlaying(false);
+                    }}
+                  >
+                    基础姿态
+                  </button>
+                )}
                 <span className="spacer" />
-                <button onClick={() => void png()}>导出当前帧 PNG</button>
+                <button onClick={() => void png()}>
+                  {restActive ? '导出成片帧 PNG' : '导出当前帧 PNG'}
+                </button>
               </div>
               <Viewport
                 key={view}
                 layersPreview={layersPreview}
-                project={p}
+                project={displayedProject!}
+                restEditing={restActive}
+                restEditable={!!e && rigNodes(p, sceneId).has(e.id)}
                 sceneId={sceneId}
                 frame={frame}
                 playing={playing}
@@ -882,7 +912,21 @@ export function App() {
                 select={select}
                 mode={mode}
                 view={view}
-                onTransform={transform}
+                onTransform={
+                  restActive
+                    ? (entityId, transform) =>
+                        void send(
+                          [
+                            {
+                              type: 'rig.rest.update',
+                              updates: [{ entityId, transform }],
+                              preserveShape: preserveRestShape,
+                            },
+                          ],
+                          '手柄编辑基础姿态',
+                        )
+                    : transform
+                }
                 meshSelection={meshSelection}
                 meshXray={meshXray}
                 onMeshXray={setMeshXray}
@@ -933,7 +977,16 @@ export function App() {
         </section>
         <aside className="inspector">
           <fieldset disabled={busy}>
-            {meshSelection && workspace === 'studio' && view === 'scene' ? (
+            {restActive ? (
+              <RestPosePanel
+                project={p}
+                entity={e}
+                frame={frame}
+                preserveShape={preserveRestShape}
+                setPreserveShape={setPreserveRestShape}
+                send={(c, l) => void send(c, l)}
+              />
+            ) : meshSelection && workspace === 'studio' && view === 'scene' ? (
               <MeshPanel
                 project={p}
                 geometry={p.geometries.find((g) => g.id === meshSelection.geometryId)!}

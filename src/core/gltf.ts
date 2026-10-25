@@ -1134,6 +1134,10 @@ export function exportGLB(
       '原始动画 GLB 无法保存 IK；请使用“烘焙动画 GLB”采样链结果，项目包保留可编辑 IK',
     );
   const pose = animated ? undefined : sceneEvaluator(project, sceneId)(frame);
+  if (animated && entities.some((e) => e.restPose?.enabled))
+    throw new Error(
+      '原始动画 GLB 无法保存独立基础姿态；请使用“烘焙动画 GLB”，项目包保留基础姿态和原曲线',
+    );
   if (animated && project.animationLayers?.some((l) => l.enabled && byId.has(l.entityId)))
     throw new Error(
       '原始动画 GLB 不包含动作层；请使用“烘焙动画 GLB”导出混合结果，或禁用层后导出原始动作（动作层烘焙需指定区间）',
@@ -1609,7 +1613,7 @@ export function exportGLB(
   const json: JSONRecord = {
     asset: {
       version: '2.0',
-      generator: 'Frameforge Studio 0.16 scene exchange',
+      generator: 'Frameforge Studio 0.17 scene exchange',
       ...(scene.source?.copyright ? { copyright: scene.source.copyright } : {}),
     },
     scene: 0,

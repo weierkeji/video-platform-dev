@@ -1,0 +1,185 @@
+{
+  "checkedAt": "2026-10-25T07:36:32.978Z",
+  "projectId": "c523cd6a-e6bc-49b7-91ae-ede697167e7b",
+  "importedProjectId": "0d21ef9d-a133-4651-ab9a-47a1e355b5b1",
+  "jobId": "99df4b91-b92b-4c89-871f-8d96e17b077f",
+  "media": "verified",
+  "browser": "155.0.8059.82",
+  "format": 16,
+  "frames": 48,
+  "validator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 1,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/7"
+      }
+    ],
+    "truncated": false
+  },
+  "staticValidator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 2,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/6"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/7"
+      }
+    ],
+    "truncated": false
+  },
+  "staticDifference": 0.0005658436213991769,
+  "measurements": [
+    {
+      "frame": 0,
+      "difference": 0
+    },
+    {
+      "frame": 6.25,
+      "difference": 0.00000257201646090535
+    },
+    {
+      "frame": 12,
+      "difference": 0.00014146090534979423
+    },
+    {
+      "frame": 24,
+      "difference": 0.0007458847736625515
+    },
+    {
+      "frame": 36.5,
+      "difference": 0
+    },
+    {
+      "frame": 47,
+      "difference": 0
+    }
+  ],
+  "videoMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0.3979861111111111
+    },
+    {
+      "frame": 12,
+      "difference": 0.40406121399176953
+    },
+    {
+      "frame": 24,
+      "difference": 0.4140149176954733
+    },
+    {
+      "frame": 47,
+      "difference": 0.4152777777777778
+    }
+  ],
+  "pageErrors": [],
+  "restNodes": [
+    {
+      "id": "a422ab1f-46cc-4927-affd-d958bf709fc7",
+      "name": "Ordinary spacer",
+      "restPose": {
+        "enabled": true,
+        "transform": {
+          "position": [
+            0.2,
+            1.45,
+            -0.1
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "reference": {
+          "position": [
+            0,
+            1.2,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "id": "196b9338-cbf4-44d6-a54d-615fa12a27b9",
+      "name": "Tip joint",
+      "restPose": {
+        "enabled": true,
+        "transform": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0.15,
+            -0.25,
+            0.3
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        },
+        "reference": {
+          "position": [
+            0,
+            0,
+            0
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ]
+        }
+      }
+    }
+  ],
+  "checks": [
+    "rest fields and real world gizmo preserve weighted mesh shape under nonuniform parents",
+    "one drag one transaction; Escape cancels; original geometry weights and curves unchanged",
+    "uncompensated edit changes shape; compensated reset and capture keep rest shape",
+    "undo redo reload portable restore and singular-transform atomic rejection",
+    "bake activation disables rest offsets and constraints, undo restores source",
+    "static and baked GLB validation UI reimport and pixel comparison",
+    "render snapshot unaffected by source rest edit"
+  ]
+}
