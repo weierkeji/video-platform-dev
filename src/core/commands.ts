@@ -32,7 +32,12 @@ import {
 import { extrudeFace, primitive, subdivide, projectUV } from './geometry';
 import { editTrack, normalizeQuaternion, prepareCubic, activeTracks } from './animation';
 import { unwrappedSourceFrame } from './playback';
-import { bakeAnimation, BakeOptionsSchema } from './bake';
+import {
+  bakeAnimation,
+  BakeOptionsSchema,
+  SamplingOptionsSchema,
+  requireBakeTolerance,
+} from './bake';
 import { displayColor } from './surface';
 import { bindSkin, normalizedInfluences } from './skin';
 import { ikPath, suggestedPole } from './ik';
@@ -74,7 +79,7 @@ export const CommandSchema = z.discriminatedUnion('type', [
       type: z.literal('retarget.bake'),
       profileId: ID,
       action: AnimationActionSchema,
-      options: BakeOptionsSchema,
+      options: SamplingOptionsSchema,
       activate: z.boolean(),
     })
     .strict(),
@@ -483,6 +488,7 @@ function apply(p: Project, c: Command) {
     }
     case 'action.bake': {
       const result = bakeAnimation(p, c.action.sceneId, c.options, c.action);
+      requireBakeTolerance(result);
       (p.animationActions ||= []).push(result.action);
       p.animationTracks.push(...result.tracks);
       if (c.activate) {

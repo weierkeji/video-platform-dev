@@ -1,0 +1,288 @@
+{
+  "checkedAt": "2026-10-25T11:34:03.026Z",
+  "projectId": "1536414c-f5f9-4d10-b23c-8484c584e471",
+  "importedProjectId": "f7035a6e-0e5f-42fa-b951-f91c8e605345",
+  "jobId": "ef8f89d8-4fa9-4d68-990d-619cf4b77ab5",
+  "media": "verified",
+  "browser": "155.0.8059.82",
+  "format": 17,
+  "frames": 48,
+  "validator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 4,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/6"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/8"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/9"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/11"
+      }
+    ],
+    "truncated": false
+  },
+  "staticValidator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 4,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/6"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/8"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/9"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/11"
+      }
+    ],
+    "truncated": false
+  },
+  "staticDifference": 0.00001800411522633745,
+  "measurements": [
+    {
+      "frame": 0,
+      "difference": 0
+    },
+    {
+      "frame": 6.25,
+      "difference": 0.00048353909465020576
+    },
+    {
+      "frame": 12,
+      "difference": 0.00029835390946502055
+    },
+    {
+      "frame": 24,
+      "difference": 0
+    },
+    {
+      "frame": 36,
+      "difference": 0.0001440329218106996
+    },
+    {
+      "frame": 36.5,
+      "difference": 0.00010545267489711934
+    },
+    {
+      "frame": 47,
+      "difference": 0.00000257201646090535
+    }
+  ],
+  "videoMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0.3987371399176955
+    },
+    {
+      "frame": 12,
+      "difference": 0.4296553497942387
+    },
+    {
+      "frame": 24,
+      "difference": 0.4224434156378601
+    },
+    {
+      "frame": 36,
+      "difference": 0.4283076131687243
+    },
+    {
+      "frame": 47,
+      "difference": 0.411630658436214
+    }
+  ],
+  "pageErrors": [],
+  "options": {
+    "start": 0,
+    "end": 48,
+    "step": 8,
+    "actionId": null,
+    "interpolation": "linear",
+    "rebase": false,
+    "adaptive": {
+      "position": 0.001,
+      "rotationDegrees": 0.1,
+      "scale": 0.001,
+      "minStep": 0.001
+    }
+  },
+  "stats": {
+    "samples": 128,
+    "tracks": 16,
+    "keys": 2048,
+    "entities": 6,
+    "guardedBoundaries": 2,
+    "probes": 7320,
+    "errors": {
+      "position": 0.0009554473929461182,
+      "rotationDegrees": 0.09755079595634635,
+      "scale": 8.881784197001252e-16
+    },
+    "smoothErrors": {
+      "position": 0.0009554473929461182,
+      "rotationDegrees": 0.09755079595634635,
+      "scale": 8.881784197001252e-16
+    },
+    "boundaryErrors": {
+      "position": 1.1324274851176597e-14,
+      "rotationDegrees": 5.392079525066885e-13,
+      "scale": 2.220446049250313e-16
+    },
+    "maxBoundarySpanFrames": 0.00000286102294921875,
+    "adaptive": {
+      "satisfied": true,
+      "initialSamples": 11,
+      "added": 117,
+      "unresolved": 0,
+      "unchecked": 0,
+      "reasons": [],
+      "unresolvedIntervals": [],
+      "initialSmoothErrors": {
+        "position": 0.11406382558163486,
+        "rotationDegrees": 28.89788481538065,
+        "scale": 8.881784197001252e-16
+      },
+      "maxDepth": 20,
+      "nodeBudget": 2000000
+    },
+    "evaluations": 1348,
+    "nodeEvaluations": 16176,
+    "finalProbes": 3810
+  },
+  "coarseStats": {
+    "samples": 11,
+    "tracks": 16,
+    "keys": 176,
+    "entities": 6,
+    "guardedBoundaries": 2,
+    "probes": 180,
+    "errors": {
+      "position": 0.11406382558163486,
+      "rotationDegrees": 28.89788481538065,
+      "scale": 8.881784197001252e-16
+    },
+    "smoothErrors": {
+      "position": 0.11406382558163486,
+      "rotationDegrees": 28.89788481538065,
+      "scale": 8.881784197001252e-16
+    },
+    "boundaryErrors": {
+      "position": 1.1324274851176597e-14,
+      "rotationDegrees": 5.392079525066885e-13,
+      "scale": 2.220446049250313e-16
+    },
+    "maxBoundarySpanFrames": 0.00000286102294921875,
+    "evaluations": 41,
+    "nodeEvaluations": 492,
+    "finalProbes": 180
+  },
+  "directValidator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 4,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/6"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/8"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/9"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/11"
+      }
+    ],
+    "truncated": false
+  },
+  "sourceMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0
+    },
+    {
+      "frame": 6.25,
+      "difference": 0.003912037037037037
+    },
+    {
+      "frame": 12,
+      "difference": 0
+    },
+    {
+      "frame": 24,
+      "difference": 0
+    },
+    {
+      "frame": 36,
+      "difference": 0
+    },
+    {
+      "frame": 36.5,
+      "difference": 0
+    },
+    {
+      "frame": 47,
+      "difference": 0
+    }
+  ],
+  "sourceActionId": null,
+  "targetActionId": "8e2bbe68-bca3-4106-a0cf-2fcf34514427",
+  "checks": [
+    "actual adaptive fields, precision and non-mutating analysis",
+    "worker cancellation, invalid interval and unresolved save/export/API rejection",
+    "direct adaptive GLB export, saved native clip, undo redo and reload",
+    "source drivers preserved, activation disables duplicates and original curves remain editable",
+    "original versus baked PNG, native animated and static GLB UI reimport",
+    "fixed render snapshot survives later action switch",
+    "portable project retains source, drivers, nonuniform baked action and imported scenes"
+  ]
+}

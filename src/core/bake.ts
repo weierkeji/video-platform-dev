@@ -12,15 +12,15 @@ import {
   activeTracks,
   normalizeQuaternion,
   quaternionFromEuler,
-  sampleTrack,
   scalarZeros,
   validateTrack,
 } from './animation';
 import { evaluatedTransform } from './evaluate';
 import { activeIKTracks } from './ik-animation';
 import { drivenEntities, matrixTransform, sceneEvaluator } from './constraints';
+import { AdaptiveSettingsSchema, sampleAnimationGrid } from './adaptive-sampling';
 
-export const BakeOptionsSchema = z
+export const SamplingOptionsSchema = z
   .object({
     start: z.number().finite().min(0).max(1e6),
     end: z.number().finite().min(0).max(1e6),
@@ -30,6 +30,10 @@ export const BakeOptionsSchema = z
     actionId: z.string().min(1).max(80).nullable(),
   })
   .strict();
+export type SamplingOptions = z.infer<typeof SamplingOptionsSchema>;
+export const BakeOptionsSchema = SamplingOptionsSchema.extend({
+  adaptive: AdaptiveSettingsSchema.optional(),
+});
 export type BakeOptions = z.infer<typeof BakeOptionsSchema>;
 const MAX_SAMPLES = 10000,
   MAX_KEYS = 200000,
@@ -229,6 +233,8 @@ export function bakeAnimation(
   const options = BakeOptionsSchema.parse(input);
   if (options.end - options.start < 1e-6)
     throw new Error('烘焙终点必须大于起点且至少间隔 0.000001 帧');
+  if (options.adaptive && options.adaptive.minStep > options.step)
+    throw new Error('最小采样间隔不能大于初始烘焙步长');
   const scene = p.scenes.find((s) => s.id === sceneId);
   if (!scene || action.sceneId !== sceneId) throw new Error('烘焙场景无效');
   if (
@@ -239,12 +245,7 @@ export function bakeAnimation(
   const { grid, guarded, offset } = samplingGrid(p, sceneId, options);
   const driven = drivenEntities(p, sceneId);
   const tracks: AnimationTrack[] = [];
-  const errors = { position: 0, rotationDegrees: 0, scale: 0 };
-  const smoothErrors = { ...errors },
-    boundaryErrors = { ...errors };
-  let maxBoundarySpanFrames = 0;
-  let probes = 0,
-    entities = 0;
+  let entities = 0;
   const plans: { entity: Entity; scope: Project; created: AnimationTrack[] }[] = [];
   for (const entity of p.entities.filter((e) => e.sceneId === sceneId)) {
     const layers = (p.animationLayers || []).filter(
@@ -317,18 +318,38 @@ export function bakeAnimation(
         : evaluatedTransform(scope, entity, frame, options.actionId),
     );
   };
-  for (const g of grid) {
-    const poses = sample(g.source);
-    plans.forEach(({ created }, index) => {
-      for (const track of created)
-        track.keys.push({
-          id: id(),
-          frame: g.frame,
-          value: value(poses[index], track.property as 'position' | 'quaternion' | 'scale'),
-          interpolation: options.interpolation,
-        });
-    });
-  }
+  if (!plans.length) throw new Error('当前场景和所选动作没有可烘焙的变换动画');
+  const orderedTracks = plans.flatMap((plan) => plan.created);
+  const sampled = sampleAnimationGrid(
+    grid,
+    orderedTracks.map((t) => t.property as 'position' | 'quaternion' | 'scale'),
+    (frame) => {
+      const poses = sample(frame);
+      return plans.flatMap(({ created }, index) =>
+        created.map((track) =>
+          value(poses[index], track.property as 'position' | 'quaternion' | 'scale'),
+        ),
+      );
+    },
+    {
+      fps: p.timeline.fps,
+      offset,
+      interpolation: options.interpolation,
+      nodeCost: hasConstraints ? p.entities.filter((e) => e.sceneId === sceneId).length : entities,
+      entities,
+      maxSamples: Math.min(MAX_SAMPLES, Math.floor(MAX_KEYS / orderedTracks.length)),
+      adaptive: options.adaptive,
+    },
+  );
+  for (const point of sampled.points)
+    orderedTracks.forEach((track, i) =>
+      track.keys.push({
+        id: id(),
+        frame: point.frame,
+        value: point.values[i],
+        interpolation: options.interpolation,
+      }),
+    );
   for (const { entity, created } of plans) {
     for (const track of created) {
       AnimationTrackSchema.parse(track);
@@ -341,42 +362,11 @@ export function bakeAnimation(
     }
     tracks.push(...created);
   }
-  for (let i = 0; i < grid.length - 1; i++) {
-    const atBoundary = grid[i].boundaryAfter;
-    const category = atBoundary ? boundaryErrors : smoothErrors;
-    if (atBoundary)
-      maxBoundarySpanFrames = Math.max(maxBoundarySpanFrames, grid[i + 1].frame - grid[i].frame);
-    for (const fraction of [0.25, 0.5, 0.75]) {
-      const frame = grid[i].frame + (grid[i + 1].frame - grid[i].frame) * fraction;
-      const actual = sample(frame + offset);
-      plans.forEach(({ created }, index) => {
-        probes++;
-        for (const track of created) {
-          const channel = track.property as 'position' | 'quaternion' | 'scale';
-          const expected = value(actual[index], channel),
-            sampled = sampleTrack(track, frame)!;
-          if (channel === 'quaternion') {
-            const dot = Math.min(
-              1,
-              Math.abs(expected.reduce((sum, v, j) => sum + v * sampled[j], 0)),
-            );
-            const error = (2 * Math.acos(dot) * 180) / Math.PI;
-            errors.rotationDegrees = Math.max(errors.rotationDegrees, error);
-            category.rotationDegrees = Math.max(category.rotationDegrees, error);
-          } else {
-            const error = Math.max(...expected.map((v, j) => Math.abs(v - sampled[j])));
-            errors[channel] = Math.max(errors[channel], error);
-            category[channel] = Math.max(category[channel], error);
-          }
-        }
-      });
-    }
-  }
-  if (!tracks.length) throw new Error('当前场景和所选动作没有可烘焙的变换动画');
+  const { errors, smoothErrors, boundaryErrors, probes, maxBoundarySpanFrames } = sampled;
   const stats = {
-    samples: grid.length,
+    samples: sampled.points.length,
     tracks: tracks.length,
-    keys: tracks.length * grid.length,
+    keys: tracks.length * sampled.points.length,
     entities,
     guardedBoundaries: guarded,
     probes,
@@ -384,13 +374,42 @@ export function bakeAnimation(
     smoothErrors,
     boundaryErrors,
     maxBoundarySpanFrames,
+    adaptive: sampled.adaptive,
+    evaluations: sampled.evaluations,
+    nodeEvaluations: sampled.nodeEvaluations,
+    finalProbes: sampled.finalProbes,
   };
   const notes = [
-    `烘焙场景帧 ${options.start}…${options.end}，步长 ${options.step}；${grid.length} 个时刻、${tracks.length} 条轨道、${stats.keys} 个键。${options.rebase ? '起点归零。' : '保留场景时间；范围前后保持端点。'}`,
-    `每段 1/4、1/2、3/4 位置共 ${probes} 次探测：最大位置分量差 ${errors.position.toPrecision(4)} 米、旋转差 ${errors.rotationDegrees.toPrecision(4)}°、缩放分量差 ${errors.scale.toPrecision(4)}。这是局部变换探测值，不是全区间误差上界；GLB 数值另有 Float32 量化。`,
+    `烘焙场景帧 ${options.start}…${options.end}，步长 ${options.step}；${stats.samples} 个时刻、${tracks.length} 条轨道、${stats.keys} 个键。${options.rebase ? '起点归零。' : '保留场景时间；范围前后保持端点。'}`,
+    `${options.adaptive ? '每段四分点及两个补充时刻' : '每段 1/4、1/2、3/4 位置'}共 ${probes} 次探测（包括细分前区间），最终已分析段 ${stats.finalProbes} 次：最大位置分量差 ${errors.position.toPrecision(4)} 米、旋转差 ${errors.rotationDegrees.toPrecision(4)}°、缩放分量差 ${errors.scale.toPrecision(4)}。这是局部变换探测值，不是全区间误差上界；GLB 数值另有 Float32 量化。`,
     `边界细分段以外的探测最大差：位置 ${smoothErrors.position.toPrecision(4)} 米、旋转 ${smoothErrors.rotationDegrees.toPrecision(4)}°、缩放 ${smoothErrors.scale.toPrecision(4)}。边界细分段最长 ${maxBoundarySpanFrames.toPrecision(4)} 帧；其中最大差：位置 ${boundaryErrors.position.toPrecision(4)} 米、旋转 ${boundaryErrors.rotationDegrees.toPrecision(4)}°、缩放 ${boundaryErrors.scale.toPrecision(4)}。`,
     `${guarded} 个可能跳变的边界加入 Float32 两侧时刻，并留出源时间浮点运算的舍入间隔。时间按秒量化；边界位置与两侧过渡为近似，不能精确表达瞬时跳变。`,
     '烘焙采样所选基础动作、当前启用的对象层、约束与 IK；保留父子局部变换。无法由 TRS 表达的局部剪切会拒绝烘焙。镜头/片段调度、层/约束/IK 设置和原始曲线不写入该动作；完整作品保存项目包。',
+    ...(sampled.adaptive
+      ? [
+          sampled.adaptive.satisfied
+            ? '自适应探测已达到目标：所有已分析的非跳变区间通过，仍不是连续时间误差上界。'
+            : '自适应探测未达到目标，不能保存或导出；未达标 ' +
+              sampled.adaptive.unresolved +
+              ' 段，未完成检查 ' +
+              sampled.adaptive.unchecked +
+              ' 段。原因：' +
+              sampled.adaptive.reasons.join('、'),
+          '初始 ' +
+            sampled.adaptive.initialSamples +
+            ' 时刻，增加 ' +
+            sampled.adaptive.added +
+            ' 时刻；执行 ' +
+            stats.evaluations +
+            ' 次场景/对象采样、约 ' +
+            stats.nodeEvaluations +
+            ' 次节点采样。步长是初始最大间隔，细分按容差进行；跳变保护段单独报告，不计入达标判定。',
+          ...sampled.adaptive.unresolvedIntervals.map(
+            (g) =>
+              '未达标区间 ' + g.start.toPrecision(6) + '…' + g.end.toPrecision(6) + '：' + g.reason,
+          ),
+        ]
+      : []),
     ...warnings,
   ];
   return { action, tracks, stats, notes, options };
@@ -430,4 +449,15 @@ export function bakedProject(p: Project, sceneId: string, options: BakeOptions) 
       ),
     },
   };
+}
+
+/** Analysis may return unresolved intervals; authoritative output must not. */
+export function requireBakeTolerance(result: ReturnType<typeof bakeAnimation>) {
+  const state = result.stats.adaptive;
+  if (state && !state.satisfied)
+    throw new Error(
+      '自适应探测未达到目标，不能保存或导出：' +
+        state.reasons.join('、') +
+        '；请调整容差、最小间隔或范围',
+    );
 }

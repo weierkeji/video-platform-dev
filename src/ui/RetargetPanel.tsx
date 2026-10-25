@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Euler, Quaternion } from 'three';
 import { id, type Entity, type Project, type RetargetProfile, type Vec3 } from '../core/model';
 import type { Command } from '../core/commands';
-import type { BakeOptions } from '../core/bake';
+import type { SamplingOptions as BakeOptions } from '../core/bake';
 import { rigNodes } from '../core/rest-pose';
 import { retargetSubtree } from '../core/retarget-profile';
 import { quaternionFromEuler } from '../core/animation';

@@ -10,7 +10,11 @@ import {
   type Vec3,
   type Vec4,
 } from './model';
-import { BakeOptionsSchema, samplingGrid, type BakeOptions } from './bake';
+import {
+  SamplingOptionsSchema as BakeOptionsSchema,
+  samplingGrid,
+  type SamplingOptions as BakeOptions,
+} from './bake';
 import { restWorld } from './rest-pose';
 import { validateRetargetProfile, retargetSubtree } from './retarget-profile';
 import { sceneEvaluator, transformMatrix } from './constraints';

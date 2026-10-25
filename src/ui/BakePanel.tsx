@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { id, type Project } from '../core/model';
 import type { Command } from '../core/commands';
 import type { BakeOptions, bakedProject } from '../core/bake';
+import { requireBakeTolerance } from '../core/bake';
 import { exportGLBWithAssets } from '../core/gltf';
 import { download, NumberInput } from './Inspector';
 
@@ -74,6 +75,7 @@ export function BakePanel({
     try {
       const result = await calculate();
       setNotes(result.notes);
+      if (mode !== 'analyze') requireBakeTolerance(result);
       if (mode === 'export') {
         const output = await exportGLBWithAssets(
           result.project,
@@ -118,7 +120,7 @@ export function BakePanel({
         采样所选基础动作、当前启用的对象层、约束和 IK，保留父子局部变换。局部剪切不能转换为
         TRS，会明确报错；镜头片段调度使用项目包保存。
       </p>
-      <fieldset disabled={disabled}>
+      <fieldset disabled={disabled || working}>
         <label className="field">
           烘焙基础动作
           <select
@@ -159,6 +161,72 @@ export function BakePanel({
             onChange={(step) => update({ step })}
           />
         </div>
+        <label className="check">
+          <input
+            type="checkbox"
+            aria-label="自适应烘焙"
+            checked={!!options.adaptive}
+            onChange={(e) =>
+              update({
+                adaptive: e.target.checked
+                  ? { position: 0.001, rotationDegrees: 0.1, scale: 0.001, minStep: 0.01 }
+                  : undefined,
+              })
+            }
+          />
+          按探测误差自适应补样
+        </label>
+        {options.adaptive && (
+          <>
+            <div className="bake-range">
+              <NumberInput
+                label="烘焙位置分量容差 m"
+                precision={8}
+                value={options.adaptive.position}
+                min={1e-8}
+                max={1000}
+                step={0.001}
+                onChange={(position) => update({ adaptive: { ...options.adaptive!, position } })}
+              />
+              <NumberInput
+                label="烘焙旋转容差 °"
+                precision={8}
+                value={options.adaptive.rotationDegrees}
+                min={1e-6}
+                max={180}
+                step={0.05}
+                onChange={(rotationDegrees) =>
+                  update({ adaptive: { ...options.adaptive!, rotationDegrees } })
+                }
+              />
+            </div>
+            <div className="bake-range">
+              <NumberInput
+                label="烘焙缩放分量容差"
+                precision={8}
+                value={options.adaptive.scale}
+                min={1e-8}
+                max={1000}
+                step={0.001}
+                onChange={(scale) => update({ adaptive: { ...options.adaptive!, scale } })}
+              />
+              <NumberInput
+                label="最小采样间隔 帧"
+                precision={8}
+                value={options.adaptive.minStep}
+                min={1e-6}
+                max={120}
+                step={0.01}
+                onChange={(minStep) => update({ adaptive: { ...options.adaptive!, minStep } })}
+              />
+            </div>
+            <p className="muted">
+              步长作为初始最大间隔；每段用五个内部时刻检查最终局部变换，再按差异补样。
+              达到最小间隔、时间精度或工作量上限后仍未达标时，只提供分析，不保存或导出。
+              跳变保护邻域单独报告。短暂变化可能漏检；父级和蒙皮可放大差异，不保证连续时间或世界空间误差。
+            </p>
+          </>
+        )}
         <label className="field">
           烘焙插值
           <select

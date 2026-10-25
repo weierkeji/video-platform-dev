@@ -81,3 +81,11 @@
 - [reduced-pose.glb](reduced-pose.glb)：第 24 帧冻结姿态。
 - [reduced-performance.mp4](reduced-performance.mp4)：实际 H.264、480×270、24 FPS、48 帧/2 秒、无音轨；任务提交后切换动作不改变固定快照输出。
 - 来源：[scripts/reduce-fixture.ts](../scripts/reduce-fixture.ts)，MIT，原创几何/权重/骨架及动作。局部通道容差不代表任意作品的世界空间或画面误差界。
+
+## 0.21 自适应动画烘焙
+
+- [adaptive-performance.ffstudio](adaptive-performance.ffstudio)：v17，保留原创 IK 雕塑、参数叠层、跟随/朝向约束、摄影机曲线、新烘焙动作和 GLB 重导入场景。原场景 Adaptive performance 的“自适应动作 0–48”为 128 个非均匀时刻、16 轨/2048 键。源曲线/参数还在；重新启用源驱动前应先选择源项目动画，避免重复应用。
+- [adaptive-performance.glb](adaptive-performance.glb)：原生动画含源变换动作和“自适应动作 0–48”；选择后者播放合成结果。不包含可编辑约束/IK/层元数据。
+- [adaptive-pose.glb](adaptive-pose.glb)：第 24 帧冻结姿态。
+- [adaptive-performance.mp4](adaptive-performance.mp4)：真实 H.264 480×270、24 FPS、48 帧/2 秒、无音轨，固定任务快照。
+- 原创数据来自 [scripts/adaptive-fixture.ts](../scripts/adaptive-fixture.ts) 和已有雕塑，MIT。有限局部探测达标不代表连续时间、世界空间或画面误差保证。
