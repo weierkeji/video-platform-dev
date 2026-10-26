@@ -3,8 +3,9 @@ import { GenerationOptionsSchema, GenerationRequestSchema } from './generation';
 import { validateTrack } from './animation';
 import { dependencyOrder } from './constraints';
 import { validateRetargetProfile } from './retarget-profile';
+import { Matrix4 } from 'three';
 
-export const PROJECT_VERSION = 17;
+export const PROJECT_VERSION = 18;
 
 export const id = () => crypto.randomUUID();
 const ID = z
@@ -110,6 +111,20 @@ export const SkinSchema = z
   })
   .strict();
 export type Skin = z.infer<typeof SkinSchema>;
+export const ParentOffsetSchema = z
+  .object({
+    enabled: z.boolean(),
+    matrix: z
+      .array(NumberValue)
+      .length(16)
+      .superRefine((m, ctx) => {
+        if (m[3] !== 0 || m[7] !== 0 || m[11] !== 0 || m[15] !== 1)
+          ctx.addIssue({ code: 'custom', message: '层级补偿必须为仿射矩阵' });
+        if (Math.abs(new Matrix4().fromArray(m).determinant()) < 1e-12)
+          ctx.addIssue({ code: 'custom', message: '层级补偿矩阵不可逆' });
+      }),
+  })
+  .strict();
 export const GeometrySchema = z
   .object({
     id: ID,
@@ -263,6 +278,7 @@ export const EntitySchema = z
     kind: z.enum(['mesh', 'camera', 'light', 'group']),
     transform: TransformSchema,
     restPose: RestPoseSchema.optional(),
+    parentOffset: ParentOffsetSchema.optional(),
     visible: z.boolean(),
     geometryId: ID.optional(),
     materialId: ID.optional(),
@@ -843,7 +859,7 @@ export function migrateProject(input: unknown) {
     typeof input !== 'object' ||
     !input ||
     !('schemaVersion' in input) ||
-    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, PROJECT_VERSION].includes(
+    ![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, PROJECT_VERSION].includes(
       Number(input.schemaVersion),
     ) ||
     typeof input.schemaVersion !== 'number'

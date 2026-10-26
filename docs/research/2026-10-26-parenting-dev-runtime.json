@@ -1,0 +1,180 @@
+{
+  "checkedAt": "2026-10-25T18:17:24.595Z",
+  "browser": "155.0.8059.82",
+  "projectId": "fc373c6c-c26b-4239-8931-55df44e3a22d",
+  "restoredProjectId": "efbb2faf-caf9-4899-b596-bdf8f6b4aac6",
+  "jobId": "96e1af22-415d-4528-ae1f-a6f09910dd08",
+  "revision": 18,
+  "measurements": [
+    {
+      "frame": 0,
+      "difference": 0
+    },
+    {
+      "frame": 7.5,
+      "difference": 0
+    },
+    {
+      "frame": 12,
+      "difference": 0
+    },
+    {
+      "frame": 24,
+      "difference": 0
+    },
+    {
+      "frame": 36,
+      "difference": 0
+    },
+    {
+      "frame": 47,
+      "difference": 0
+    }
+  ],
+  "importedMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0.0000205761316872428
+    },
+    {
+      "frame": 7.5,
+      "difference": 0.00007973251028806585
+    },
+    {
+      "frame": 12,
+      "difference": 0.002021604938271605
+    },
+    {
+      "frame": 24,
+      "difference": 0.00034722222222222224
+    },
+    {
+      "frame": 36,
+      "difference": 0.00012088477366255144
+    },
+    {
+      "frame": 47,
+      "difference": 0.00012088477366255144
+    }
+  ],
+  "videoMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0.4467335390946502
+    },
+    {
+      "frame": 12,
+      "difference": 0.4524845679012346
+    },
+    {
+      "frame": 24,
+      "difference": 0.45467592592592593
+    },
+    {
+      "frame": 36,
+      "difference": 0.44791152263374484
+    },
+    {
+      "frame": 47,
+      "difference": 0.47277263374485595
+    }
+  ],
+  "gizmoWorldDelta": [
+    0.3999999561230436,
+    0,
+    2.220446049250313e-16
+  ],
+  "validator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 2,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/7"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/9"
+      }
+    ],
+    "truncated": false
+  },
+  "video": {
+    "index": 0,
+    "codec_name": "h264",
+    "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+    "profile": "High",
+    "codec_type": "video",
+    "codec_tag_string": "avc1",
+    "codec_tag": "0x31637661",
+    "mime_codec_string": "avc1.640015",
+    "width": 480,
+    "height": 270,
+    "coded_width": 480,
+    "coded_height": 270,
+    "has_b_frames": 2,
+    "pix_fmt": "yuv420p",
+    "level": 21,
+    "chroma_location": "left",
+    "field_order": "progressive",
+    "is_avc": "true",
+    "nal_length_size": "4",
+    "id": "0x1",
+    "r_frame_rate": "24/1",
+    "avg_frame_rate": "24/1",
+    "time_base": "1/12288",
+    "start_pts": 0,
+    "start_time": "0.000000",
+    "duration_ts": 24576,
+    "duration": "2.000000",
+    "bit_rate": "53588",
+    "bits_per_raw_sample": "8",
+    "nb_frames": "48",
+    "extradata_size": 46,
+    "disposition": {
+      "default": 1,
+      "dub": 0,
+      "original": 0,
+      "comment": 0,
+      "lyrics": 0,
+      "karaoke": 0,
+      "forced": 0,
+      "hearing_impaired": 0,
+      "visual_impaired": 0,
+      "clean_effects": 0,
+      "attached_pic": 0,
+      "timed_thumbnails": 0,
+      "non_diegetic": 0,
+      "captions": 0,
+      "descriptions": 0,
+      "metadata": 0,
+      "dependent": 0,
+      "still_image": 0,
+      "multilayer": 0
+    },
+    "tags": {
+      "language": "und",
+      "handler_name": "VideoHandler",
+      "encoder": "Lavc63.1.102 libx264"
+    }
+  },
+  "pageErrors": [],
+  "checks": [
+    "UI keep-world reparent of ordinary and skinned nodes with nonuniform parents",
+    "original channels and skin unchanged",
+    "undo redo reload and project export import",
+    "actual gizmo Escape and world translation authored as one position key",
+    "local mode and offset disable retain recoverable matrix",
+    "cycle rejection leaves revision unchanged",
+    "affine PNG and actual H264 retain appearance",
+    "raw animated and sheared static/baked GLB reject explicitly",
+    "bake after TRS-compatible reparent disables retained offsets",
+    "independent GLB validation and UI reimport match source images"
+  ]
+}

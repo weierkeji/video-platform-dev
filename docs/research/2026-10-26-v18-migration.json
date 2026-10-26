@@ -1,0 +1,18 @@
+{
+  "checkedAt": "2026-10-25T17:42:10.820Z",
+  "migration": {
+    "id": "673930fd-5fd2-4aba-abd8-d230c767fa7a",
+    "from_version": 17,
+    "to_version": 18,
+    "created_at": "2026-10-25T17:41:41.204Z",
+    "backup_name": "before-schema-v18-1792950091973.sqlite",
+    "details": "{\"projects\":200,\"revisions\":1644,\"jobs\":116,\"previousVersions\":[17]}"
+  },
+  "counts": {
+    "revisions": 1644,
+    "jobs": 116,
+    "projects": 200,
+    "histories": 1182
+  },
+  "result": "All stored projects, histories, revision and job snapshots differ only by schemaVersion 17→18. Cursors, revision/job metadata and blob index unchanged. Read-only comparison; complete original database backup retained."
+}

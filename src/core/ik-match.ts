@@ -9,7 +9,7 @@ import {
   sampleTrack,
   slerp,
 } from './animation';
-import { activeConstraints, matrixTransform, restDelta, sceneEvaluator } from './constraints';
+import { activeConstraints, matrixTransform, localBasis, sceneEvaluator } from './constraints';
 import { evaluatedBaseTransform, evaluatedTransform } from './evaluate';
 import { activeIKTracks, evaluatedIK } from './ik-animation';
 import { layerSourceFrame, layerWeight } from './layers';
@@ -220,7 +220,7 @@ export function planIKMatch(p: Project, options: MatchOptions) {
         p,
         e,
         frame,
-        matrixTransform(inverse(restDelta(e)).multiply(local), e.name),
+        matrixTransform(inverse(localBasis(e)).multiply(local), e.name),
       );
     const base = evaluatedBaseTransform(p, e, frame),
       rotation = rotationProperty(p, e);

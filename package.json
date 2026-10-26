@@ -1,6 +1,6 @@
 {
   "name": "frameforge-studio",
-  "version": "0.22.0",
+  "version": "0.23.0",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -35,7 +35,8 @@
     "smoke:retarget": "tsx scripts/retarget-smoke.ts",
     "smoke:reduce": "tsx scripts/reduce-smoke.ts",
     "smoke:adaptive": "tsx scripts/adaptive-smoke.ts",
-    "smoke:keys": "tsx scripts/key-editing-smoke.ts"
+    "smoke:keys": "tsx scripts/key-editing-smoke.ts",
+    "smoke:parenting": "tsx scripts/parenting-smoke.ts"
   },
   "dependencies": {
     "react": "19.1.1",

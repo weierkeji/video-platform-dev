@@ -428,6 +428,7 @@ export function bakedProject(p: Project, sceneId: string, options: BakeOptions) 
               ...e,
               constraints: e.constraints?.map((c) => ({ ...c, enabled: false })),
               restPose: e.restPose ? { ...e.restPose, enabled: false } : undefined,
+              parentOffset: e.parentOffset ? { ...e.parentOffset, enabled: false } : undefined,
             }
           : e,
       ),

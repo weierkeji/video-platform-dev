@@ -8,8 +8,9 @@ import { type Entity, type Project } from '../core/model';
 import { transformVertices, type MeshSelection } from '../core/mesh';
 import { MeshOverlay, MeshPicker } from '../render/mesh-edit';
 import { JointOverlay } from '../render/joints';
-import { activeConstraints, activeIK } from '../core/constraints';
+import { activeConstraints, activeIK, localBasis, matrixTransform } from '../core/constraints';
 import { evaluatedIK } from '../core/ik-animation';
+import { evaluatedTransform } from '../core/evaluate';
 
 export type ViewportProps = {
   project: Project;
@@ -89,6 +90,10 @@ export function Viewport(props: ViewportProps) {
         indices: number[];
         matrix?: number[];
         changed: boolean;
+        entityId?: string;
+        parent?: THREE.Matrix4;
+        basis?: THREE.Matrix4;
+        channel?: Entity['transform'];
       } | null = null;
       let down: { x: number; y: number; transformed: boolean; box: boolean } | null = null;
       let cancelling = false;
@@ -111,6 +116,11 @@ export function Viewport(props: ViewportProps) {
           if (down) down.transformed = true;
           const p = current.current;
           proxy.updateMatrixWorld(true);
+          const attached =
+            gizmo.object === proxy && !overlay
+              ? p.project.entities.find((e) => e.id === p.selected && e.parentOffset?.enabled)
+              : undefined;
+          const object = attached && renderer.objects.get(attached.id);
           drag = {
             projectId: p.project.id,
             revision: p.project.revision,
@@ -118,11 +128,17 @@ export function Viewport(props: ViewportProps) {
             layersPreview: p.layersPreview,
             restEditing: p.restEditing,
             selection: p.meshSelection,
-            world: overlay?.mesh.matrixWorld.clone() || new THREE.Matrix4(),
+            world:
+              overlay?.mesh.matrixWorld.clone() ||
+              object?.matrixWorld.clone() ||
+              new THREE.Matrix4(),
             start: proxy.matrixWorld.clone(),
             geometry: overlay ? structuredClone(overlay.geometry) : undefined,
             indices: overlay ? [...overlay.vertices] : [],
             changed: false,
+            entityId: attached?.id,
+            parent: object?.parent?.matrixWorld.clone(),
+            basis: attached && localBasis(attached),
           };
         } else if (!e.value && gizmo.object && !cancelling && drag) {
           const pending = drag;
@@ -134,7 +150,8 @@ export function Viewport(props: ViewportProps) {
             p.frame === pending.frame &&
             p.layersPreview === pending.layersPreview &&
             p.restEditing === pending.restEditing &&
-            p.meshSelection === pending.selection;
+            p.meshSelection === pending.selection &&
+            (!pending.entityId || p.selected === pending.entityId);
           if (pending.geometry && overlay) {
             overlay.preview(pending.geometry.positions, true);
             if (valid && pending.matrix && pending.changed)
@@ -142,6 +159,10 @@ export function Viewport(props: ViewportProps) {
             return;
           }
           if (!valid || !pending.changed) return;
+          if (pending.entityId) {
+            if (pending.channel) current.current.onTransform(pending.entityId, pending.channel);
+            return;
+          }
           const o = gizmo.object;
           current.current.onTransform(o.userData.entityId, {
             position: o.position.toArray(),
@@ -153,6 +174,44 @@ export function Viewport(props: ViewportProps) {
       gizmo.addEventListener('objectChange', () => {
         if (!drag || cancelling) return;
         drag.changed = true;
+        if (drag.entityId) {
+          proxy.updateMatrixWorld(true);
+          try {
+            const parent = drag.parent || new THREE.Matrix4();
+            if (Math.abs(parent.determinant()) < 1e-12)
+              throw new Error('父级矩阵不可逆，无法编辑频道');
+            const local = parent
+              .clone()
+              .invert()
+              .multiply(proxy.matrixWorld)
+              .multiply(drag.start.clone().invert())
+              .multiply(drag.world);
+            const e = current.current.project.entities.find((e) => e.id === drag!.entityId)!;
+            const channel = matrixTransform(drag.basis!.clone().invert().multiply(local), e.name);
+            if (current.current.mode === 'translate') {
+              const authored = evaluatedTransform(
+                current.current.project,
+                e,
+                current.current.frame,
+                undefined,
+                current.current.layersPreview,
+              );
+              channel.rotation = authored.rotation;
+              channel.quaternion = authored.quaternion;
+              channel.scale = authored.scale;
+            }
+            drag.channel = channel;
+            const object = renderer.objects.get(e.id)!;
+            object.matrix.copy(local);
+            object.matrix.decompose(object.position, object.quaternion, object.scale);
+            object.updateMatrixWorld(true);
+            setError('');
+          } catch (e) {
+            cancel();
+            setError((e as Error).message);
+          }
+          return;
+        }
         if (!drag.geometry || !overlay) return;
         proxy.updateMatrixWorld(true);
         const matrix = drag.world
@@ -379,14 +438,24 @@ export function Viewport(props: ViewportProps) {
             p.layersPreview !== drag.layersPreview ||
             p.restEditing !== drag.restEditing ||
             p.meshSelection !== drag.selection ||
-            p.playing)
+            p.playing ||
+            (drag.entityId && p.selected !== drag.entityId))
         )
           cancel();
         const selected = syncSelection();
+        const compensated =
+          selected &&
+          p.project.entities.some((e) => e.id === p.selected && e.parentOffset?.enabled);
         if (overlay && !gizmo.dragging) {
           proxy.position.copy(overlay.center());
           proxy.quaternion.identity();
           proxy.scale.set(1, 1, 1);
+          proxy.updateMatrixWorld(true);
+        } else if (compensated && !gizmo.dragging) {
+          proxy.position.setFromMatrixPosition(selected.matrixWorld);
+          proxy.quaternion.identity();
+          proxy.scale.set(1, 1, 1);
+          proxy.userData.entityId = p.selected;
           proxy.updateMatrixWorld(true);
         }
         const target =
@@ -410,7 +479,9 @@ export function Viewport(props: ViewportProps) {
                   (p.layersPreview &&
                     p.project.animationLayers?.some((l) => l.entityId === p.selected && l.enabled))
                 ? undefined
-                : selected;
+                : compensated
+                  ? proxy
+                  : selected;
         if (target && gizmo.object !== target) gizmo.attach(target);
         else if (!target) gizmo.detach();
         gizmo.enabled =

@@ -1134,6 +1134,10 @@ export function exportGLB(
       '原始动画 GLB 无法保存 IK；请使用“烘焙动画 GLB”采样链结果，项目包保留可编辑 IK',
     );
   const pose = animated ? undefined : sceneEvaluator(project, sceneId)(frame);
+  if (animated && entities.some((e) => e.parentOffset?.enabled))
+    throw new Error(
+      '原始动画 GLB 无法保存层级补偿；请使用“烘焙动画 GLB”，项目包保留新父级、补偿和原动画频道',
+    );
   if (animated && entities.some((e) => e.restPose?.enabled))
     throw new Error(
       '原始动画 GLB 无法保存独立基础姿态；请使用“烘焙动画 GLB”，项目包保留基础姿态和原曲线',

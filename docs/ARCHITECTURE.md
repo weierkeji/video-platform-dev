@@ -6,9 +6,10 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 
 | 模块 | 职责 |
 | --- | --- |
-| `src/core/model.ts` | v17 模型、v1–v16 迁移、引用/层级/绑定/权重/时间轴/动作约束、工作流拓扑检查 |
+| `src/core/model.ts` | v18 模型、v1–v17 迁移、引用/层级/绑定/权重/时间轴/动作约束、工作流拓扑检查 |
 | `src/core/generation.ts` | 生成参数、模型系列限制、不可变请求规格 |
 | `src/core/commands.ts` | 有限结构化命令，复制状态、整批应用并校验 |
+| `src/core/parenting.ts` / `ui/ParentingPanel.tsx` | 原层级快照计算仿射补偿、批量父级编辑、完整世界矩阵验收与属性入口 |
 | `src/core/key-editing.ts` / `ui/KeyBatchTools.tsx` | 原子多键时间变换/复制/删除、手柄和导数换算、共用拖动预演与批量 UI |
 | `src/core/geometry.ts` | 自主基本几何、共享边中点细分、三角面法向挤出、OBJ 交换 |
 | `src/core/mesh.ts` | 组件选择转换、仿射组变换、删除/合并、区域边界挤出 |
@@ -47,15 +48,25 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 `Project` 包含 `Asset`、`Scene`、`Entity`、`Geometry`、`Material`、实体上的 `Light` / `Camera`、`AnimationAction` / `AnimationTrack` / `AnimationLayer`、`Shot`、`Timeline`、`Workflow`、`Artifact`。`GenerationJob` / `Revision` 在同一数据库通过 projectId 和修订号关联，避免编辑反向改变运行任务。
 
 - ID：UUID 创建，项目内命名对象唯一校验；引用不依赖名称。
-- 空间：右手系、Y 向上、米；本地位置、XYZ Euler 弧度、非零缩放；v8 可选单位四元数 XYZW 优先表示姿态，求值时生成 Euler 供属性与空间编辑使用，Three.js 显示直接使用四元数。UI 角度显示为度。父子关系限制同场景，子对象继承父变换/可见性。重设父对象保留本地变换，不保留世界姿态。
+- 空间：右手系、Y 向上、米；本地位置、XYZ Euler 弧度、非零缩放；v8 可选单位四元数 XYZW 优先表示姿态，求值时生成 Euler 供属性与空间编辑使用，Three.js 显示直接使用四元数。UI 角度显示为度。父子关系限制同场景，子对象继承父变换/可见性。v18 属性重设父对象默认保持当前世界姿态；显式局部模式保留已有局部基底。低层 entity.update.parentId 保持原局部语义。
 - 时间：零起点；片段边界/长度仍是整数帧，区间 `[start, start + duration)`，动画键允许小数帧。1–120 整数帧率，尚无 24000/1001。媒体源帧=`sourceIn + timelineFrame - start`，镜头可选恒速和范围映射，详见下文。改帧率保留帧位置，秒数变化。导入动画秒时间乘项目 FPS，切线除 FPS；导出反向转换。媒体/镜头插入吸附最近整帧，分数播放头不可切分片段。
 - 摄影机：透视垂直 FOV、有限 near/far；镜头引用摄影机实体。v6 可选 aspect 固定投影比例，缺省随输出尺寸调整；无自动信箱边框。
 - 颜色：sRGB 输入、Three.js 线性着色、ACES 映射、sRGB 输出；v6 材质可选 linearColor 保存原始线性 RGB，优先于 color 的 8 位显示值；修改颜色选择器会移除旧 linearColor。支持 opacity、OPAQUE/MASK/BLEND、alphaCutoff、emissive、doubleSided、flatShading，缺省仍为平面双面不透明。v7 基础色/自发光贴图按 sRGB，其他贴图按线性数据；alpha 为线性值。无 OCIO 或专业校色保证。
 - 几何：本地顶点/三角面，v5 允许无面、孤立顶点及空网格。边是三角面的规范化索引对；没有独立线段或多边形数据。修改几何后，预览和导出读取相同数据。线性四分三角形不是平滑曲面细分。
 - 素材：SHA-256 内容寻址，ffprobe 读取真实流信息；便携包 base64 嵌入素材并校验哈希。没有压缩包或缺失媒体重定位流程。
 - 画幅：Clip.fit 为 contain/cover/stretch。默认 contain 保持完整画面、空白处显示低轨；cover 居中裁切源画面；stretch 拉伸。预览和导出共用矩形计算。
-- 数据版本：schemaVersion=17；显式拒绝未知格式。v1 在副本上升级，每个旧片段设为 stretch，保留音量；v2–v16 保留已有设置。v1–v3 关键帧按轨道内原时间派生 `legacy-key-<frame>`，在历史/任务快照间保持一致；v4 及以上的键 ID 原样保留。v6–v17 新字段均可选；v11→v12→v13→v14→v15→v16→v17 修改格式号，并沿用机器精度绑定矩阵末行规范化。新关键帧为 UUID，ID 在轨道内唯一；完整身份是 `(trackId,keyId)`。复制动作创建新轨道/键 ID。不改原项目文件。数据库启动时先校验全部待迁移数据，`VACUUM INTO` 备份完整库，再在事务内升级项目、撤销历史、版本与任务快照，并写入 `schema_migrations` 的版本、备份名和计数；不增加用户编辑修订。夹具覆盖升级、原库备份和历史恢复。
+- 数据版本：schemaVersion=18；显式拒绝未知格式。v1 在副本上升级，每个旧片段设为 stretch，保留音量；v2–v17 保留已有设置。v1–v3 关键帧按轨道内原时间派生 `legacy-key-<frame>`，在历史/任务快照间保持一致；v4 及以上的键 ID 原样保留。v6–v18 新字段均可选；v11→v12→v13→v14→v15→v16→v17→v18 修改格式号，并沿用机器精度绑定矩阵末行规范化。新关键帧为 UUID，ID 在轨道内唯一；完整身份是 `(trackId,keyId)`。复制动作创建新轨道/键 ID。不改原项目文件。数据库启动时先校验全部待迁移数据，`VACUUM INTO` 备份完整库，再在事务内升级项目、撤销历史、版本与任务快照，并写入 `schema_migrations` 的版本、备份名和计数；不增加用户编辑修订。夹具覆盖升级、原库备份和历史恢复。
 - 生成：工作流节点保存参数和首尾帧 Asset ID，通过统一命令编辑并验证引用；被引用图片不可删除。提交时保存解析后的 GenerationRequest、Project 快照、工作流/输出节点和 requestKey；后续编辑不影响已提交请求。
+
+## 保持世界姿态的层级编辑（0.23）
+
+Entity.parentOffset 可选，保留 enabled 与列主序 16 元可逆仿射矩阵，允许剪切。父级实际局部 = parentOffset × restDelta × authoredTRS，随后进入原有约束/IK 求值；disabled 相当于单位基底。restProject 保留 parentOffset，rest capture 与 FK 匹配反算移除相应基底一次。渲染与蒙皮继续共用 sceneEvaluator 的完整矩阵。
+
+entity.reparent 以同场景 ID 批次、parentId、frame、keepWorld、layers、rest 为输入，最多 2000 对象。读取同一旧场景快照，补偿为 inverse(newParentWorld)×oldParentWorld×oldOffset，不改原 TRS/键/绑定。先做模型依赖校验，再比较整场景所有世界矩阵与诊断：位移差阈值 1e-6，其他元素相对阈值 1e-8，超出拒绝整批。local 约束仍解释为物理父级局部空间，不能靠重命名空间来隐去语义变化。当前帧不等于全范围保证；静态父级的等式可跨帧保持。
+
+补偿对象手柄使用世界代理，按 inverse(parentWorld)×worldDelta×oldWorld 取目标局部，再除去 localBasis 得原频道；不能表示为 TRS 的旋转/缩放拒绝。移动只更新位置，保留原旋转表达和尺度。Esc、修订/帧/选择变化取消未提交拖动。原有效驱动/蒙皮手柄限制仍适用。
+
+烘焙及重定向生成物理局部 TRS，激活时保留但停用补偿，避免重复相乘；未激活只保存动作不切换。原始动画 GLB 拒绝启用补偿，静态/烘焙 GLB 沿用剪切拒绝；项目包及影片保持仿射结果。v17→v18 没有补写对象字段，启动时沿用完整备份、全快照原子升级与历史游标保持。
 
 ## 自适应动画烘焙（0.21）
 

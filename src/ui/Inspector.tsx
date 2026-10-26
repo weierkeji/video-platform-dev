@@ -11,6 +11,7 @@ import { exportOBJ } from '../core/geometry';
 import { displayColor } from '../core/surface';
 import { TexturePanel } from './TexturePanel';
 import { ShotPlaybackPanel } from './ShotPlaybackPanel';
+import { ParentingPanel } from './ParentingPanel';
 
 export function download(name: string, body: Blob | string, type = 'application/json') {
   const url = URL.createObjectURL(body instanceof Blob ? body : new Blob([body], { type }));
@@ -95,6 +96,7 @@ export function Inspector({
   entity,
   clip,
   frame,
+  layers = true,
   send,
   transform,
 }: {
@@ -102,6 +104,7 @@ export function Inspector({
   entity?: Entity;
   clip?: Clip;
   frame: number;
+  layers?: boolean;
   send: (c: Command[], label: string) => void;
   transform: (id: string, t: Entity['transform']) => void;
 }) {
@@ -302,34 +305,14 @@ export function Inspector({
             }}
           />
         </label>
-        <label className="field">
-          父对象
-          <select
-            aria-label="父对象"
-            value={e.parentId || ''}
-            onChange={(event) =>
-              send(
-                [
-                  {
-                    type: 'entity.update',
-                    id: e.id,
-                    patch: { parentId: event.target.value || null },
-                  },
-                ],
-                '调整对象层级',
-              )
-            }
-          >
-            <option value="">场景根节点</option>
-            {p.entities
-              .filter((x) => x.id !== e.id && x.sceneId === e.sceneId)
-              .map((x) => (
-                <option key={x.id} value={x.id}>
-                  {x.name}
-                </option>
-              ))}
-          </select>
-        </label>
+        <ParentingPanel
+          key={e.id}
+          project={p}
+          entity={e}
+          frame={frame}
+          layers={layers}
+          send={send}
+        />
         <label className="check">
           <input
             type="checkbox"

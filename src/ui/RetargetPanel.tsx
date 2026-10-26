@@ -391,7 +391,7 @@ export function RetargetPanel({
               checked={activate}
               onChange={(e) => setActivate(e.target.checked)}
             />{' '}
-            设为目标场景默认动作并停用目标子树的基础偏移、层、约束及 IK
+            设为目标场景默认动作并停用目标子树的层级补偿、基础偏移、层、约束及 IK
           </label>
           <p className="muted">
             源数据和蒙皮绑定保留。场景默认动作切换会影响场景其他对象的基础动作；镜头或片段指定的动作仍优先。若只保存，请先停用目标子树的上述驱动再使用该动作，避免重复变换。

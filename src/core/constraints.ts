@@ -22,7 +22,7 @@ export function drivenEntities(p: Project, sceneId?: string) {
       .filter(
         (e) =>
           (!sceneId || e.sceneId === sceneId) &&
-          (activeConstraints(e).length || e.restPose?.enabled),
+          (activeConstraints(e).length || e.restPose?.enabled || e.parentOffset?.enabled),
       )
       .map((e) => e.id),
     ...activeIK(p.ikChains, p.ikTracks)
@@ -168,6 +168,11 @@ export function restDelta(e: Entity) {
   return transformMatrix(e.restPose.transform).multiply(reference.invert());
 }
 
+/** Physical parent-relative local = attachment basis × rest delta × authored channels. */
+export const parentBasis = (e: Entity) =>
+  e.parentOffset?.enabled ? new Matrix4().fromArray(e.parentOffset.matrix) : new Matrix4();
+export const localBasis = (e: Entity) => parentBasis(e).multiply(restDelta(e));
+
 const axes = { x: new Vector3(1, 0, 0), y: new Vector3(0, 1, 0), z: new Vector3(0, 0, 1) };
 function projectedUp(forward: Vector3, up: Vector3) {
   const projected = up.clone().addScaledVector(forward, -up.dot(forward));
@@ -223,7 +228,7 @@ export function matrixTransform(m: Matrix4, label: string): Entity['transform'] 
     1e-7 * Math.max(1, Math.abs(sx), Math.abs(sy), Math.abs(sz))
   )
     throw new Error(
-      `对象“${label}”的约束产生局部剪切，TRS 动作/GLB 无法保真表达；请调整父级非均匀缩放或约束空间，项目与影片仍保留实际结果`,
+      `对象“${label}”的局部变换包含剪切，TRS 动作/GLB 无法保真表达；请调整父级非均匀缩放或驱动设置，项目与影片仍保留实际结果`,
     );
   return {
     position: parts.position.toArray() as Vec3,
@@ -244,7 +249,9 @@ export function sceneEvaluator(p: Project, sceneId: string) {
   );
   const driven = drivenEntities(p, sceneId);
   const restMatrices = new Map(
-    entities.filter((e) => e.restPose?.enabled).map((e) => [e.id, restDelta(e)]),
+    entities
+      .filter((e) => e.restPose?.enabled || e.parentOffset?.enabled)
+      .map((e) => [e.id, localBasis(e)]),
   );
   return (frame?: number, actionId?: string | null, layers = true) => {
     const local = new Map<string, Matrix4>(),
@@ -267,7 +274,7 @@ export function sceneEvaluator(p: Project, sceneId: string) {
         let matrix = transformMatrix(
           frame === undefined ? e.transform : evaluatedTransform(p, e, frame, actionId, layers),
         );
-        if (e.restPose?.enabled) matrix.premultiply(restMatrices.get(e.id)!);
+        if (restMatrices.has(e.id)) matrix.premultiply(restMatrices.get(e.id)!);
         for (const c of activeConstraints(e)) {
           try {
             const worldSpace = c.type === 'aim' || c.ownerSpace === 'world';

@@ -1,6 +1,6 @@
 import { Matrix4 } from 'three';
 import type { Entity, Project } from './model';
-import { matrixTransform, sceneEvaluator, transformMatrix } from './constraints';
+import { matrixTransform, parentBasis, sceneEvaluator, transformMatrix } from './constraints';
 
 export const restTransform = (e: Entity) =>
   e.restPose?.enabled ? e.restPose.transform : e.transform;
@@ -124,7 +124,7 @@ export function captureRestPose(
     throw new Error('当前姿态有求解诊断，请先处理后再复制到基础姿态：' + pose.warnings[0].message);
   const updates = entities.map((e) => ({
     entityId: e.id,
-    transform: matrixTransform(pose.local.get(e.id)!, e.name),
+    transform: matrixTransform(parentBasis(e).invert().multiply(pose.local.get(e.id)!), e.name),
   }));
   updateRestPose(p, updates, preserveShape);
 }

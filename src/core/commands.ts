@@ -54,11 +54,13 @@ import { updateRestPose, captureRestPose, resetRestPose } from './rest-pose';
 import { planIKMatch, verifyIKMatch } from './ik-match';
 import { retargetAnimation, activateRetarget } from './retarget';
 import { reduceAction, ReduceOptionsSchema } from './reduce-curves';
+import { ReparentSchema, reparentEntities } from './parenting';
 import { deleteElements, extrudeRegion, mergeVertices, transformVertices } from './mesh';
 
 const ID = z.string().min(1).max(80);
 const MeshIndices = z.array(z.number().int().nonnegative()).min(1).max(200000);
 export const CommandSchema = z.discriminatedUnion('type', [
+  ReparentSchema,
   TransformKeysSchema,
   DuplicateKeysSchema,
   DeleteKeysSchema,
@@ -511,6 +513,7 @@ function apply(p: Project, c: Command) {
           if (targets.has(entity.id)) {
             for (const constraint of entity.constraints || []) constraint.enabled = false;
             if (entity.restPose) entity.restPose.enabled = false;
+            if (entity.parentOffset) entity.parentOffset.enabled = false;
           }
         for (const chain of p.ikChains || [])
           if (chain.sceneId === c.action.sceneId) chain.enabled = false;
@@ -688,6 +691,9 @@ function apply(p: Project, c: Command) {
       p.entities.push(entity);
       break;
     }
+    case 'entity.reparent':
+      reparentEntities(p, c);
+      break;
     case 'entity.update':
       Object.assign(get(p.entities, c.id), c.patch);
       break;

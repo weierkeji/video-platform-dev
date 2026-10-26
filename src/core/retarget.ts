@@ -17,7 +17,7 @@ import {
 } from './bake';
 import { restWorld } from './rest-pose';
 import { validateRetargetProfile, retargetSubtree } from './retarget-profile';
-import { sceneEvaluator, transformMatrix } from './constraints';
+import { sceneEvaluator, transformMatrix, parentBasis, matrixTransform } from './constraints';
 import { affineParts } from './affine';
 import { sampleTrack, validateTrack } from './animation';
 
@@ -73,6 +73,7 @@ export function retargetAnimation(
     entities: p.entities.map((e) => ({
       ...e,
       restPose: e.restPose && { ...e.restPose, enabled: true },
+      parentOffset: e.parentOffset && { ...e.parentOffset, enabled: true },
     })),
   };
   const sourceRest = restWorld(referenceProject, sourceScene),
@@ -98,10 +99,14 @@ export function retargetAnimation(
     alignmentInverse = alignment.clone().invert(),
     evaluate = sceneEvaluator(p, sourceScene);
   const plans = target.map((entity) => {
-    const rest = parts(
-      transformMatrix(entity.restPose?.transform || entity.transform),
-      entity.name,
-    );
+    const reference = parentBasis({
+      ...entity,
+      parentOffset: entity.parentOffset && { ...entity.parentOffset, enabled: true },
+    }).multiply(transformMatrix(entity.restPose?.transform || entity.transform));
+    // Output tracks use physical parent-relative TRS and activation disables the offset.
+    // A sheared target rest cannot be silently reduced to diagonal scale.
+    matrixTransform(reference, entity.name);
+    const rest = parts(reference, entity.name);
     const tracks: AnimationTrack[] = (['position', 'quaternion', 'scale'] as const).map(
       (property) => ({
         id: id(),
@@ -238,6 +243,7 @@ export function activateRetarget(p: Project, profile: RetargetProfile, action: A
   for (const entity of p.entities)
     if (targets.has(entity.id)) {
       if (entity.restPose) entity.restPose.enabled = false;
+      if (entity.parentOffset) entity.parentOffset.enabled = false;
       for (const constraint of entity.constraints || []) constraint.enabled = false;
     }
   for (const layer of p.animationLayers || [])

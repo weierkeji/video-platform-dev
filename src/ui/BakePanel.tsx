@@ -117,8 +117,8 @@ export function BakePanel({
     <section className="bake-panel" aria-label="动作层烘焙">
       <h3>烘焙混合动画</h3>
       <p className="muted">
-        采样所选基础动作、当前启用的对象层、约束和 IK，保留父子局部变换。局部剪切不能转换为
-        TRS，会明确报错；镜头片段调度使用项目包保存。
+        采样所选基础动作、当前启用的层级补偿、基础偏移、对象层、约束和
+        IK，保留父子局部变换。局部剪切不能转换为 TRS，会明确报错；镜头片段调度使用项目包保存。
       </p>
       <fieldset disabled={disabled || working}>
         <label className="field">
@@ -274,7 +274,7 @@ export function BakePanel({
             aria-label="启用烘焙动作"
             onChange={(e) => setActivate(e.target.checked)}
           />
-          保存时切换场景动作并禁用本场景所有对象层、约束及 IK
+          保存时切换场景动作并停用本场景层级补偿、基础偏移、对象层、约束及 IK
         </label>
         <p className="muted">
           仅保存时保留当前播放设置。勾选切换会影响本场景全部镜头的对象层；镜头/片段显式指定的基础动作需自行选择新动作。原数据保留，可撤销。

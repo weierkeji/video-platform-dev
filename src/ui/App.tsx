@@ -534,7 +534,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.22</small>
+            FRAMEFORGE<small>创作工作台 · 0.23</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -1023,6 +1023,7 @@ export function App() {
                 entity={e}
                 clip={clip}
                 frame={frame}
+                layers={workspace === 'studio' && view === 'scene' ? layersPreview : true}
                 send={(c, l) => void send(c, l)}
                 transform={transform}
               />

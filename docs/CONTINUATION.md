@@ -1,8 +1,34 @@
 # 持续开发恢复记录
 
-更新时间：2026-10-26。完整 Blender + LibTV 功能目标仍 active；0.22 是基础版本检查点，不是目标完成声明。旧段落保留历史证据。
+更新时间：2026-10-26。完整 Blender + LibTV 功能目标仍 active；0.23 是基础版本检查点，不是目标完成声明。旧段落保留历史证据。
 
-## 0.22 最新恢复入口
+## 0.23 最新恢复入口
+
+0.22 已提交并推送 5de3e05。本轮 0.23 新增保持世界姿态的重设父级与仿射补偿，项目格式 v18；没有新依赖。用户已授权普通开发、git 存档和推送 https://github.com/weierkeji/video-platform-dev.git，最终 HEAD/origin/main 以 Git 为准。原 .local/data 与作品/备份保留。没有 Blender/bpy、LibTV 私有接口或外部模型调用。REA 当前说明/许可/要求已读，本地 6.7.0 保持；Node 24.20.0 低于当前 main 的 24.22.1 要求，本单元未运行分析引擎。Blender 3.0 官方 Parent 文本为详细公开参照，4.5 搜索信息另列，4.5 直取 402，没有参考产品实机分析声明。
+
+Entity.parentOffset 可选 enabled+16 元可逆仿射矩阵；物理局部为 parentOffset × restDelta × authoredTRS，随后执行原约束/IK。core/parenting.ts 的 entity.reparent 使用同一旧场景快照，对所选对象计算 inverse(newParentWorld)×oldParentWorld×oldOffset；保留原 TRS、所有动画键、绑定与几何。最多 2000 同场景对象，支持 null 根节点、保留局部模式及 API rest/layers 选择。模型先检查循环、骨架祖先、IK 链连续性，再对整场景最终世界矩阵和新增诊断验收；局部约束/读者或 IK 使任何对象变化则整批拒绝。只保证选定帧；两父级静止时等式可保持整段原动作。
+
+ParentingPanel 接入属性父对象选择器，默认保持当前世界姿态，排除自身/后代；可切换补偿，矩阵保留便于恢复。当前 GUI 为单对象，API 可批量。Viewport 对带补偿的普通对象使用世界代理，反算父级和 localBasis 后写原频道；平移保留原旋转表达和尺度，不能由 TRS 表示的操作拒绝，Esc/修订/帧/选择变化取消。原蒙皮、有效 IK、约束、基础偏移、动作层手柄限制保留。rest capture/FK 匹配移除正确基底，烘焙/重定向激活保留但停用补偿，避免重复相乘。
+
+原始动画 GLB 拒绝启用的补偿，静态 GLB 与 TRS 烘焙继续拒绝局部剪切；项目包与 PNG/MP4 保留仿射结果。此次输出 GLB 先重设回可由 TRS 表示的原父级再烘焙，视觉与包内补偿场景一致，但层级不同。没有实现完整仿射 GLB、动态父级切换或全时段补偿烘焙。
+
+实际 v17→v18 自动升级：200 项目、1182 历史、1644 版本、116 任务；备份 before-schema-v18-1792950091973.sqlite。逐快照只读比较除版本号外完全相同，游标、版本/任务元数据和素材索引保持，见 research/2026-10-26-v18-migration.json。
+
+新增 11 项核心检查，完整 179/179，类型检查与构建通过；覆盖静态/动画/镜像父级、层预览/基础范围、约束、IK/FK、捕获、批次拒绝、SQLite 重启、重定向激活和独立 GLTFLoader 蒙皮顶点。164 模块，主包 1107.32 KB / gzip 317.43 KB，>500 KB 提示保留，不作性能达标声明。
+
+开发/正式 smoke:parenting 完整通过。正式 2026-10-25T18:20:01.120Z（本地 10-26），项目 78c881b9-b9cd-46ff-8f2e-906a19edcf27，重开 9ff00fb9-cd9c-4d2e-9eb4-563270dd8ba0，影片任务 aaaba124-3936-4f9c-968b-d53e20ae95a0，r18。6 时刻 PNG 重父级前后像素差 0；实际世界 X 手柄 +0.399999956 米。GLB 0 错误/0 警告/2 空节点信息，重导入最大 RGB 平均绝对差 0.002021605（0–255 量程）。影片 H.264 480×270、24 FPS、48 帧、2 秒，无音轨；5 帧差 0.446733539…0.472772634；无 pageerror。
+
+共用视口代理回归 smoke:mesh 在正式入口完整通过，2026-10-25T18:20:29.760Z，项目 a523d925-14e6-46d7-9ec1-2c21f501febd，任务 f7d65d52-d322-47f9-80b6-7693ea1f936c。遮挡/穿透选择、区域挤出、非均匀父级的真实手柄、Esc、空网格恢复、OBJ/包重开和 12 帧影片均通过；差 0.543793724，无 pageerror。记录 *-parenting-mesh-runtime.json。
+
+开发流程暴露 Vite 监听正在写入的 .local PNG 导致 Windows EBUSY，已在 vite.config.ts 忽略 **/.local/**，后续完整开发流程通过。脚本等待服务端受控复选框的保存修订；烘焙错误位于共用 alert。影片完成登记素材增加修订，继续编辑前需刷新。不要把观测脚本的旧选择器失败当作产品允许剪切导出。
+
+研究 docs/research/2026-10-26-parenting.md，开发/正式 *-parenting-dev-runtime.json / *-parenting-runtime.json；原始 PNG 在 .local/checks/parenting。examples/parented-animation.ffstudio/.glb/.mp4 已归档。启动 npm.cmd run dev；正式 npm.cmd run build 后 npm.cmd start；新集成入口 npm.cmd run smoke:parenting。不要执行 .local/checks/update-parenting-docs.mjs、audit-v18.mjs 或旧单元生成/更新助手，它们针对当时快照，可能覆盖新文档或对新编辑快照产生错误比较。后端修改需重启。
+
+**下一项**：场景层级多对象选择与成组编辑，研究祖先/子节点同时选择、主动对象、枢轴和事务语义，为已有批量父级命令提供统一 UI。动态附着、完整仿射交换、跨对象/IK 图形多选、范围 FK/IK、专业绑定/建模/UV/材质/物理/媒体/合成/AI 的完整范围继续保留。
+
+本轮开发/正式服务和浏览器已结束，4173 无监听，Node 仅原 Codex PID 11844；未触碰该进程。Seedance 仍 missing-credentials，无付费或模拟结果。提交和推送使用已有授权，完整目标仍 active。
+
+## 0.22 历史恢复记录
 
 0.21 已提交并推送 198cce4。本轮 0.22 新增曲线多键选择与批量时间编辑，沿用项目 v17，无新迁移/依赖。HEAD/origin/main 以实际 Git 为准。用户授权普通开发、提交和推送，保留 .local/data 与原有数据。没有 Blender/bpy、LibTV 私有接口或外部模型调用。REA 文档/许可/要求已读，本地 6.7.0 保持；本机 Node 24.20.0 低于最新 main 24.22.1 要求，未运行额外引擎。
 
