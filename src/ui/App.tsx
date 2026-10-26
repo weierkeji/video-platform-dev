@@ -26,6 +26,9 @@ import { RetargetPanel } from './RetargetPanel';
 import { ReducePanel } from './ReducePanel';
 import { restProject, rigNodes } from '../core/rest-pose';
 import { RestPosePanel } from './RestPosePanel';
+import { ObjectGroupPanel } from './ObjectGroupPanel';
+import { chooseObjects, sceneRows, visibleObjects } from './object-selection';
+import type { ObjectPivot } from '../core/object-transform';
 
 type Envelope = { project: Project; canUndo: boolean; canRedo: boolean };
 type Summary = { id: string; name: string; revision: number };
@@ -46,7 +49,7 @@ async function api<T>(
 export function App() {
   const [envelope, setEnvelope] = useState<Envelope | null>(null),
     [projects, setProjects] = useState<Summary[]>([]),
-    [selected, setSelected] = useState<string | null>(null),
+    [selectedIds, setSelectedIds] = useState<string[]>([]),
     [selectedClip, setSelectedClip] = useState<string | null>(null),
     [selectedKey, setSelectedKey] = useState<KeySelection>(null),
     [meshSelection, setMeshSelection] = useState<MeshSelection | null>(null),
@@ -57,6 +60,11 @@ export function App() {
     [layersPreview, setLayersPreview] = useState(true);
   const [restEditing, setRestEditing] = useState(false),
     [preserveRestShape, setPreserveRestShape] = useState(true);
+  const selected = selectedIds.at(-1) || null;
+  const setSelected = (id: string | null) => setSelectedIds(id ? [id] : []);
+  const [objectPivot, setObjectPivot] = useState<ObjectPivot>('median');
+  const sceneRef = useRef(sceneId);
+  sceneRef.current = sceneId;
   const [mode, setMode] = useState<'translate' | 'rotate' | 'scale'>('translate'),
     [view, setView] = useState<'scene' | 'sequence'>('scene'),
     [workspace, setWorkspace] = useState<'studio' | 'curves' | 'workflow'>('studio'),
@@ -80,6 +88,10 @@ export function App() {
     assetInput = useRef<HTMLInputElement>(null),
     projectInput = useRef<HTMLInputElement>(null),
     objInput = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (restEditing || meshSelection || workspace !== 'studio' || view !== 'scene')
+      setSelectedIds((ids) => (ids.length > 1 ? [ids.at(-1)!] : ids));
+  }, [restEditing, meshSelection, workspace, view]);
   const accept = useCallback((next: Envelope) => {
     const previous = projectRef.current;
     if (previous?.id !== next.project.id) setRestEditing(false);
@@ -101,7 +113,13 @@ export function App() {
     setSceneId((s) =>
       next.project.scenes.some((x) => x.id === s) ? s : next.project.scenes[0].id,
     );
-    setSelected((s) => (next.project.entities.some((e) => e.id === s) ? s : null));
+    setSelectedIds((ids) =>
+      previous?.id !== next.project.id
+        ? []
+        : ids.filter((key) =>
+            next.project.entities.some((e) => e.id === key && e.sceneId === sceneRef.current),
+          ),
+    );
     setSelectedClip((s) => (next.project.timeline.clips.some((c) => c.id === s) ? s : null));
     setSelectedKey((s) => {
       if (!s?.length || previous?.id !== next.project.id) return null;
@@ -291,7 +309,21 @@ export function App() {
           if (selectedKey?.length)
             void send([{ type: 'keys.delete', keys: selectedKey }], '删除所选关键帧');
         } else if (selectedClip) void send([{ type: 'clip.delete', id: selectedClip }], '删除片段');
-        else if (selected) void send([{ type: 'entity.delete', id: selected }], '删除对象');
+        else if (selectedIds.length)
+          void send([{ type: 'entities.delete', entityIds: selectedIds }], '删除所选对象及后代');
+      } else if (
+        workspace === 'studio' &&
+        view === 'scene' &&
+        !meshSelection &&
+        !restEditing &&
+        e.key.toLowerCase() === 'a' &&
+        !e.ctrlKey &&
+        !e.metaKey
+      ) {
+        e.preventDefault();
+        setSelectedIds(e.altKey ? [] : visibleObjects(projectRef.current!, sceneRef.current));
+        setSelectedClip(null);
+        setSelectedKey(null);
       } else if (['g', 'r', 's'].includes(e.key.toLowerCase()))
         setMode(({ g: 'translate', r: 'rotate', s: 'scale' } as const)[e.key.toLowerCase() as 'g']);
       else if (
@@ -317,12 +349,14 @@ export function App() {
     history,
     send,
     selected,
+    selectedIds,
     selectedClip,
     selectedKey,
     workspace,
     view,
     meshSelection,
     frame,
+    restEditing,
     exchangeOpen,
     retargetOpen,
     reduceOpen,
@@ -374,9 +408,19 @@ export function App() {
       fail(e);
     }
   };
-  const select = (id: string) => {
-    if (id !== selected) setMeshSelection(null);
-    setSelected(id);
+  const select = (id: string | null, toggle = false) => {
+    if (id !== selected || toggle) setMeshSelection(null);
+    setSelectedIds((ids) =>
+      id
+        ? chooseObjects(
+            ids,
+            [id],
+            toggle && !restEditing && workspace === 'studio' && view === 'scene'
+              ? 'toggle'
+              : 'replace',
+          )
+        : [],
+    );
     setSelectedClip(null);
     setSelectedKey(null);
   };
@@ -439,6 +483,7 @@ export function App() {
     setPlaying(false);
     setView('scene');
     setWorkspace('studio');
+    setSelected(entity.id);
     setMeshSelection({
       entityId: entity.id,
       geometryId: g.id,
@@ -534,7 +579,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.23</small>
+            FRAMEFORGE<small>创作工作台 · 0.24</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -716,22 +761,42 @@ export function App() {
             </button>
           </div>
           <div className="entity-list">
-            {p.entities
-              .filter((x) => x.sceneId === sceneId)
-              .map((x) => (
-                <button
-                  key={x.id}
-                  className={'entity ' + (x.id === selected ? 'selected' : '')}
-                  onClick={() => select(x.id)}
-                  style={{ paddingLeft: x.parentId ? 28 : 12 }}
-                >
-                  <span className={'kind-icon ' + x.kind}>
-                    {x.joint ? '●' : { mesh: '◇', camera: '▣', light: '☼', group: '▧' }[x.kind]}
-                  </span>
-                  <span>{x.name}</span>
-                  <small>{x.visible ? '' : '隐藏'}</small>
-                </button>
-              ))}
+            {sceneRows(p, sceneId).map(({ entity: x, depth }) => (
+              <button
+                key={x.id}
+                data-entity-id={x.id}
+                data-active-object={x.id === selected ? 'true' : 'false'}
+                aria-pressed={selectedIds.includes(x.id)}
+                className={
+                  'entity ' +
+                  (selectedIds.includes(x.id) ? 'selected ' : '') +
+                  (x.id === selected ? 'active-object' : '')
+                }
+                onClick={(event) => select(x.id, event.shiftKey || event.ctrlKey || event.metaKey)}
+                title="点击单选；Shift 或 Ctrl 点击增减选择；最后选中者为活动对象"
+                style={{ paddingLeft: 12 + Math.min(depth, 12) * 16 }}
+              >
+                <span className={'kind-icon ' + x.kind}>
+                  {x.joint ? '●' : { mesh: '◇', camera: '▣', light: '☼', group: '▧' }[x.kind]}
+                </span>
+                <span>{x.name}</span>
+                <small>{x.visible ? '' : '隐藏'}</small>
+              </button>
+            ))}
+          </div>
+          <div className="button-row object-selection-tools">
+            <button
+              disabled={restEditing || workspace !== 'studio' || view !== 'scene'}
+              onClick={() => {
+                setMeshSelection(null);
+                setSelectedClip(null);
+                setSelectedKey(null);
+                setSelectedIds(visibleObjects(p, sceneId));
+              }}
+            >
+              选择可见对象
+            </button>
+            <button onClick={() => select(null)}>清空对象选择</button>
           </div>
           <div className="panel-heading">
             镜头{' '}
@@ -931,7 +996,15 @@ export function App() {
                 frame={frame}
                 playing={playing}
                 selected={selected}
+                selectedIds={selectedIds}
+                objectPivot={objectPivot}
                 select={select}
+                selectObjects={(ids, mode) => {
+                  setSelectedIds((previous) => chooseObjects(previous, ids, mode));
+                  setSelectedClip(null);
+                  setSelectedKey(null);
+                }}
+                onGroupTransform={(command) => void send([command], '成组手柄变换')}
                 mode={mode}
                 view={view}
                 onTransform={
@@ -1016,6 +1089,18 @@ export function App() {
                 onMode={meshMode}
                 onSelect={(indices) => setMeshSelection({ ...meshSelection, indices })}
                 send={(c, l, keep) => void meshSend(c, l, keep)}
+              />
+            ) : selectedIds.length > 1 && workspace === 'studio' && view === 'scene' ? (
+              <ObjectGroupPanel
+                key={[...selectedIds].sort().join('/')}
+                project={p}
+                ids={selectedIds}
+                frame={frame}
+                layers={layersPreview}
+                pivot={objectPivot}
+                setPivot={setObjectPivot}
+                activate={(key) => setSelectedIds((ids) => chooseObjects(ids, [key], 'add'))}
+                send={send}
               />
             ) : (
               <Inspector

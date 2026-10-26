@@ -55,11 +55,27 @@ import { planIKMatch, verifyIKMatch } from './ik-match';
 import { retargetAnimation, activateRetarget } from './retarget';
 import { reduceAction, ReduceOptionsSchema } from './reduce-curves';
 import { ReparentSchema, reparentEntities } from './parenting';
+import {
+  ObjectTransformSchema,
+  planObjectTransform,
+  verifyObjectTransform,
+} from './object-transform';
 import { deleteElements, extrudeRegion, mergeVertices, transformVertices } from './mesh';
 
 const ID = z.string().min(1).max(80);
 const MeshIndices = z.array(z.number().int().nonnegative()).min(1).max(200000);
 export const CommandSchema = z.discriminatedUnion('type', [
+  ObjectTransformSchema,
+  z
+    .object({
+      type: z.literal('entities.visibility'),
+      entityIds: z.array(ID).min(1).max(2000),
+      visible: z.boolean(),
+    })
+    .strict(),
+  z
+    .object({ type: z.literal('entities.delete'), entityIds: z.array(ID).min(1).max(2000) })
+    .strict(),
   ReparentSchema,
   TransformKeysSchema,
   DuplicateKeysSchema,
@@ -694,9 +710,23 @@ function apply(p: Project, c: Command) {
     case 'entity.reparent':
       reparentEntities(p, c);
       break;
+    case 'entities.transform': {
+      const plan = planObjectTransform(p, c);
+      for (const command of plan.commands) apply(p, command);
+      parseProject(p);
+      verifyObjectTransform(p, c, plan);
+      break;
+    }
     case 'entity.update':
       Object.assign(get(p.entities, c.id), c.patch);
       break;
+    case 'entities.visibility': {
+      if (new Set(c.entityIds).size !== c.entityIds.length)
+        throw new Error('显示/隐藏对象不能重复');
+      const entities = c.entityIds.map((key) => get(p.entities, key));
+      for (const entity of entities) entity.visible = c.visible;
+      break;
+    }
     case 'rig.rest.update':
       updateRestPose(p, c.updates, c.preserveShape);
       break;
@@ -706,9 +736,12 @@ function apply(p: Project, c: Command) {
     case 'rig.rest.reset':
       resetRestPose(p, c.entityIds, c.preserveShape);
       break;
-    case 'entity.delete': {
-      get(p.entities, c.id);
-      const removing = new Set([c.id]);
+    case 'entity.delete':
+    case 'entities.delete': {
+      const ids = c.type === 'entity.delete' ? [c.id] : c.entityIds;
+      if (new Set(ids).size !== ids.length) throw new Error('删除对象不能重复');
+      ids.forEach((key) => get(p.entities, key));
+      const removing = new Set(ids);
       let changed = true;
       while (changed) {
         changed = false;

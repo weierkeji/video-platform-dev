@@ -171,8 +171,21 @@ export class SceneRenderer {
     }
     this.scene.updateMatrixWorld(true);
     const world = new Map([...this.objects].map(([id, o]) => [id, o.matrixWorld]));
+    this.updateSkins(world, restEntityId);
+  }
+  /** Temporary editor pose. The next evaluate restores the authoritative project. */
+  previewPose(pose: ReturnType<ReturnType<typeof sceneEvaluator>>) {
+    for (const [key, object] of this.objects) {
+      object.matrixAutoUpdate = false;
+      object.matrix.copy(pose.local.get(key)!);
+      object.matrix.decompose(object.position, object.quaternion, object.scale);
+    }
+    this.scene.updateMatrixWorld(true);
+    this.updateSkins(pose.world);
+  }
+  private updateSkins(world: Map<string, THREE.Matrix4>, restEntityId?: string) {
     for (const [id, entry] of this.skins) {
-      const entity = this.project.entities.find((e) => e.id === id)!,
+      const entity = this.project!.entities.find((e) => e.id === id)!,
         node = this.objects.get(id)!;
       const rest = restEntityId === id;
       let visible = true;

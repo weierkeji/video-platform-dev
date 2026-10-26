@@ -1,8 +1,30 @@
 # 持续开发恢复记录
 
-更新时间：2026-10-26。完整 Blender + LibTV 功能目标仍 active；0.23 是基础版本检查点，不是目标完成声明。旧段落保留历史证据。
+更新时间：2026-10-27。完整 Blender + LibTV 功能目标仍 active；0.24 是基础版本检查点，不是目标完成声明。旧段落保留历史证据。
 
-## 0.23 最新恢复入口
+## 0.24 最新恢复入口
+
+0.23 已提交并推送 de8e599。本轮 0.24 新增场景多对象选择与成组编辑，沿用格式 v18，无新迁移/依赖。用户已授权普通开发、git 存档和推送 https://github.com/weierkeji/video-platform-dev.git；最终 HEAD/origin/main 以 Git 为准。保留原 .local/data、作品与备份，没有 Blender/bpy、LibTV 私有接口或外部模型调用。REA 当前说明/许可/要求已读，本地 6.7.0 保持，Node 24.20.0 低于当前 main 的 24.22.1 要求，没有运行额外分析引擎。Blender 4.5 选择/枢轴官方搜索内容提供行为参照，直取失败单列，无参考产品实机声明。
+
+App 共用临时有序 selectedIds，最后一项是活动对象。真实层级行、列表/视口 Shift/Ctrl/Cmd 增减、活动对象下拉、A/Alt+A、B 原点框选；项目/场景切换清理，进入曲线/成片/基础姿态/组件编辑收敛到活动对象。对象框选只检查可见原点投影，无网格遮挡/套索/范围行选。青色选择/金色活动包围标记仅在编辑器。
+
+core/object-transform.ts 的 entities.transform 使用同一旧姿态计算目标世界矩阵，最近所选祖先的 delta 预测新父级世界，除去 localBasis 后写原频道。共同枢轴（所有所选原点均值）、活动和各自原点；共同 delta 使父子不重复变换，各自原点通过子频道反算抵消父级附带位移。已有动画写当前动作当前帧键，其余频道改基础值；保留原键身份/插值/切线，纯平移保留镜像尺度和多圈 Euler。有效约束、当前非零 IK、启用层预览、直接蒙皮或无法 TRS 表达的剪切拒绝；最终选中世界矩阵及新增诊断验收，整组原子提交。
+
+Viewport 共用命令草稿/场景求值预演，SceneRenderer.previewPose 应用临时完整局部矩阵并更新蒙皮，权威项目不改；松开一次修订、Esc/帧/修订/选择/枢轴变化取消。ObjectGroupPanel 接入数字增量、批量 reparent、entities.visibility、entities.delete。显示/隐藏一条命令最多 2000 项，避开普通批次 100 条上限；删除合并子树再校验引用，父级命令将每项放到统一父级（所选父子可能同级）。活动对象切换保留未应用输入；B 状态不再禁用基础姿态手柄。
+
+11 项新增核心检查，完整 190/190，最终类型与构建通过；含大坐标小位移、仿射补偿、父子/异父、三枢轴、负尺度/多圈 Euler、骨架祖先带动蒙皮、层开关/IK 零影响、101 对象可见性、引用保护、跨重启历史。168 模块，主包 1121.71 KB / gzip 321.70 KB，>500 KB 提示保留，无专业性能声明。
+
+开发与最终正式 smoke:objects 完整通过。正式时间 2026-10-26T17:18:01.634Z（北京时间 10-27），项目 c7125da0-edfe-4869-8c8c-884dd84c3363，重开 0490ab5c-581e-40b3-9e95-2fbd74d2f6fe，影片任务 29e3d68b-fb4d-41e8-aea6-375579075787，r17。真实世界手柄 +0.499999485 米；活动/各自枢轴、非法剪切/重复 ID 原子拒绝、批量改挂/显示/删除和历史、重载及同实体 ID 项目副本切换均通过。原生动画 GLB 0 错误/0 警告/1 空节点信息，6 时刻重导入最大差 0.001640947/255；H.264 480×270、24 FPS、48 帧、2 秒，无音轨，5 帧差 0.488439–0.528202/255，无页面错误。
+
+共用网格 smoke:mesh 与基础姿态 smoke:rest-pose 在开发入口完整回归，记录 *-object-group-mesh-runtime.json / *-object-group-rest-runtime.json。网格影片差 0.543794/255；基础姿态动态 GLB 最大差 0.000745885/255，影片 0.397986–0.415278/255，无页面错误。没有重跑每个历史脚本。审批有时耗时很久，不能仅因输出等待结束就重启仍在工作的检查。
+
+研究 docs/research/2026-10-26-object-group.md；开发/正式 *-object-group-dev-runtime.json / *-object-group-runtime.json，原始画面在 .local/checks/object-group。examples/grouped-motion.ffstudio/.glb/.mp4 已归档；包保留源/导入两场景与影片。启动 npm.cmd run dev；正式 npm.cmd run build 后 npm.cmd start；集成入口 npm.cmd run smoke:objects。不要执行旧 .local/checks/update-*-docs.mjs、audit-v18.mjs 或旧生成助手，它们针对历史快照，可能覆盖新文档或错误比较已编辑数据。
+
+**下一项**：完整层级复制，在一个事务中复制所选子树，重映射内部父级、约束、骨架/蒙皮、动作与层引用，定义外部引用、共享几何/材质及新 ID 策略。现有 entity.duplicate 是单对象功能，不能计作完整复制。世界轴之外的坐标系/吸附、动态附着、完整仿射交换、跨对象/IK 图形多选、范围匹配和专业绑定/建模/UV/材质/物理/合成/媒体/AI 全范围继续保留。
+
+本轮开发/正式服务与浏览器已结束，4173 无监听，Node 仅原 Codex PID 11844（未触碰）。Seedance 仍 missing-credentials，无付费或模拟生成。完整目标保持 active。
+
+## 0.23 历史恢复记录
 
 0.22 已提交并推送 5de3e05。本轮 0.23 新增保持世界姿态的重设父级与仿射补偿，项目格式 v18；没有新依赖。用户已授权普通开发、git 存档和推送 https://github.com/weierkeji/video-platform-dev.git，最终 HEAD/origin/main 以 Git 为准。原 .local/data 与作品/备份保留。没有 Blender/bpy、LibTV 私有接口或外部模型调用。REA 当前说明/许可/要求已读，本地 6.7.0 保持；Node 24.20.0 低于当前 main 的 24.22.1 要求，本单元未运行分析引擎。Blender 3.0 官方 Parent 文本为详细公开参照，4.5 搜索信息另列，4.5 直取 402，没有参考产品实机分析声明。
 

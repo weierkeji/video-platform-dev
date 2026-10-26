@@ -1,0 +1,52 @@
+{
+  "checkedAt": "2026-10-26T10:32:48.024Z",
+  "projectId": "73c85fe3-a352-456a-a7e8-9e6c5c5321ac",
+  "importedProjectId": "48d99258-462c-487e-baaa-bcfadb8641b0",
+  "jobId": "b99b7eea-b131-48a4-9825-1eaba4aee348",
+  "browser": "155.0.8059.82",
+  "format": 18,
+  "visibleBoxVertices": 7,
+  "xrayBoxVertices": 8,
+  "worldDisplacement": [
+    [
+      0.5999996931560495,
+      1.554312234475219e-16,
+      -8.326672684688674e-16
+    ],
+    [
+      0.5999996931560492,
+      1.554312234475219e-16,
+      -7.494005416219807e-16
+    ],
+    [
+      0.5999996931560492,
+      -1.554312234475219e-16,
+      -7.494005416219807e-16
+    ],
+    [
+      0.5999996931560495,
+      -1.554312234475219e-16,
+      -8.326672684688674e-16
+    ]
+  ],
+  "vertices": 12,
+  "triangles": 20,
+  "frames": 12,
+  "orangePixels": 10473,
+  "previewExportMeanAbsoluteDifference": 0.5437937242798354,
+  "checks": [
+    "vertex pick and shift toggle",
+    "occlusion vs xray",
+    "box selection and mode conversion",
+    "edge transform and undo",
+    "connected face region extrusion",
+    "world gizmo with rotated nonuniform parent",
+    "one drag one transaction; Escape cancels",
+    "numeric rotation and scale",
+    "empty mesh save/reload/undo keeps entity",
+    "OBJ download",
+    "MP4 render and portable project reimport",
+    "OBJ retains exact geometry; actual PNG/MP4 pixels match and include the edited mesh"
+  ],
+  "pageErrors": []
+}

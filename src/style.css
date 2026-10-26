@@ -385,6 +385,24 @@ small {
   gap: 9px;
   padding: 8px 12px;
 }
+.entity.active-object {
+  box-shadow: inset 3px 0 #ffc36a;
+}
+.object-selection-tools,
+.object-group-panel .button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.object-selection-tools {
+  padding: 6px 10px;
+}
+.object-group-panel h3 {
+  margin: 12px 0 8px;
+}
+.object-group-panel {
+  padding: 0 12px 12px;
+}
 .entity.selected {
   background: #344a5d;
   color: #fff;

@@ -1,0 +1,176 @@
+{
+  "checkedAt": "2026-10-26T10:30:05.455Z",
+  "browser": "155.0.8059.82",
+  "projectId": "7a37e1c6-1ed5-4427-b8b8-9621b6f5c46e",
+  "restoredProjectId": "dba82624-83d6-4c83-85c7-0a1066d9e0ff",
+  "jobId": "fac6538e-2fad-44c4-a121-749b033505e4",
+  "revision": 17,
+  "gizmoWorldDelta": [
+    0.4999994847997743,
+    0,
+    -5.551115123125783e-17
+  ],
+  "previewChange": 1.5762091669433838,
+  "previewCommitDifference": 0.03798978914162378,
+  "editMeasurements": [
+    {
+      "frame": 0,
+      "difference": 4.659068930041152
+    },
+    {
+      "frame": 7.5,
+      "difference": 4.9560982510288065
+    },
+    {
+      "frame": 12,
+      "difference": 5.128937757201646
+    },
+    {
+      "frame": 24,
+      "difference": 4.685401234567901
+    },
+    {
+      "frame": 36,
+      "difference": 4.637001028806584
+    },
+    {
+      "frame": 47,
+      "difference": 4.602975823045267
+    }
+  ],
+  "importedMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0.00031635802469135804
+    },
+    {
+      "frame": 7.5,
+      "difference": 0.00034722222222222224
+    },
+    {
+      "frame": 12,
+      "difference": 0.000051440329218106995
+    },
+    {
+      "frame": 24,
+      "difference": 0.00043467078189300413
+    },
+    {
+      "frame": 36,
+      "difference": 0.0002777777777777778
+    },
+    {
+      "frame": 47,
+      "difference": 0.0016409465020576133
+    }
+  ],
+  "videoMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0.48843878600823043
+    },
+    {
+      "frame": 12,
+      "difference": 0.5282021604938272
+    },
+    {
+      "frame": 24,
+      "difference": 0.5136985596707819
+    },
+    {
+      "frame": 36,
+      "difference": 0.5063940329218107
+    },
+    {
+      "frame": 47,
+      "difference": 0.5175617283950618
+    }
+  ],
+  "validator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 1,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/5"
+      }
+    ],
+    "truncated": false
+  },
+  "video": {
+    "index": 0,
+    "codec_name": "h264",
+    "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+    "profile": "High",
+    "codec_type": "video",
+    "codec_tag_string": "avc1",
+    "codec_tag": "0x31637661",
+    "mime_codec_string": "avc1.640015",
+    "width": 480,
+    "height": 270,
+    "coded_width": 480,
+    "coded_height": 270,
+    "has_b_frames": 2,
+    "pix_fmt": "yuv420p",
+    "level": 21,
+    "chroma_location": "left",
+    "field_order": "progressive",
+    "is_avc": "true",
+    "nal_length_size": "4",
+    "id": "0x1",
+    "r_frame_rate": "24/1",
+    "avg_frame_rate": "24/1",
+    "time_base": "1/12288",
+    "start_pts": 0,
+    "start_time": "0.000000",
+    "duration_ts": 24576,
+    "duration": "2.000000",
+    "bit_rate": "84504",
+    "bits_per_raw_sample": "8",
+    "nb_frames": "48",
+    "extradata_size": 46,
+    "disposition": {
+      "default": 1,
+      "dub": 0,
+      "original": 0,
+      "comment": 0,
+      "lyrics": 0,
+      "karaoke": 0,
+      "forced": 0,
+      "hearing_impaired": 0,
+      "visual_impaired": 0,
+      "clean_effects": 0,
+      "attached_pic": 0,
+      "timed_thumbnails": 0,
+      "non_diegetic": 0,
+      "captions": 0,
+      "descriptions": 0,
+      "metadata": 0,
+      "dependent": 0,
+      "still_image": 0,
+      "multilayer": 0
+    },
+    "tags": {
+      "language": "und",
+      "handler_name": "VideoHandler",
+      "encoder": "Lavc63.1.102 libx264"
+    }
+  },
+  "pageErrors": [],
+  "checks": [
+    "hierarchical list Shift toggles and active-object reassignment",
+    "viewport click/Shift, origin rectangle and A/Alt-A selection",
+    "real group gizmo preview, Escape and one saved revision",
+    "selected ancestor/child receive exactly one world delta",
+    "active and individual pivots with numeric rotation/scale",
+    "shear and duplicate selections reject atomically",
+    "batch keep-world reparent, visibility, delete and undo/redo",
+    "reload clears temporary selection but retains every edit",
+    "native animated GLB reimport and complete project recovery",
+    "real H264 matches edited previews"
+  ]
+}

@@ -8,9 +8,25 @@ import { type Entity, type Project } from '../core/model';
 import { transformVertices, type MeshSelection } from '../core/mesh';
 import { MeshOverlay, MeshPicker } from '../render/mesh-edit';
 import { JointOverlay } from '../render/joints';
-import { activeConstraints, activeIK, localBasis, matrixTransform } from '../core/constraints';
+import {
+  activeConstraints,
+  activeIK,
+  localBasis,
+  matrixTransform,
+  sceneEvaluator,
+} from '../core/constraints';
 import { evaluatedIK } from '../core/ik-animation';
 import { evaluatedTransform } from '../core/evaluate';
+import { applyCommands } from '../core/commands';
+import { identity } from '../core/model';
+import {
+  objectPivot,
+  objectTransformBlock,
+  type ObjectPivot,
+  type ObjectTransformCommand,
+} from '../core/object-transform';
+import { ObjectSelectionOverlay } from '../render/object-selection';
+import { visibleObjects } from './object-selection';
 
 export type ViewportProps = {
   project: Project;
@@ -21,7 +37,11 @@ export type ViewportProps = {
   restEditing: boolean;
   restEditable: boolean;
   selected: string | null;
-  select: (id: string) => void;
+  selectedIds: string[];
+  objectPivot: ObjectPivot;
+  select: (id: string | null, toggle?: boolean) => void;
+  selectObjects: (ids: string[], mode: 'replace' | 'add' | 'remove') => void;
+  onGroupTransform: (command: ObjectTransformCommand) => void;
   mode: 'translate' | 'rotate' | 'scale';
   view: 'scene' | 'sequence';
   onTransform: (id: string, transform: Entity['transform']) => void;
@@ -77,6 +97,7 @@ export function Viewport(props: ViewportProps) {
       let lastSelection: MeshSelection | null | undefined,
         lastXray = false;
       const proxy = new THREE.Object3D();
+      const selectionMarks = new ObjectSelectionOverlay(renderer);
       let drag: {
         projectId: string;
         revision: number;
@@ -94,6 +115,7 @@ export function Viewport(props: ViewportProps) {
         parent?: THREE.Matrix4;
         basis?: THREE.Matrix4;
         channel?: Entity['transform'];
+        group?: ObjectTransformCommand;
       } | null = null;
       let down: { x: number; y: number; transformed: boolean; box: boolean } | null = null;
       let cancelling = false;
@@ -117,7 +139,7 @@ export function Viewport(props: ViewportProps) {
           const p = current.current;
           proxy.updateMatrixWorld(true);
           const attached =
-            gizmo.object === proxy && !overlay
+            gizmo.object === proxy && !overlay && p.selectedIds.length === 1
               ? p.project.entities.find((e) => e.id === p.selected && e.parentOffset?.enabled)
               : undefined;
           const object = attached && renderer.objects.get(attached.id);
@@ -139,6 +161,18 @@ export function Viewport(props: ViewportProps) {
             entityId: attached?.id,
             parent: object?.parent?.matrixWorld.clone(),
             basis: attached && localBasis(attached),
+            group:
+              !overlay && p.selectedIds.length > 1
+                ? {
+                    type: 'entities.transform',
+                    entityIds: [...p.selectedIds],
+                    activeId: p.selected!,
+                    frame: p.frame,
+                    layers: p.layersPreview,
+                    pivot: p.objectPivot,
+                    delta: identity(),
+                  }
+                : undefined,
           };
         } else if (!e.value && gizmo.object && !cancelling && drag) {
           const pending = drag;
@@ -151,7 +185,10 @@ export function Viewport(props: ViewportProps) {
             p.layersPreview === pending.layersPreview &&
             p.restEditing === pending.restEditing &&
             p.meshSelection === pending.selection &&
-            (!pending.entityId || p.selected === pending.entityId);
+            (!pending.entityId || p.selected === pending.entityId) &&
+            (!pending.group ||
+              (p.selectedIds.join('/') === pending.group.entityIds.join('/') &&
+                p.objectPivot === pending.group.pivot));
           if (pending.geometry && overlay) {
             overlay.preview(pending.geometry.positions, true);
             if (valid && pending.matrix && pending.changed)
@@ -159,6 +196,10 @@ export function Viewport(props: ViewportProps) {
             return;
           }
           if (!valid || !pending.changed) return;
+          if (pending.group) {
+            current.current.onGroupTransform(pending.group);
+            return;
+          }
           if (pending.entityId) {
             if (pending.channel) current.current.onTransform(pending.entityId, pending.channel);
             return;
@@ -174,6 +215,37 @@ export function Viewport(props: ViewportProps) {
       gizmo.addEventListener('objectChange', () => {
         if (!drag || cancelling) return;
         drag.changed = true;
+        if (drag.group) {
+          try {
+            const delta = {
+              position: proxy.position
+                .clone()
+                .sub(new THREE.Vector3().setFromMatrixPosition(drag.start))
+                .toArray(),
+              rotation: [proxy.rotation.x, proxy.rotation.y, proxy.rotation.z] as [
+                number,
+                number,
+                number,
+              ],
+              scale: proxy.scale.toArray(),
+            };
+            const command = { ...drag.group, delta };
+            const preview = applyCommands(current.current.project, [command]).project;
+            renderer.previewPose(
+              sceneEvaluator(preview, current.current.sceneId)(
+                command.frame,
+                undefined,
+                command.layers,
+              ),
+            );
+            drag.group = command;
+            setError('');
+          } catch (e) {
+            cancel();
+            setError((e as Error).message);
+          }
+          return;
+        }
         if (drag.entityId) {
           proxy.updateMatrixWorld(true);
           try {
@@ -238,6 +310,7 @@ export function Viewport(props: ViewportProps) {
         if (drag) cancel();
         overlay?.dispose();
         joints?.dispose();
+        selectionMarks.dispose();
         overlay = undefined;
         gizmo.detach();
         renderer.setProject(current.current.project, current.current.sceneId);
@@ -294,7 +367,7 @@ export function Viewport(props: ViewportProps) {
           x: e.clientX,
           y: e.clientY,
           transformed: false,
-          box: !!current.current.meshSelection && boxToolRef.current,
+          box: !current.current.restEditing && boxToolRef.current,
         };
         if (down.box) {
           e.preventDefault();
@@ -349,6 +422,24 @@ export function Viewport(props: ViewportProps) {
             e,
             true,
           );
+        else if (!current.current.meshSelection) {
+          const p = current.current,
+            ids: string[] = [];
+          const left = Math.min(down.x, e.clientX),
+            right = Math.max(down.x, e.clientX),
+            top = Math.min(down.y, e.clientY),
+            bottom = Math.max(down.y, e.clientY);
+          for (const key of visibleObjects(p.project, p.sceneId)) {
+            const q = new THREE.Vector3()
+              .setFromMatrixPosition(renderer.objects.get(key)!.matrixWorld)
+              .project(cam);
+            const x = r.left + ((q.x + 1) * r.width) / 2,
+              y = r.top + ((1 - q.y) * r.height) / 2;
+            if (q.z >= -1 && q.z <= 1 && x >= left && x <= right && y >= top && y <= bottom)
+              ids.push(key);
+          }
+          p.selectObjects(ids, e.ctrlKey || e.metaKey ? 'remove' : e.shiftKey ? 'add' : 'replace');
+        }
         down = null;
         orbit.enabled = true;
         setBox(null);
@@ -386,7 +477,10 @@ export function Viewport(props: ViewportProps) {
         );
         const jointHits = ray.intersectObjects(joints?.pickables() || [], false);
         if (jointHits[0]) {
-          current.current.select(jointHits[0].object.userData.entityId);
+          current.current.select(
+            jointHits[0].object.userData.entityId,
+            e.shiftKey || e.ctrlKey || e.metaKey,
+          );
           return;
         }
         const hits = ray.intersectObjects(
@@ -400,7 +494,12 @@ export function Viewport(props: ViewportProps) {
           }),
           false,
         );
-        if (hits[0]) current.current.select(hits[0].object.userData.entityId);
+        if (hits[0])
+          current.current.select(
+            hits[0].object.userData.entityId,
+            e.shiftKey || e.ctrlKey || e.metaKey,
+          );
+        else if (!e.shiftKey && !e.ctrlKey && !e.metaKey) current.current.select(null);
       };
       const keydown = (e: KeyboardEvent) => {
         if (document.querySelector('.modal-backdrop')) return;
@@ -414,7 +513,7 @@ export function Viewport(props: ViewportProps) {
           e.preventDefault();
           e.stopImmediatePropagation();
           cancel();
-        } else if (current.current.meshSelection && e.key.toLowerCase() === 'b') {
+        } else if (!current.current.restEditing && e.key.toLowerCase() === 'b') {
           e.preventDefault();
           setBoxTool((v) => !v);
         } else if (down?.box && e.key === 'Escape') {
@@ -439,15 +538,27 @@ export function Viewport(props: ViewportProps) {
             p.restEditing !== drag.restEditing ||
             p.meshSelection !== drag.selection ||
             p.playing ||
-            (drag.entityId && p.selected !== drag.entityId))
+            (drag.entityId && p.selected !== drag.entityId) ||
+            (drag.group &&
+              (p.selectedIds.join('/') !== drag.group.entityIds.join('/') ||
+                p.objectPivot !== drag.group.pivot)))
         )
           cancel();
         const selected = syncSelection();
         const compensated =
           selected &&
           p.project.entities.some((e) => e.id === p.selected && e.parentOffset?.enabled);
+        const group = p.selectedIds.length > 1 && !p.meshSelection && !p.restEditing;
         if (overlay && !gizmo.dragging) {
           proxy.position.copy(overlay.center());
+          proxy.quaternion.identity();
+          proxy.scale.set(1, 1, 1);
+          proxy.updateMatrixWorld(true);
+        } else if (group && !gizmo.dragging) {
+          const world = new Map(
+            p.selectedIds.map((key) => [key, renderer.objects.get(key)!.matrixWorld]),
+          );
+          proxy.position.copy(objectPivot(world, p.selectedIds, p.selected!, p.objectPivot));
           proxy.quaternion.identity();
           proxy.scale.set(1, 1, 1);
           proxy.updateMatrixWorld(true);
@@ -458,8 +569,11 @@ export function Viewport(props: ViewportProps) {
           proxy.userData.entityId = p.selected;
           proxy.updateMatrixWorld(true);
         }
-        const target =
-          p.restEditing && !p.restEditable
+        const target = group
+          ? objectTransformBlock(p.project, p.selectedIds, p.frame, p.layersPreview)
+            ? undefined
+            : proxy
+          : p.restEditing && !p.restEditable
             ? undefined
             : p.meshSelection
               ? overlay?.vertices.length && Math.abs(overlay.mesh.matrixWorld.determinant()) > 1e-12
@@ -489,10 +603,11 @@ export function Viewport(props: ViewportProps) {
           !p.playing &&
           !renderer.loading &&
           !renderer.textureError &&
-          !(p.meshSelection && boxToolRef.current);
+          !(boxToolRef.current && !p.restEditing);
         gizmo.setSpace('world');
         gizmo.setMode(p.mode);
         orbit.update();
+        selectionMarks.update(p.meshSelection ? [] : p.selectedIds, p.selected);
         if (renderer.loading !== previousLoading) {
           previousLoading = renderer.loading;
           setLoadingTextures(renderer.loading);
@@ -522,6 +637,7 @@ export function Viewport(props: ViewportProps) {
         canvas.current?.removeEventListener('pointerup', pick);
         overlay?.dispose();
         joints?.dispose();
+        selectionMarks.dispose();
         gizmo.detach();
         gizmo.dispose();
         orbit.dispose();
@@ -583,6 +699,7 @@ export function Viewport(props: ViewportProps) {
         tabIndex={0}
         data-mesh-mode={props.meshSelection?.mode || 'object'}
         data-rest-pose={props.restEditing ? 'true' : 'false'}
+        data-selected-objects={props.selectedIds.join(' ')}
         aria-label={props.view === 'scene' ? '三维编辑视图' : '成片预览'}
       />
       {box && (
@@ -612,11 +729,13 @@ export function Viewport(props: ViewportProps) {
             />
             显示关节
           </label>
+          {!props.restEditing && (
+            <button className={boxTool ? 'active' : ''} onClick={() => setBoxTool(!boxTool)}>
+              {props.meshSelection ? '框选 · B' : '框选原点 · B'}
+            </button>
+          )}
           {props.meshSelection && (
             <>
-              <button className={boxTool ? 'active' : ''} onClick={() => setBoxTool(!boxTool)}>
-                框选 · B
-              </button>
               <label>
                 <input
                   type="checkbox"

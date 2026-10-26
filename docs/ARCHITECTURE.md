@@ -9,6 +9,8 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 | `src/core/model.ts` | v18 模型、v1–v17 迁移、引用/层级/绑定/权重/时间轴/动作约束、工作流拓扑检查 |
 | `src/core/generation.ts` | 生成参数、模型系列限制、不可变请求规格 |
 | `src/core/commands.ts` | 有限结构化命令，复制状态、整批应用并校验 |
+| `src/core/object-transform.ts` / `ui/ObjectGroupPanel.tsx` | 同一旧姿态定义成组世界变换、父级预测/频道反算、最终姿态验收与批量入口 |
+| `src/ui/object-selection.ts` / `render/object-selection.ts` | 临时有序对象集合、活动对象、层级行/可见性；编辑器专用包围标记 |
 | `src/core/parenting.ts` / `ui/ParentingPanel.tsx` | 原层级快照计算仿射补偿、批量父级编辑、完整世界矩阵验收与属性入口 |
 | `src/core/key-editing.ts` / `ui/KeyBatchTools.tsx` | 原子多键时间变换/复制/删除、手柄和导数换算、共用拖动预演与批量 UI |
 | `src/core/geometry.ts` | 自主基本几何、共享边中点细分、三角面法向挤出、OBJ 交换 |
@@ -57,6 +59,16 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 - 画幅：Clip.fit 为 contain/cover/stretch。默认 contain 保持完整画面、空白处显示低轨；cover 居中裁切源画面；stretch 拉伸。预览和导出共用矩形计算。
 - 数据版本：schemaVersion=18；显式拒绝未知格式。v1 在副本上升级，每个旧片段设为 stretch，保留音量；v2–v17 保留已有设置。v1–v3 关键帧按轨道内原时间派生 `legacy-key-<frame>`，在历史/任务快照间保持一致；v4 及以上的键 ID 原样保留。v6–v18 新字段均可选；v11→v12→v13→v14→v15→v16→v17→v18 修改格式号，并沿用机器精度绑定矩阵末行规范化。新关键帧为 UUID，ID 在轨道内唯一；完整身份是 `(trackId,keyId)`。复制动作创建新轨道/键 ID。不改原项目文件。数据库启动时先校验全部待迁移数据，`VACUUM INTO` 备份完整库，再在事务内升级项目、撤销历史、版本与任务快照，并写入 `schema_migrations` 的版本、备份名和计数；不增加用户编辑修订。夹具覆盖升级、原库备份和历史恢复。
 - 生成：工作流节点保存参数和首尾帧 Asset ID，通过统一命令编辑并验证引用；被引用图片不可删除。提交时保存解析后的 GenerationRequest、Project 快照、工作流/输出节点和 requestKey；后续编辑不影响已提交请求。
+
+## 多对象选择与成组编辑（0.24）
+
+App 保存临时有序 selectedIds，最后一项为唯一活动对象。列表按真实层级前序排列，列表/视口共用增减选择，A/Alt+A 全选可见对象/清空，B 框选可见原点投影。父级隐藏时后代不参加框选；对象框选不执行网格遮挡检测。项目切换即清空（即使复制项目保留实体 ID），场景刷新剔除无效 ID，进入曲线/成片/基础姿态/组件上下文收敛到活动对象。选择不写入项目，不需要格式迁移。
+
+entities.transform 接收最多 2000 个同场景唯一 ID、activeId、frame、layers、pivot 和世界 position/rotation/scale 增量。Dᵢ=T(位移)×T(枢轴ᵢ)×R×S×T(-枢轴ᵢ)，目标 Wᵢ'=Dᵢ×旧 Wᵢ；均值枢轴包含所有所选原点，活动/各自模式分别取活动/各自原点。父级若有选中祖先，使用最近选中祖先的 D 更新旧父级世界矩阵，再以 inverse(localBasis)×inverse(新父世界)×Wᵢ' 反算原频道。共同 D 在父子之间抵消，避免重复移动；各自原点允许反算子频道以抵消父级附带位移。
+
+已有动画频道通过 key.set 更新当前动作当前帧，保留已有键身份/插值/切线；其余频道改基础值，其他动作不改。纯平移保留镜像尺度和多圈 Euler；四元数取靠近原符号的半球，Euler 取接近原角度的等价分支。直接蒙皮、有效约束、当前非零 IK、启用层预览阻止频道编辑；不可表示的剪切、最终选中世界矩阵偏移或新增求值诊断拒绝整批。位移验收绝对阈值 1e-6 米，其余分量相对阈值 1e-8。
+
+Viewport 的世界代理通过同一命令草稿与场景求值生成临时完整姿态；SceneRenderer.previewPose 更新实际矩阵与蒙皮，权威项目不变，松开才保存一个修订，Esc/帧/修订/选择/枢轴变化取消。包围标记只在编辑视口。entities.visibility 用单命令设置至多 2000 项显式可见性，避免普通批次 100 命令上限；entities.delete 先合并所选子树，再检查外部引用和最终模型，内部引用没有逐项顺序依赖。批量父级复用 entity.reparent，逐项附加到统一父级，因此所选父子可能变为同级。
 
 ## 保持世界姿态的层级编辑（0.23）
 
