@@ -1,8 +1,32 @@
 # 持续开发恢复记录
 
-更新时间：2026-10-27。完整 Blender + LibTV 功能目标仍 active；0.24 是基础版本检查点，不是目标完成声明。旧段落保留历史证据。
+更新时间：2026-10-27。完整 Blender + LibTV 功能目标仍 active；0.25 是基础版本检查点，不是目标完成声明。旧段落保留历史证据。
 
-## 0.24 最新恢复入口
+## 0.25 最新恢复入口
+
+0.24 已提交并推送 c735dbc。本轮 0.25 新增完整实体子树复制与内部依赖映射，沿用格式 v18，无新迁移/依赖。用户再次明确所有操作授权、继续至可交付，不要停下等待询问；普通开发/提交/推送继续自主执行。远端 https://github.com/weierkeji/video-platform-dev.git，最终 HEAD/origin/main 以实际 Git 为准，完整目标不能因本版本完成而关闭。
+
+core/hierarchy-copy.ts 定义 entities.duplicate：entityIds 子树并集、UUID batchId、geometry/materials copy/linked、external preserve/include/reject。内部父级、约束目标、skin joints/skeletonId、完整 IK joints/target/pole/limits、参数轨道、全部动作变换轨道/新键、对象层与目标骨架的重定向配方映射到副本。ID 为 batchId_kind_serial，符合旧 ID 字符规则，按源数组顺序确定；命名空间复用拒绝。原地复制，不自动移动或改原对象。单对象旧 entity.duplicate API 保留兼容，GUI 改为层级复制入口。
+
+include 递归包含出向依赖的子树，重定向源可跨场景且留在其原场景；preserve/reject 下不完整 IK 链拒绝。外部父级是边界，始终保留，不沿它扩展整场景。未选节点/镜头/片段等入向引用不重写。重定向配方归 targetRootId：复制目标才复制配方，复制源不改其他目标。独立几何/材质每个原资源只复制一次，保留副本内部共享；linked 直接复用原 ID。图片 Asset/blob 共用。
+
+动作容器为场景选择，复制轨道/键与层但保持 actionId，立即在当前动作播放，原对象键值不联动；动作改名/删除/场景切换仍影响整个容器。复制保留 restPose/parentOffset/原绑定矩阵、权重/UV/插值/限角。模型最终校验，错误无部分保存；共享数据用户管理、集合实例、跨项目复制未实现。不是完全独立资产包或专业性能声明。
+
+HierarchyCopyPanel 提供复制范围、额外依赖、根/场景与外部引用预览；列表多选“复制所选层级”、Inspector“复制层级”进入。取消/Esc 不保存，模态屏蔽编辑快捷键，项目切换关闭；成功只选原场景的副本根，继续现有手柄/属性编辑。前端/Agent 共用命令与单修订 SQLite 历史。
+
+9 项新增核心检查，完整 199/199，TypeScript/构建通过。覆盖全部动作多个子帧世界矩阵与蒙皮顶点、内部共享/独立数据、新键与层、外部策略/入向不变、部分 IK/限角、跨场景重定向、仿射补偿/基础姿态/镜像、容量/输入/批次冲突、SQLite 重启撤销重做。170 模块，主包 1131.74 KB / gzip 324.54 KB，>500 KB 提示保留。首次 ID 草稿含斜线被模型拒绝，已改下划线；未写入产品数据库。
+
+开发 smoke:hierarchy 2026-10-27T07:25:39.832Z，正式 2026-10-27T07:29:15.677Z 均完整通过。正式项目 fe5b5b48-9cb7-47da-9c01-cd3299c31f41，重开 556bf4e8-d568-4274-9806-d0ba8f481095，任务 c60ab8c1-bc1d-4ee1-882f-878dfd15596a，r15。12 对象完整副本、部分链包含依赖后 7 对象；源隐藏只显示副本的六时刻 PNG 差为 0。复制后独立改根、当前帧控制器与材质，原对象数据保留。共享附件引用验证、取消/拒绝、撤销重做、重载与包恢复通过。0.25 帧步长烘焙 GLB 0 错误/0 警告/8 空节点信息，六时刻重导入最大差 0.003539095/255；实际 H.264 480×270、24 FPS、48 帧、2 秒，无音轨，五抽样差 0.451237–0.491008/255，无页面错误。
+
+开发入口还完整回归 smoke:objects（2026-10-27T07:27:47.272Z），原选择/枢轴/手柄/批量操作/恢复/GLB/影片通过，无页面错误；未重跑每个历史脚本。开发/正式服务和浏览器已结束，4173 无监听，Node 仅原 Codex 11844 未触碰。审批/观察等待有时很久，活进程不要因观察超时重复启动。
+
+证据 docs/research/2026-10-27-hierarchy-copy.md 和 *-hierarchy-copy-dev-runtime.json / *-hierarchy-copy-runtime.json / *-hierarchy-copy-objects-runtime.json。原始画面 .local/checks/hierarchy-copy；examples/copied-assembly.ffstudio/.glb/.mp4 已归档。包约 3 MB，保留可编辑源/副本与烘焙重导入场景；镜头指向重导入场景。npm.cmd run dev；正式 npm.cmd run build 后 npm.cmd start；新入口 npm.cmd run smoke:hierarchy，tsx 沙箱 uv_os_get_passwd ENOMEM 时按授权提升执行。保护 .local/data；不要运行旧更新文档/旧快照审计脚本。
+
+REA 当前 README/安装/MIT 已复读；本地 6.7.0 保持，Node 24.20.0 低于当前 main 的 24.22.1 要求，未运行额外引擎。Blender 4.5 Duplicate/Outliner 搜索内容只作行为参考，直接页面 402 未绕过。没有 Blender/bpy、LibTV 私有接口、外部生成或假结果；Seedance 仍 missing-credentials。
+
+**下一项**：共享几何/材质用户管理，显示受影响对象、选择共享用户、按所选对象组解除共享，同时保持蒙皮/UV/图片引用与统一撤销；随后继续片段拖动/裁剪/吸附、多边形拓扑等公共编辑能力。全部专业建模/UV/材质/物理/合成/媒体/AI 目标保留，完整目标保持 active。
+
+## 0.24 历史恢复记录
 
 0.23 已提交并推送 de8e599。本轮 0.24 新增场景多对象选择与成组编辑，沿用格式 v18，无新迁移/依赖。用户已授权普通开发、git 存档和推送 https://github.com/weierkeji/video-platform-dev.git；最终 HEAD/origin/main 以 Git 为准。保留原 .local/data、作品与备份，没有 Blender/bpy、LibTV 私有接口或外部模型调用。REA 当前说明/许可/要求已读，本地 6.7.0 保持，Node 24.20.0 低于当前 main 的 24.22.1 要求，没有运行额外分析引擎。Blender 4.5 选择/枢轴官方搜索内容提供行为参照，直取失败单列，无参考产品实机声明。
 

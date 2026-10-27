@@ -27,6 +27,7 @@ import { ReducePanel } from './ReducePanel';
 import { restProject, rigNodes } from '../core/rest-pose';
 import { RestPosePanel } from './RestPosePanel';
 import { ObjectGroupPanel } from './ObjectGroupPanel';
+import { HierarchyCopyPanel } from './HierarchyCopyPanel';
 import { chooseObjects, sceneRows, visibleObjects } from './object-selection';
 import type { ObjectPivot } from '../core/object-transform';
 
@@ -79,6 +80,7 @@ export function App() {
     [exchangeOpen, setExchangeOpen] = useState(false),
     [retargetOpen, setRetargetOpen] = useState(false),
     [reduceOpen, setReduceOpen] = useState(false),
+    [copyIds, setCopyIds] = useState<string[] | null>(null),
     [commandText, setCommandText] = useState(
       '[\n  { "type": "project.rename", "name": "新作品" }\n]',
     ),
@@ -94,7 +96,10 @@ export function App() {
   }, [restEditing, meshSelection, workspace, view]);
   const accept = useCallback((next: Envelope) => {
     const previous = projectRef.current;
-    if (previous?.id !== next.project.id) setRestEditing(false);
+    if (previous?.id !== next.project.id) {
+      setRestEditing(false);
+      setCopyIds(null);
+    }
     setMeshSelection((selection) => {
       if (!selection || previous?.id !== next.project.id) return null;
       const old = previous.geometries.find((g) => g.id === selection.geometryId),
@@ -279,7 +284,7 @@ export function App() {
   }, [playing, envelope?.project.timeline.fps, envelope?.project.timeline.duration]);
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
-      if (exchangeOpen || retargetOpen || reduceOpen || newDialog) return;
+      if (exchangeOpen || retargetOpen || reduceOpen || newDialog || copyIds) return;
       if ((e.target as HTMLElement).closest('input,textarea,select,[contenteditable]')) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
@@ -360,6 +365,7 @@ export function App() {
     exchangeOpen,
     retargetOpen,
     reduceOpen,
+    copyIds,
     newDialog,
   ]);
   const projectId = envelope?.project.id;
@@ -579,7 +585,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.24</small>
+            FRAMEFORGE<small>创作工作台 · 0.25</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -785,6 +791,22 @@ export function App() {
             ))}
           </div>
           <div className="button-row object-selection-tools">
+            <button
+              disabled={
+                !selectedIds.length ||
+                !!meshSelection ||
+                restEditing ||
+                workspace !== 'studio' ||
+                view !== 'scene'
+              }
+              onClick={() => {
+                setPlaying(false);
+                setError('');
+                setCopyIds([...selectedIds]);
+              }}
+            >
+              复制所选层级
+            </button>
             <button
               disabled={restEditing || workspace !== 'studio' || view !== 'scene'}
               onClick={() => {
@@ -1111,6 +1133,11 @@ export function App() {
                 layers={workspace === 'studio' && view === 'scene' ? layersPreview : true}
                 send={(c, l) => void send(c, l)}
                 transform={transform}
+                duplicate={() => {
+                  setPlaying(false);
+                  setError('');
+                  setCopyIds(selected ? [selected] : []);
+                }}
               />
             )}
           </fieldset>
@@ -1374,6 +1401,27 @@ export function App() {
           event.target.value = '';
         }}
       />
+      {copyIds && (
+        <HierarchyCopyPanel
+          key={p.id}
+          project={p}
+          ids={copyIds}
+          busy={busy}
+          saveError={error}
+          send={send}
+          onClose={() => setCopyIds(null)}
+          onCopied={(ids) => {
+            setCopyIds(null);
+            setSelectedIds(ids);
+            setSelectedKey(null);
+            setSelectedClip(null);
+            setMeshSelection(null);
+            setRestEditing(false);
+            setWorkspace('studio');
+            setView('scene');
+          }}
+        />
+      )}
       {reduceOpen && (
         <ReducePanel
           key={p.id + sceneId}

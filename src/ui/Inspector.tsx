@@ -99,6 +99,7 @@ export function Inspector({
   layers = true,
   send,
   transform,
+  duplicate,
 }: {
   project: Project;
   entity?: Entity;
@@ -107,6 +108,7 @@ export function Inspector({
   layers?: boolean;
   send: (c: Command[], label: string) => void;
   transform: (id: string, t: Entity['transform']) => void;
+  duplicate: () => void;
 }) {
   const [vertex, setVertex] = useState(0),
     [face, setFace] = useState(0),
@@ -730,9 +732,7 @@ export function Inspector({
           </>
         )}
         <div className="button-row">
-          <button onClick={() => send([{ type: 'entity.duplicate', id: e.id }], '复制对象')}>
-            复制
-          </button>
+          <button onClick={duplicate}>复制层级</button>
           <button
             className="danger"
             onClick={() => send([{ type: 'entity.delete', id: e.id }], '删除对象及子对象')}

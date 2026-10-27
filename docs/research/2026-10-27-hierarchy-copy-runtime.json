@@ -1,0 +1,213 @@
+{
+  "checkedAt": "2026-10-27T07:29:15.677Z",
+  "browser": "155.0.8059.82",
+  "projectId": "fe5b5b48-9cb7-47da-9c01-cd3299c31f41",
+  "restoredProjectId": "556bf4e8-d568-4274-9806-d0ba8f481095",
+  "jobId": "c60ab8c1-bc1d-4ee1-882f-878dfd15596a",
+  "revision": 15,
+  "copiedObjects": 12,
+  "expandedObjects": 7,
+  "copyMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0
+    },
+    {
+      "frame": 7.5,
+      "difference": 0
+    },
+    {
+      "frame": 12,
+      "difference": 0
+    },
+    {
+      "frame": 24,
+      "difference": 0
+    },
+    {
+      "frame": 36,
+      "difference": 0
+    },
+    {
+      "frame": 47,
+      "difference": 0
+    }
+  ],
+  "importedMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0.0013605967078189301
+    },
+    {
+      "frame": 7.5,
+      "difference": 0.00051440329218107
+    },
+    {
+      "frame": 12,
+      "difference": 0.000522119341563786
+    },
+    {
+      "frame": 24,
+      "difference": 0.0007124485596707819
+    },
+    {
+      "frame": 36,
+      "difference": 0.0004063786008230453
+    },
+    {
+      "frame": 47,
+      "difference": 0.003539094650205761
+    }
+  ],
+  "videoMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0.45346707818930043
+    },
+    {
+      "frame": 12,
+      "difference": 0.4512371399176955
+    },
+    {
+      "frame": 24,
+      "difference": 0.4836831275720165
+    },
+    {
+      "frame": 36,
+      "difference": 0.4571373456790123
+    },
+    {
+      "frame": 47,
+      "difference": 0.4910082304526749
+    }
+  ],
+  "validator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 8,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/6"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/8"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/9"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/11"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/18"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/20"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/21"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/23"
+      }
+    ],
+    "truncated": false
+  },
+  "video": {
+    "index": 0,
+    "codec_name": "h264",
+    "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+    "profile": "High",
+    "codec_type": "video",
+    "codec_tag_string": "avc1",
+    "codec_tag": "0x31637661",
+    "mime_codec_string": "avc1.640015",
+    "width": 480,
+    "height": 270,
+    "coded_width": 480,
+    "coded_height": 270,
+    "has_b_frames": 2,
+    "pix_fmt": "yuv420p",
+    "level": 21,
+    "chroma_location": "left",
+    "field_order": "progressive",
+    "is_avc": "true",
+    "nal_length_size": "4",
+    "id": "0x1",
+    "r_frame_rate": "24/1",
+    "avg_frame_rate": "24/1",
+    "time_base": "1/12288",
+    "start_pts": 0,
+    "start_time": "0.000000",
+    "duration_ts": 24576,
+    "duration": "2.000000",
+    "bit_rate": "83636",
+    "bits_per_raw_sample": "8",
+    "nb_frames": "48",
+    "extradata_size": 46,
+    "disposition": {
+      "default": 1,
+      "dub": 0,
+      "original": 0,
+      "comment": 0,
+      "lyrics": 0,
+      "karaoke": 0,
+      "forced": 0,
+      "hearing_impaired": 0,
+      "visual_impaired": 0,
+      "clean_effects": 0,
+      "attached_pic": 0,
+      "timed_thumbnails": 0,
+      "non_diegetic": 0,
+      "captions": 0,
+      "descriptions": 0,
+      "metadata": 0,
+      "dependent": 0,
+      "still_image": 0,
+      "multilayer": 0
+    },
+    "tags": {
+      "language": "und",
+      "handler_name": "VideoHandler",
+      "encoder": "Lavc63.1.102 libx264"
+    }
+  },
+  "pageErrors": [],
+  "checks": [
+    "partial IK rejection and dependency-inclusive copy",
+    "overlapping ancestor/child selection copies one subtree union",
+    "preview cancellation, external reference rejection and single revision undo/redo",
+    "copied worlds and weighted skin match across six sample times",
+    "only copied assembly renders identically to original at six times",
+    "independent copied root, animated controller and material edits leave originals unchanged",
+    "linked data uses original geometry/material IDs",
+    "reload and project recovery retain both independent rigs and control tracks",
+    "baked animated GLB validates and reimports",
+    "real H264 matches edited scenes"
+  ]
+}

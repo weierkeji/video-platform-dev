@@ -1,6 +1,6 @@
 {
   "name": "frameforge-studio",
-  "version": "0.24.0",
+  "version": "0.25.0",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -37,7 +37,8 @@
     "smoke:adaptive": "tsx scripts/adaptive-smoke.ts",
     "smoke:keys": "tsx scripts/key-editing-smoke.ts",
     "smoke:parenting": "tsx scripts/parenting-smoke.ts",
-    "smoke:objects": "tsx scripts/object-group-smoke.ts"
+    "smoke:objects": "tsx scripts/object-group-smoke.ts",
+    "smoke:hierarchy": "tsx scripts/hierarchy-copy-smoke.ts"
   },
   "dependencies": {
     "react": "19.1.1",

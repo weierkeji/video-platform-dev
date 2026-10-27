@@ -55,6 +55,7 @@ import { planIKMatch, verifyIKMatch } from './ik-match';
 import { retargetAnimation, activateRetarget } from './retarget';
 import { reduceAction, ReduceOptionsSchema } from './reduce-curves';
 import { ReparentSchema, reparentEntities } from './parenting';
+import { HierarchyCopySchema, duplicateHierarchy } from './hierarchy-copy';
 import {
   ObjectTransformSchema,
   planObjectTransform,
@@ -66,6 +67,7 @@ const ID = z.string().min(1).max(80);
 const MeshIndices = z.array(z.number().int().nonnegative()).min(1).max(200000);
 export const CommandSchema = z.discriminatedUnion('type', [
   ObjectTransformSchema,
+  HierarchyCopySchema,
   z
     .object({
       type: z.literal('entities.visibility'),
@@ -786,6 +788,9 @@ function apply(p: Project, c: Command) {
       p.materials = p.materials.filter((m) => p.entities.some((e) => e.materialId === m.id));
       break;
     }
+    case 'entities.duplicate':
+      duplicateHierarchy(p, c);
+      break;
     case 'entity.duplicate': {
       const source = get(p.entities, c.id),
         e = structuredClone(source);

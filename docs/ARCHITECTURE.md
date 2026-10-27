@@ -9,6 +9,7 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 | `src/core/model.ts` | v18 模型、v1–v17 迁移、引用/层级/绑定/权重/时间轴/动作约束、工作流拓扑检查 |
 | `src/core/generation.ts` | 生成参数、模型系列限制、不可变请求规格 |
 | `src/core/commands.ts` | 有限结构化命令，复制状态、整批应用并校验 |
+| `src/core/hierarchy-copy.ts` / `ui/HierarchyCopyPanel.tsx` | 子树并集与出向依赖闭包、批次 ID、内部引用映射、共享数据策略及复制范围预览 |
 | `src/core/object-transform.ts` / `ui/ObjectGroupPanel.tsx` | 同一旧姿态定义成组世界变换、父级预测/频道反算、最终姿态验收与批量入口 |
 | `src/ui/object-selection.ts` / `render/object-selection.ts` | 临时有序对象集合、活动对象、层级行/可见性；编辑器专用包围标记 |
 | `src/core/parenting.ts` / `ui/ParentingPanel.tsx` | 原层级快照计算仿射补偿、批量父级编辑、完整世界矩阵验收与属性入口 |
@@ -59,6 +60,16 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 - 画幅：Clip.fit 为 contain/cover/stretch。默认 contain 保持完整画面、空白处显示低轨；cover 居中裁切源画面；stretch 拉伸。预览和导出共用矩形计算。
 - 数据版本：schemaVersion=18；显式拒绝未知格式。v1 在副本上升级，每个旧片段设为 stretch，保留音量；v2–v17 保留已有设置。v1–v3 关键帧按轨道内原时间派生 `legacy-key-<frame>`，在历史/任务快照间保持一致；v4 及以上的键 ID 原样保留。v6–v18 新字段均可选；v11→v12→v13→v14→v15→v16→v17→v18 修改格式号，并沿用机器精度绑定矩阵末行规范化。新关键帧为 UUID，ID 在轨道内唯一；完整身份是 `(trackId,keyId)`。复制动作创建新轨道/键 ID。不改原项目文件。数据库启动时先校验全部待迁移数据，`VACUUM INTO` 备份完整库，再在事务内升级项目、撤销历史、版本与任务快照，并写入 `schema_migrations` 的版本、备份名和计数；不增加用户编辑修订。夹具覆盖升级、原库备份和历史恢复。
 - 生成：工作流节点保存参数和首尾帧 Asset ID，通过统一命令编辑并验证引用；被引用图片不可删除。提交时保存解析后的 GenerationRequest、Project 快照、工作流/输出节点和 requestKey；后续编辑不影响已提交请求。
+
+## 层级复制与数据引用（0.25）
+
+entities.duplicate 输入同场景 entityIds、UUID batchId、geometry/materials 的 copy/linked 选择，以及 external 的 preserve/include/reject 策略。所选子树取并集；include 对约束目标、蒙皮关节/根、相交 IK 链所有关节/目标/极向、目标骨架配方的源根/映射节点反复扩展子树，直到不再增加。扩展最多项目现有 2000 对象，重定向源可跨场景并留在原场景。外部父级是结构边界，不沿它扩展。preserve/reject 下部分 IK 链拒绝，避免副本悄悄丢失驱动。依赖包括禁用项，以保留以后启用的引用。
+
+新增数据 ID 为 batchId_kind_serial，由固定源数组顺序确定，符合既有 ID 字符限制；重复批次命名空间拒绝。一次完整引用表重映射实体、几何、材质、约束、变换/IK 轨道与新键、IK 链/限角、对象层和重定向配方；复制保留 parentOffset/restPose、绑定矩阵、权重、UV、时间/插值及层顺序。每个原几何/材质只复制一次，副本间保持内部共享，linked 则沿用原 ID；图片 Asset 和 blob 不复制。
+
+动作容器是场景级选择；新对象各动作的轨道/键独立复制，actionId 保持，层读取新对象在同动作中的新轨道，不切换场景/镜头/片段动作。容器改名/删除仍作用于整个场景动作，不是对象动画数据链接。重定向配方归 targetRootId 所有，目标复制才复制配方并映射两端；仅复制源不重写其他目标。未复制实体、镜头、片段及其他入向引用保持原目标。模型最终检查结构、循环、绑定和配方，错误不产生修订。
+
+HierarchyCopyPanel 显示对象、额外依赖、根/场景、数据和保留引用数量；创建后只选中原操作场景的副本根。取消/Esc 不写数据，模态期间屏蔽全局编辑快捷键，跨项目关闭。entities.duplicate 走统一 SQLite 单事务与历史，无格式迁移；旧 entity.duplicate 命令保留原单对象兼容语义。共享数据用户管理、集合实例及跨项目复制尚未实现。
 
 ## 多对象选择与成组编辑（0.24）
 
