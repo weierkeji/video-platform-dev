@@ -1064,6 +1064,27 @@ pre {
   place-items: center;
   z-index: 10;
 }
+.data-users-panel {
+  padding: 0 12px 14px;
+  border-bottom: 1px solid #405266;
+}
+.data-users-panel details {
+  padding: 6px 0;
+}
+.data-users-panel summary {
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.data-users-panel ul {
+  margin: 6px 0;
+  padding-left: 14px;
+  max-height: 180px;
+  overflow-y: auto;
+}
+.data-users-panel li button {
+  text-align: left;
+  white-space: normal;
+}
 .modal {
   width: 370px;
   background: #202d3c;

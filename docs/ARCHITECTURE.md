@@ -61,6 +61,14 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 - 数据版本：schemaVersion=18；显式拒绝未知格式。v1 在副本上升级，每个旧片段设为 stretch，保留音量；v2–v17 保留已有设置。v1–v3 关键帧按轨道内原时间派生 `legacy-key-<frame>`，在历史/任务快照间保持一致；v4 及以上的键 ID 原样保留。v6–v18 新字段均可选；v11→v12→v13→v14→v15→v16→v17→v18 修改格式号，并沿用机器精度绑定矩阵末行规范化。新关键帧为 UUID，ID 在轨道内唯一；完整身份是 `(trackId,keyId)`。复制动作创建新轨道/键 ID。不改原项目文件。数据库启动时先校验全部待迁移数据，`VACUUM INTO` 备份完整库，再在事务内升级项目、撤销历史、版本与任务快照，并写入 `schema_migrations` 的版本、备份名和计数；不增加用户编辑修订。夹具覆盖升级、原库备份和历史恢复。
 - 生成：工作流节点保存参数和首尾帧 Asset ID，通过统一命令编辑并验证引用；被引用图片不可删除。提交时保存解析后的 GenerationRequest、Project 快照、工作流/输出节点和 requestKey；后续编辑不影响已提交请求。
 
+## 共享数据用户与独立化（0.26）
+
+core/data-users.ts 从整个 Project.entities 统计 geometryId/materialId 引用，包含隐藏和跨场景使用者。entities.data.isolate 接收唯一网格 ID、资源类型集合、individual/selection 和 UUID batchId。按源资源分组；selection 仅当存在未选使用者时创建一份给选中组共用。individual 为每个共享使用者拆分；若所有使用者均被选中，保留首个使用者指向原数据，避免无用副本。已经独立的项跳过，全无变化明确拒绝，不产生空修订。
+
+几何和材质分别 structuredClone，只替换 ID/名称与所选实体引用；几何所有权重、UV0/UV1、法线等保留，skin 绑定不变，图片 Asset/blob 不复制。批次 ID 确定新资源身份；预先检查容量与重复输入，再经统一 applyCommands 副本应用和最终 parseProject 检查，SQLite 单事务与撤销重做，不增加格式版本。
+
+DataUsersPanel 同时服务对象与组件编辑，列出资源及全部使用者，可跨场景定位或选择本场景使用者；资源种类/独立方式改变即时计算新增数量，无变化或无选择时禁用提交。按选择集合重置面板，执行沿用 busy 防重复机制。App.accept 在 geometryId 改变后清空旧组件选择，材质独立不改变几何选择。资源摘要超过 12 项时提示缩小选择，核心仍处理全部选中网格。尚无跨项目链接、集合实例、图片独立化、动画数据块链接或孤立资源回收。
+
 ## 层级复制与数据引用（0.25）
 
 entities.duplicate 输入同场景 entityIds、UUID batchId、geometry/materials 的 copy/linked 选择，以及 external 的 preserve/include/reject 策略。所选子树取并集；include 对约束目标、蒙皮关节/根、相交 IK 链所有关节/目标/极向、目标骨架配方的源根/映射节点反复扩展子树，直到不再增加。扩展最多项目现有 2000 对象，重定向源可跨场景并留在原场景。外部父级是结构边界，不沿它扩展。preserve/reject 下部分 IK 链拒绝，避免副本悄悄丢失驱动。依赖包括禁用项，以保留以后启用的引用。
@@ -69,7 +77,7 @@ entities.duplicate 输入同场景 entityIds、UUID batchId、geometry/materials
 
 动作容器是场景级选择；新对象各动作的轨道/键独立复制，actionId 保持，层读取新对象在同动作中的新轨道，不切换场景/镜头/片段动作。容器改名/删除仍作用于整个场景动作，不是对象动画数据链接。重定向配方归 targetRootId 所有，目标复制才复制配方并映射两端；仅复制源不重写其他目标。未复制实体、镜头、片段及其他入向引用保持原目标。模型最终检查结构、循环、绑定和配方，错误不产生修订。
 
-HierarchyCopyPanel 显示对象、额外依赖、根/场景、数据和保留引用数量；创建后只选中原操作场景的副本根。取消/Esc 不写数据，模态期间屏蔽全局编辑快捷键，跨项目关闭。entities.duplicate 走统一 SQLite 单事务与历史，无格式迁移；旧 entity.duplicate 命令保留原单对象兼容语义。共享数据用户管理、集合实例及跨项目复制尚未实现。
+HierarchyCopyPanel 显示对象、额外依赖、根/场景、数据和保留引用数量；创建后只选中原操作场景的副本根。取消/Esc 不写数据，模态期间屏蔽全局编辑快捷键，跨项目关闭。entities.duplicate 走统一 SQLite 单事务与历史，无格式迁移；旧 entity.duplicate 命令保留原单对象兼容语义。0.26 接入共享数据用户管理；集合实例及跨项目复制尚未实现。
 
 ## 多对象选择与成组编辑（0.24）
 

@@ -28,6 +28,7 @@ import { restProject, rigNodes } from '../core/rest-pose';
 import { RestPosePanel } from './RestPosePanel';
 import { ObjectGroupPanel } from './ObjectGroupPanel';
 import { HierarchyCopyPanel } from './HierarchyCopyPanel';
+import { DataUsersPanel } from './DataUsersPanel';
 import { chooseObjects, sceneRows, visibleObjects } from './object-selection';
 import type { ObjectPivot } from '../core/object-transform';
 
@@ -585,7 +586,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.25</small>
+            FRAMEFORGE<small>创作工作台 · 0.26</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -1094,6 +1095,28 @@ export function App() {
         </section>
         <aside className="inspector">
           <fieldset disabled={busy}>
+            {!restActive &&
+              workspace === 'studio' &&
+              view === 'scene' &&
+              !clip &&
+              selectedIds.some((key) =>
+                p.entities.some((entity) => entity.id === key && entity.kind === 'mesh'),
+              ) && (
+                <DataUsersPanel
+                  key={p.id + [...selectedIds].sort().join('/')}
+                  project={p}
+                  ids={selectedIds}
+                  send={send}
+                  onSelectUsers={(scene, ids) => {
+                    setPlaying(false);
+                    setSceneId(scene);
+                    setSelectedIds(ids);
+                    setSelectedClip(null);
+                    setSelectedKey(null);
+                    setMeshSelection(null);
+                  }}
+                />
+              )}
             {restActive ? (
               <RestPosePanel
                 project={p}

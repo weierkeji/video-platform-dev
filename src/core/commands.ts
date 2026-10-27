@@ -56,6 +56,7 @@ import { retargetAnimation, activateRetarget } from './retarget';
 import { reduceAction, ReduceOptionsSchema } from './reduce-curves';
 import { ReparentSchema, reparentEntities } from './parenting';
 import { HierarchyCopySchema, duplicateHierarchy } from './hierarchy-copy';
+import { DataIsolationSchema, isolateData } from './data-users';
 import {
   ObjectTransformSchema,
   planObjectTransform,
@@ -68,6 +69,7 @@ const MeshIndices = z.array(z.number().int().nonnegative()).min(1).max(200000);
 export const CommandSchema = z.discriminatedUnion('type', [
   ObjectTransformSchema,
   HierarchyCopySchema,
+  DataIsolationSchema,
   z
     .object({
       type: z.literal('entities.visibility'),
@@ -790,6 +792,9 @@ function apply(p: Project, c: Command) {
     }
     case 'entities.duplicate':
       duplicateHierarchy(p, c);
+      break;
+    case 'entities.data.isolate':
+      isolateData(p, c);
       break;
     case 'entity.duplicate': {
       const source = get(p.entities, c.id),

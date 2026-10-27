@@ -1,8 +1,30 @@
 # 持续开发恢复记录
 
-更新时间：2026-10-27。完整 Blender + LibTV 功能目标仍 active；0.25 是基础版本检查点，不是目标完成声明。旧段落保留历史证据。
+更新时间：2026-10-27。完整 Blender + LibTV 功能目标继续保留；0.26 是基础版本检查点，不是目标完成声明。旧段落保留历史证据。
 
-## 0.25 最新恢复入口
+## 0.26 最新恢复入口
+
+0.25 已提交并推送 b2f6420。本轮 0.26 新增共享几何/材质用户管理与解除共享，沿用项目 v18，无新迁移/依赖。用户最新指令再次授权所有操作并要求直接继续至可交付，常规开发/提交/推送自主执行。远端 https://github.com/weierkeji/video-platform-dev.git，最终 HEAD/origin/main 以实际 Git 为准；不要将本次功能版本作为完整目标结束。
+
+core/data-users.ts 的 entities.data.isolate 接收唯一网格 ID、geometry/material 集合、individual/selection 与 UUID batchId。使用者覆盖所有场景/隐藏对象；selection 仅在存在组外使用者时复制一份，保留组内联系。individual 将各共享使用者分开，全部用户选中时保留首个原数据用户，避免孤立原件。资源独立选择，无需复制的项跳过，全无操作明确拒绝。新 ID batchId_kind_serial，冲突/容量预检，最终模型校验，一条命令一次历史，无部分保存。
+
+几何逐项保留权重/UV/法线等，实体绑定、动画和依赖不变；材质克隆保留图片 Asset/blob 引用，不复制像素。DataUsersPanel 在对象和组件属性上方展示资源人数与名单，支持跨场景定位、本场景全选、折叠独立设置与新增数量。App.accept 原有 geometryId 身份检查会退出旧组件编辑；材质独立不替换几何。一次最多显示 12 个资源摘要，核心仍处理全部选择。尚无图片独立化、集合实例、跨项目链接、动画数据块共享或孤立资源回收，也没有专业规模性能声明。
+
+8 项新增核心检查，全套 207/207 通过；类型与构建通过。检查覆盖两个资源/模式、全部用户独立无孤立项、隐藏跨场景计数、原数据不变、绑定/权重/双 UV 与多时刻姿态、非法输入/配额/批次命名空间、GLB 原始图片与两套独立资源、SQLite 重启和单次历史。172 模块，主包 1137.58 KB / gzip 326.15 KB，>500 KB 提示保留。构建后更新 third_party 文档并重新运行 package-notices.mjs，产物声明已同步。
+
+开发 smoke:data-users 2026-10-27T15:47:19.995Z，正式 2026-10-27T15:51:03.297Z 全部通过。正式项目 3900b2c7-4031-42dc-b1ba-d237747c183e，恢复 0918b0a0-0800-4f16-8902-7b5c7553680f，任务 35b004c6-0ee0-40e6-8c87-a5e1dac23d60，r9。两套可见蒙皮与一个跨场景隐藏用户最初共享；实际整组独立→撤销重做→右侧组件全选→右侧独立退出旧组件→改单顶点与青色材质。六时刻解除共享前后 RGB 差均 0，原几何/材质和组内另一对象数据保持。重载及原生包恢复通过，所有场景/绑定/权重/图片保留。
+
+原生动画 GLB 0 错误/0 警告，4 条信息为两套备用 UV1 与两个空节点；六时刻重导入最大 RGB 平均差 0.002332819/255，Euler 转线性四元数按帧率采样，帧间仍有近似。实际 H.264 480×270、24 FPS、48 帧、2 秒、无音轨，五帧差 0.458889–0.501865/255。实际查看共享用户面板与橙色/青色动画画面，无页面错误。原生 .ffstudio 约 103 KB，保存 GLB 重导入前的可编辑作品；GLB 约 30 KB、MP4 约 18 KB。
+
+本版另回归 smoke:hierarchy，2026-10-27T15:48:24.565Z，项目 6a2cec18-beac-4c9f-b259-8a1523b46d9a，任务 40f3fb5d-2123-4f80-87ec-903e01849c8c；复制范围、两套 IK/蒙皮、共享/独立数据、历史、GLB 与影片通过。未重跑全部历史脚本。开发/正式服务、浏览器已结束；4173 无监听，仅原 Codex Node 11844，未触碰。
+
+证据 docs/research/2026-10-27-data-users.md、*-data-users-dev-runtime.json、*-data-users-runtime.json、*-data-users-hierarchy-runtime.json；原始 PNG/截图 .local/checks/data-users；正式产物 examples/independent-sculptures.ffstudio/.glb/.mp4。npm.cmd run dev；正式 npm.cmd run build 后 npm.cmd start；新入口 npm.cmd run smoke:data-users。tsx 沙箱 uv_os_get_passwd ENOMEM 时按已授权提升执行，观察超时不能视为运行失败或重复启动。保护 .local/data 与既有作品，不运行旧文档更新/快照审计脚本。
+
+REA 当前说明/能力/安装/MIT 已在本次连续工作中复读，本地 6.7.0 保留；Node 24.20.0 低于当前 main 的 24.22.1，未运行额外引擎。Blender 4.5 Data-Blocks/Make Single User 官方搜索抓取作行为参照，直接页面 402 未绕过。新增方格 PNG 与几何/动作自主编写，无 Blender/bpy、LibTV 私有接口、外部生成调用或假结果；Seedance 仍 missing-credentials。
+
+**下一项**：时间轴片段拖动、两端裁剪与吸附。先读现有 Clip/源时间/轨道约束，明确移动保持 sourceIn、左裁剪同步源入点、右裁剪保持源入点的边界；UI 临时预演，释放一次事务、Esc 取消，继续镜头/媒体/动作与重叠轨语义，实际导出核验。随后继续多边形拓扑等公共编辑能力，保留完整专业建模、UV、材质、物理、合成、媒体和 AI 目标。
+
+## 0.25 历史恢复记录
 
 0.24 已提交并推送 c735dbc。本轮 0.25 新增完整实体子树复制与内部依赖映射，沿用格式 v18，无新迁移/依赖。用户再次明确所有操作授权、继续至可交付，不要停下等待询问；普通开发/提交/推送继续自主执行。远端 https://github.com/weierkeji/video-platform-dev.git，最终 HEAD/origin/main 以实际 Git 为准，完整目标不能因本版本完成而关闭。
 

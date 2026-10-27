@@ -1,0 +1,187 @@
+{
+  "checkedAt": "2026-10-27T15:51:03.297Z",
+  "browser": "155.0.8059.82",
+  "projectId": "3900b2c7-4031-42dc-b1ba-d237747c183e",
+  "restoredProjectId": "0918b0a0-0800-4f16-8902-7b5c7553680f",
+  "jobId": "35b004c6-0ee0-40e6-8c87-a5e1dac23d60",
+  "revision": 9,
+  "isolationMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0
+    },
+    {
+      "frame": 7.5,
+      "difference": 0
+    },
+    {
+      "frame": 12,
+      "difference": 0
+    },
+    {
+      "frame": 24,
+      "difference": 0
+    },
+    {
+      "frame": 36,
+      "difference": 0
+    },
+    {
+      "frame": 47,
+      "difference": 0
+    }
+  ],
+  "importedMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0.0012268518518518518
+    },
+    {
+      "frame": 7.5,
+      "difference": 0.002332818930041152
+    },
+    {
+      "frame": 12,
+      "difference": 0.0019675925925925924
+    },
+    {
+      "frame": 24,
+      "difference": 0.0019367283950617283
+    },
+    {
+      "frame": 36,
+      "difference": 0.002170781893004115
+    },
+    {
+      "frame": 47,
+      "difference": 0.0007896090534979424
+    }
+  ],
+  "videoMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0.4588888888888889
+    },
+    {
+      "frame": 12,
+      "difference": 0.46679269547325103
+    },
+    {
+      "frame": 24,
+      "difference": 0.4701054526748971
+    },
+    {
+      "frame": 36,
+      "difference": 0.46005915637860084
+    },
+    {
+      "frame": 47,
+      "difference": 0.5018647119341564
+    }
+  ],
+  "validator": {
+    "numErrors": 0,
+    "numWarnings": 0,
+    "numInfos": 4,
+    "numHints": 0,
+    "messages": [
+      {
+        "code": "UNUSED_OBJECT",
+        "message": "This object may be unused.",
+        "severity": 2,
+        "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_1"
+      },
+      {
+        "code": "UNUSED_OBJECT",
+        "message": "This object may be unused.",
+        "severity": 2,
+        "pointer": "/meshes/1/primitives/0/attributes/TEXCOORD_1"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/7"
+      },
+      {
+        "code": "NODE_EMPTY",
+        "message": "Empty node encountered.",
+        "severity": 2,
+        "pointer": "/nodes/13"
+      }
+    ],
+    "truncated": false
+  },
+  "video": {
+    "index": 0,
+    "codec_name": "h264",
+    "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+    "profile": "High",
+    "codec_type": "video",
+    "codec_tag_string": "avc1",
+    "codec_tag": "0x31637661",
+    "mime_codec_string": "avc1.640015",
+    "width": 480,
+    "height": 270,
+    "coded_width": 480,
+    "coded_height": 270,
+    "has_b_frames": 2,
+    "pix_fmt": "yuv420p",
+    "level": 21,
+    "chroma_location": "left",
+    "field_order": "progressive",
+    "is_avc": "true",
+    "nal_length_size": "4",
+    "id": "0x1",
+    "r_frame_rate": "24/1",
+    "avg_frame_rate": "24/1",
+    "time_base": "1/12288",
+    "start_pts": 0,
+    "start_time": "0.000000",
+    "duration_ts": 24576,
+    "duration": "2.000000",
+    "bit_rate": "67708",
+    "bits_per_raw_sample": "8",
+    "nb_frames": "48",
+    "extradata_size": 46,
+    "disposition": {
+      "default": 1,
+      "dub": 0,
+      "original": 0,
+      "comment": 0,
+      "lyrics": 0,
+      "karaoke": 0,
+      "forced": 0,
+      "hearing_impaired": 0,
+      "visual_impaired": 0,
+      "clean_effects": 0,
+      "attached_pic": 0,
+      "timed_thumbnails": 0,
+      "non_diegetic": 0,
+      "captions": 0,
+      "descriptions": 0,
+      "metadata": 0,
+      "dependent": 0,
+      "still_image": 0,
+      "multilayer": 0
+    },
+    "tags": {
+      "language": "und",
+      "handler_name": "VideoHandler",
+      "encoder": "Lavc63.1.102 libx264"
+    }
+  },
+  "pageErrors": [],
+  "checks": [
+    "hidden cross-scene users and navigation",
+    "select all local users and independent resource choices",
+    "grouped isolation preserves internal sharing and single revision undo/redo",
+    "individual isolation clears previous geometry components",
+    "UV, weights, skin binding, image assets and animation retained",
+    "six before/after isolation PNGs are identical",
+    "independent UI vertex and material edits leave both previous data groups unchanged",
+    "reload and native project package retain editable rigs and all image bytes",
+    "animated GLB validates and reimports two skins",
+    "real H264 matches edited scenes"
+  ]
+}
