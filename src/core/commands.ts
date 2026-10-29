@@ -409,7 +409,10 @@ export const CommandSchema = z.discriminatedUnion('type', [
     .object({
       type: z.literal('clip.update'),
       id: ID,
-      patch: ClipSchema.omit({ id: true, kind: true, sourceId: true }).partial(),
+      // Creation defaults must not overwrite omitted fields in a partial update.
+      patch: ClipSchema.omit({ id: true, kind: true, sourceId: true })
+        .partial()
+        .extend({ fit: ClipSchema.shape.fit.unwrap().optional() }),
     })
     .strict(),
   z.object({ type: z.literal('clip.delete'), id: ID }).strict(),

@@ -1,0 +1,235 @@
+{
+  "checkedAt": "2026-10-27T16:25:34.820Z",
+  "browser": "155.0.8059.82",
+  "projectId": "2b21bc20-b80b-468c-ade5-292278430bdf",
+  "restoredProjectId": "a00dc37d-41b9-425d-9686-5fbf3b0ab364",
+  "jobId": "cb8a9d01-ba2a-4780-b72e-e6061be507f5",
+  "revision": 18,
+  "clips": [
+    {
+      "id": "210fd4de-2258-4440-b75b-c49ba0799175",
+      "name": "底层动画",
+      "kind": "shot",
+      "sourceId": "e22c8287-1d4e-40b2-b17f-3439db4787e7",
+      "start": 0,
+      "duration": 96,
+      "sourceIn": 0,
+      "playback": {
+        "rate": 0.5,
+        "rangeStart": 0,
+        "rangeEnd": 48,
+        "mode": "repeat"
+      },
+      "channel": 0,
+      "muted": false,
+      "volume": 1,
+      "fit": "contain"
+    },
+    {
+      "id": "5e1d5190-2e79-4491-925e-3ceeddc50aa5",
+      "name": "视频前段",
+      "kind": "video",
+      "sourceId": "526a9217-7c4e-4c45-93c0-a018b5badb43",
+      "start": 52,
+      "duration": 16,
+      "sourceIn": 16,
+      "channel": 1,
+      "muted": false,
+      "volume": 0.75,
+      "fit": "cover"
+    },
+    {
+      "id": "767a7a45-b62a-4047-a29d-3ae104000324",
+      "name": "视频后段",
+      "kind": "video",
+      "sourceId": "526a9217-7c4e-4c45-93c0-a018b5badb43",
+      "start": 72,
+      "duration": 24,
+      "sourceIn": 0,
+      "channel": 1,
+      "muted": false,
+      "volume": 0.5,
+      "fit": "cover"
+    },
+    {
+      "id": "7c334070-efc5-470e-854d-ecf14e407835",
+      "name": "倒放往返镜头",
+      "kind": "shot",
+      "sourceId": "e22c8287-1d4e-40b2-b17f-3439db4787e7",
+      "start": 44,
+      "duration": 18,
+      "sourceIn": 25.375,
+      "action": {
+        "actionId": null
+      },
+      "playback": {
+        "rate": -0.75,
+        "rangeStart": 0,
+        "rangeEnd": 24,
+        "mode": "pingpong"
+      },
+      "channel": 3,
+      "muted": false,
+      "volume": 1,
+      "fit": "contain"
+    }
+  ],
+  "trimMeasurements": [
+    {
+      "frame": 12,
+      "difference": 0
+    },
+    {
+      "frame": 17.5,
+      "difference": 0
+    },
+    {
+      "frame": 24,
+      "difference": 0
+    },
+    {
+      "frame": 27,
+      "difference": 0
+    }
+  ],
+  "videoMeasurements": [
+    {
+      "frame": 0,
+      "difference": 0.3933564814814815
+    },
+    {
+      "frame": 12,
+      "difference": 0.38257973251028804
+    },
+    {
+      "frame": 44,
+      "difference": 0.3949537037037037
+    },
+    {
+      "frame": 60,
+      "difference": 0.4031327160493827
+    },
+    {
+      "frame": 64,
+      "difference": 1.7485751028806584
+    },
+    {
+      "frame": 68,
+      "difference": 0.3940329218106996
+    },
+    {
+      "frame": 72,
+      "difference": 1.7497453703703705
+    },
+    {
+      "frame": 84,
+      "difference": 1.8151594650205762
+    },
+    {
+      "frame": 95,
+      "difference": 1.851820987654321
+    }
+  ],
+  "audio": {
+    "source660": {
+      "rms": 0.08833252890328787,
+      "frequency": 660
+    },
+    "source440": {
+      "rms": 0.08837725161730176,
+      "frequency": 440
+    },
+    "first": {
+      "rms": 0.06624308790503923,
+      "frequency": 660
+    },
+    "second": {
+      "rms": 0.06619809310725422,
+      "frequency": 873.3333333333334
+    },
+    "third": {
+      "rms": 0.044178425102734516,
+      "frequency": 440
+    },
+    "before": {
+      "rms": 0,
+      "frequency": 0
+    },
+    "gap": {
+      "rms": 0,
+      "frequency": 0
+    }
+  },
+  "video": {
+    "index": 0,
+    "codec_name": "h264",
+    "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+    "profile": "High",
+    "codec_type": "video",
+    "codec_tag_string": "avc1",
+    "codec_tag": "0x31637661",
+    "mime_codec_string": "avc1.640015",
+    "width": 480,
+    "height": 270,
+    "coded_width": 480,
+    "coded_height": 270,
+    "has_b_frames": 2,
+    "pix_fmt": "yuv420p",
+    "level": 21,
+    "chroma_location": "left",
+    "field_order": "progressive",
+    "is_avc": "true",
+    "nal_length_size": "4",
+    "id": "0x1",
+    "r_frame_rate": "24/1",
+    "avg_frame_rate": "24/1",
+    "time_base": "1/12288",
+    "start_pts": 0,
+    "start_time": "0.000000",
+    "duration_ts": 49152,
+    "duration": "4.000000",
+    "bit_rate": "101850",
+    "bits_per_raw_sample": "8",
+    "nb_frames": "96",
+    "extradata_size": 46,
+    "disposition": {
+      "default": 1,
+      "dub": 0,
+      "original": 0,
+      "comment": 0,
+      "lyrics": 0,
+      "karaoke": 0,
+      "forced": 0,
+      "hearing_impaired": 0,
+      "visual_impaired": 0,
+      "clean_effects": 0,
+      "attached_pic": 0,
+      "timed_thumbnails": 0,
+      "non_diegetic": 0,
+      "captions": 0,
+      "descriptions": 0,
+      "metadata": 0,
+      "dependent": 0,
+      "still_image": 0,
+      "multilayer": 0
+    },
+    "tags": {
+      "language": "und",
+      "handler_name": "VideoHandler",
+      "encoder": "Lavc63.1.102 libx264"
+    }
+  },
+  "pageErrors": [],
+  "checks": [
+    "real mouse preview and release save exactly one revision",
+    "end-edge snap and Ctrl inversion",
+    "undo/redo and Esc/overlap/negative media-source rejection",
+    "cross-track move and both trim handles",
+    "fractional reverse pingpong phase and exact retained PNGs",
+    "zoom and keyboard handle precision",
+    "new channel and source-preserving shot move",
+    "partial updates preserve cover fit",
+    "reload and project package recover exact editable timeline",
+    "real H264 frames and AAC source frequencies, gain and silent gap"
+  ]
+}

@@ -22,10 +22,32 @@ import { newProject } from '../src/core/factory';
 const port = Number(process.env.PORT || 4173),
   host = '127.0.0.1',
   origin = `http://${host}:${port}`;
+if (!Number.isInteger(port) || port < 1 || port > 65535)
+  throw new Error('PORT 必须为 1–65535 的整数');
+// Reserve the real port before opening data or recovering jobs: a second launch
+// must never mark the first server's running jobs as interrupted.
+const starting = (_req: IncomingMessage, res: ServerResponse) => {
+  res.writeHead(503, { 'Content-Type': 'text/plain; charset=utf-8', 'Retry-After': '1' });
+  res.end('服务正在启动，请稍后重试');
+};
+const server = createServer(starting);
+try {
+  await new Promise<void>((accept, reject) => {
+    server.once('error', reject);
+    server.listen(port, host, () => {
+      server.off('error', reject);
+      accept();
+    });
+  });
+} catch (error) {
+  console.error(
+    `无法启动 ${origin}：${(error as NodeJS.ErrnoException).code === 'EADDRINUSE' ? '端口已被使用，请打开已有服务或使用其他端口和独立数据目录。' : (error as Error).message}`,
+  );
+  process.exit(1);
+}
 const directory = resolve(process.env.STUDIO_DATA_DIR || '.local/data');
 mkdirSync(join(directory, 'blobs'), { recursive: true });
-const store = new Store(directory),
-  jobs = new Jobs(store, origin);
+const store = new Store(directory);
 if (!store.list().length) store.create(newProject('我的第一部作品'));
 const production = process.argv.includes('--production');
 const vite = production
@@ -34,6 +56,7 @@ const vite = production
       server: {
         middlewareMode: true,
         host,
+        hmr: { port: port === 4173 ? 24678 : port < 65535 ? port + 1 : port - 1 },
         fs: {
           strict: true,
           deny: ['.env', '.env.*', '**/.git/**', '**/.local/**', '**/server/**'],
@@ -41,6 +64,7 @@ const vite = production
       },
       appType: 'spa',
     });
+const jobs = new Jobs(store, origin);
 function json(res: ServerResponse, value: unknown, status = 200) {
   res.writeHead(status, {
     'Content-Type': 'application/json; charset=utf-8',
@@ -174,7 +198,8 @@ async function upload(req: IncomingMessage) {
   store.addBlob(blobId, mime, bytes.length);
   return asset;
 }
-const server = createServer(async (req, res) => {
+server.removeListener('request', starting);
+server.on('request', async (req, res) => {
   try {
     if (![`${host}:${port}`, `localhost:${port}`].includes(req.headers.host || '')) {
       json(res, { error: '仅支持本地访问' }, 403);
@@ -233,7 +258,7 @@ const server = createServer(async (req, res) => {
       } catch {}
       json(res, {
         status: 'ok',
-        version: '0.26.0',
+        version: '0.27.0',
         browser: !!browser,
         providers: [providerStatus()],
       });
@@ -437,7 +462,7 @@ const server = createServer(async (req, res) => {
     json(res, { error: message }, error instanceof Conflict ? 409 : 400);
   }
 });
-server.listen(port, host, () => console.log(`Frameforge Studio: ${origin}\nStorage: ${directory}`));
+console.log(`Frameforge Studio: ${origin}\nStorage: ${directory}`);
 let closing = false;
 async function close() {
   if (closing) return;

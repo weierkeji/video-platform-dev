@@ -586,7 +586,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.26</small>
+            FRAMEFORGE<small>创作工作台 · 0.27</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -1168,6 +1168,7 @@ export function App() {
       </div>
       <Timeline
         p={p}
+        disabled={busy || exchangeOpen || retargetOpen || reduceOpen || newDialog || !!copyIds}
         frame={frame}
         setFrame={(f) => {
           setPlaying(false);

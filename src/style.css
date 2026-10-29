@@ -661,7 +661,7 @@ small {
   padding: 3px 5px;
 }
 .timeline-scroll {
-  height: calc(100% - 38px);
+  height: calc(100% - 60px);
   overflow: auto;
 }
 .ruler {
@@ -724,6 +724,77 @@ small {
   overflow: hidden;
   text-overflow: ellipsis;
   color: #d8edef;
+  touch-action: none;
+  cursor: grab;
+}
+.timeline-edit-status {
+  height: 22px;
+  padding: 3px 14px;
+  color: #a6bbce;
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.timeline-edit-status[data-error='true'] {
+  color: #ffb1a2;
+}
+.timeline-snap {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.timeline-snap input {
+  width: auto;
+}
+.clip-shell {
+  position: absolute;
+  height: 33px;
+  min-width: 3px;
+}
+.clip-shell.editing {
+  opacity: 0.35;
+}
+.clip-trim-handle {
+  position: absolute;
+  top: 4px;
+  height: 25px;
+  width: 7px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #a3c0d3aa;
+  cursor: ew-resize;
+  touch-action: none;
+  z-index: 2;
+}
+.clip-trim-handle.trimStart {
+  left: 0;
+}
+.clip-trim-handle.trimEnd {
+  right: 0;
+}
+.clip-trim-handle:focus-visible {
+  outline: 2px solid #ffc36a;
+}
+.clip-draft {
+  pointer-events: none;
+  z-index: 5;
+  border: 2px solid #f8c68e;
+  background: #52697ae8;
+}
+.clip-draft.invalid {
+  border-color: #ff7e6a;
+  background: #713f42dd;
+}
+.clip-snap-line {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #91e9e2;
+  pointer-events: none;
+  z-index: 6;
 }
 .clip small {
   float: right;

@@ -61,6 +61,18 @@ TypeScript 同构内核、React UI、Three.js 显示层、Node HTTP 与内置 SQ
 - 数据版本：schemaVersion=18；显式拒绝未知格式。v1 在副本上升级，每个旧片段设为 stretch，保留音量；v2–v17 保留已有设置。v1–v3 关键帧按轨道内原时间派生 `legacy-key-<frame>`，在历史/任务快照间保持一致；v4 及以上的键 ID 原样保留。v6–v18 新字段均可选；v11→v12→v13→v14→v15→v16→v17→v18 修改格式号，并沿用机器精度绑定矩阵末行规范化。新关键帧为 UUID，ID 在轨道内唯一；完整身份是 `(trackId,keyId)`。复制动作创建新轨道/键 ID。不改原项目文件。数据库启动时先校验全部待迁移数据，`VACUUM INTO` 备份完整库，再在事务内升级项目、撤销历史、版本与任务快照，并写入 `schema_migrations` 的版本、备份名和计数；不增加用户编辑修订。夹具覆盖升级、原库备份和历史恢复。
 - 生成：工作流节点保存参数和首尾帧 Asset ID，通过统一命令编辑并验证引用；被引用图片不可删除。提交时保存解析后的 GenerationRequest、Project 快照、工作流/输出节点和 requestKey；后续编辑不影响已提交请求。
 
+## 时间轴片段交互（0.27）
+
+core/clip-editing.ts 的 planClipEdit 根据原片段计算 move/trimStart/trimEnd 和目标轨道，返回 ClipTiming 补丁、changed 与拒绝原因。左裁剪直接调用 unwrappedSourceFrame，新 sourceIn 保留倒放/往返方向，右端不变；移动保持 sourceIn/时长，右裁剪只改时长。先限制合法整帧、至少 1 帧、时间轴/媒体源范围及同轨碰撞；媒体沿用模型的一帧时长容差。没有波纹、覆盖或自动让位。
+
+previewClipEdit 在 8 CSS 像素换算的帧距离内对候选吸附排序，检查移动的两端或当前裁剪端；目标是其他片段两端、全时间轴边界和整帧播放头，包含禁用与音频片段，自身排除。按距离、目标帧、delta 确定排序，跳过非法候选；没有合法吸附则返回原始草稿/错误。没有修改源对象或整个项目，未做大型时间轴性能达标声明。
+
+Timeline 保持真实片段和有 pointer capture 的按钮稳定，另画草稿、源入点/时间/轨道状态及吸附线；跨轨也不在拖动中重挂源 DOM。松开将已算补丁提交现有 clip.update，一次修订。无位移/无变化不提交。Esc、指针取消/失捕获、失焦/窗口变化、项目/修订/播放头/选择改变、滚动/缩放取消；拖动期间屏蔽全局编辑快捷键，释放再检查上下文。键盘方向键与 Shift 十帧走同一规划。增加空轨与缩放是本地视图状态，持久化轨道仍来自片段 channel。
+
+修复 Zod 4 optional/default 组合导致 clip.update 的未提供 fit 自动填 contain：创建 schema 继续有默认，patch 显式 unwrap default 再 optional。因此改名称/音量/时间不会覆盖已有 cover/stretch；显式修改仍生效。UI 轨道统一为 channel+1，输入反减 1，数据格式不变。
+
+本轮发现重复启动先创建 Store/Jobs、后监听端口，可能在 EADDRINUSE 前执行任务恢复。现在先绑定真实 HTTP 端口，启动期回复 503，再初始化数据/Vite/Jobs，最后安装实际路由；端口失败不会创建数据目录。默认 HMR 24678 保持，其他服务端口分配相邻 HMR；并行进程仍必须使用独立数据目录，尚无跨端口的数据目录独占锁。
+
 ## 共享数据用户与独立化（0.26）
 
 core/data-users.ts 从整个 Project.entities 统计 geometryId/materialId 引用，包含隐藏和跨场景使用者。entities.data.isolate 接收唯一网格 ID、资源类型集合、individual/selection 和 UUID batchId。按源资源分组；selection 仅当存在未选使用者时创建一份给选中组共用。individual 为每个共享使用者拆分；若所有使用者均被选中，保留首个使用者指向原数据，避免无用副本。已经独立的项跳过，全无变化明确拒绝，不产生空修订。

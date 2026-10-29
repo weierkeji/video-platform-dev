@@ -162,12 +162,12 @@ export function Inspector({
           />
           <NumberInput
             label="轨道"
-            value={clip.channel}
-            min={0}
-            max={31}
+            value={clip.channel + 1}
+            min={1}
+            max={32}
             step={1}
             onChange={(v) =>
-              send([{ type: 'clip.update', id: clip.id, patch: { channel: v } }], '更换轨道')
+              send([{ type: 'clip.update', id: clip.id, patch: { channel: v - 1 } }], '更换轨道')
             }
           />
           {clip.kind === 'shot' && (
