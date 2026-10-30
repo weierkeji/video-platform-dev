@@ -1,0 +1,96 @@
+{
+  "checkedAt": "2026-10-30T11:27:53.036Z",
+  "browser": "155.0.8059.82",
+  "projectId": "1890cff1-259c-42eb-a7ab-cb80d3ab158b",
+  "restoredProjectId": "f2e6cfe4-224e-4dbb-bbdb-892d3bdfc23d",
+  "jobId": "a1f9b1e5-f923-45df-8b7a-6f859e0463b8",
+  "revision": 7,
+  "sourcePolygons": 10,
+  "sourceVertices": 16,
+  "vertices": 48,
+  "triangles": 28,
+  "video": {
+    "index": 0,
+    "codec_name": "h264",
+    "codec_long_name": "H.264 / AVC / MPEG-4 AVC / MPEG-4 part 10",
+    "profile": "High",
+    "codec_type": "video",
+    "codec_tag_string": "avc1",
+    "codec_tag": "0x31637661",
+    "mime_codec_string": "avc1.640015",
+    "width": 480,
+    "height": 270,
+    "coded_width": 480,
+    "coded_height": 270,
+    "has_b_frames": 2,
+    "pix_fmt": "yuv420p",
+    "level": 21,
+    "chroma_location": "left",
+    "field_order": "progressive",
+    "is_avc": "true",
+    "nal_length_size": "4",
+    "id": "0x1",
+    "r_frame_rate": "24/1",
+    "avg_frame_rate": "24/1",
+    "time_base": "1/12288",
+    "start_pts": 0,
+    "start_time": "0.000000",
+    "duration_ts": 12288,
+    "duration": "1.000000",
+    "bit_rate": "119136",
+    "bits_per_raw_sample": "8",
+    "nb_frames": "24",
+    "extradata_size": 46,
+    "disposition": {
+      "default": 1,
+      "dub": 0,
+      "original": 0,
+      "comment": 0,
+      "lyrics": 0,
+      "karaoke": 0,
+      "forced": 0,
+      "hearing_impaired": 0,
+      "visual_impaired": 0,
+      "clean_effects": 0,
+      "attached_pic": 0,
+      "timed_thumbnails": 0,
+      "non_diegetic": 0,
+      "captions": 0,
+      "descriptions": 0,
+      "metadata": 0,
+      "dependent": 0,
+      "still_image": 0,
+      "multilayer": 0
+    },
+    "tags": {
+      "language": "und",
+      "handler_name": "VideoHandler",
+      "encoder": "Lavc63.1.102 libx264"
+    }
+  },
+  "differences": [
+    {
+      "frame": 0,
+      "mean": 0.9298894032921811
+    },
+    {
+      "frame": 12,
+      "mean": 0.9481764403292181
+    },
+    {
+      "frame": 23,
+      "mean": 1.0362139917695474
+    }
+  ],
+  "pageErrors": [],
+  "checks": [
+    "worker cancel and invalid index reject without revisions",
+    "import warnings, UV seams and explicit normals",
+    "one import revision; undo and redo",
+    "component move preserves UV; undo restores custom normals",
+    "OBJ download and exact geometry/UV reimport",
+    "reload and native package restore",
+    "textured animated concave sculpture rendered to 24 H264 frames",
+    "frontal notch remains empty; PNG matches actual encoded frames"
+  ]
+}

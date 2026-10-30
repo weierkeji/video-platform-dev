@@ -832,7 +832,14 @@ function apply(p: Project, c: Command) {
       break;
     }
     case 'geometry.import': {
-      const m = { id: id(), name: '导入材质', color: '#9da9bf', roughness: 0.5, metalness: 0 };
+      const m = {
+        id: id(),
+        name: '导入材质',
+        color: '#9da9bf',
+        roughness: 0.5,
+        metalness: 0,
+        ...(c.geometry.normals ? { flatShading: false } : {}),
+      };
       p.materials.push(m);
       p.geometries.push(c.geometry);
       p.entities.push({

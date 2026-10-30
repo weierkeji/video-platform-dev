@@ -1,8 +1,27 @@
 # 持续开发恢复记录
+更新时间：2026-10-30。完整 Blender + LibTV 目标仍保留，0.28 是进度检查点，不是完整目标完成。用户已授权继续开发、提交与推送 https://github.com/weierkeji/video-platform-dev.git；实际 HEAD/origin/main 以 Git 为准。
 
-更新时间：2026-10-29。完整 Blender + LibTV 目标继续保留；0.27 是进度检查点，不能标记完整目标完成。用户已明确持续授权开发、提交、推送，最新要求继续完成完整对标。远端 https://github.com/weierkeji/video-platform-dev.git，最终 HEAD/origin/main 以实际 Git 为准。
+## 0.28 最新恢复入口
 
-## 0.27 最新恢复入口
+0.27 基线 103fa8278b9daec87d64192569583ed039faadde 已确认推送。原定多边形拓扑研究发现已有 OBJ 扇形三角化会填错凹面且丢弃 UV/法线，因此先完成依赖基础交换单元：core/polygon.ts、obj.ts、OBJImportPanel/worker，geometry.ts 重新导出交换函数；geometry.import 有法线时默认关闭 flatShading。项目格式仍 v18，无迁移/新依赖。
+
+简单平面单环，归一化 Newell/主平面投影、自交检查、耳切，保留绕序/共线角点；拒绝孔/退化/非平面（范围相对 1e-6）。每面 3–1024 角点、20 MB、源/结果各 10 万顶点、20 万三角面、共享 800 万次几何比较预算。独立 v/vt/vn 引用和负索引，禁止 0；首次属性域复用源顶点，其他接缝追加，UV 接缝共享平滑域法线，显式法线优先。默认 s off 硬边；无显式法线按面/面积加权平滑组生成。OBJ V=1-v 转为平台左上 UV，导出逆转换；不加载 MTL 路径，未支持属性/分组报告。原生还是三角网格，稳定组件身份/面环尚未实现。
+
+服务重启打断过新增检查，恢复后确认代码保留，再运行。Python 不可用，修改辅助脚本用 Node 文件；不要重跑 .local/checks/update-obj-docs.mjs 或 finalize-obj-docs.mjs（一遍式）。ts​​x 在沙箱仍 uv_os_get_passwd ENOMEM，按用户授权提升执行。工具审批可能久等，非终结会话不要重复启动。
+
+10 项新增核心检查、全套 226/226（.local/checks/obj-tests.log）。独立面积/缺口/边界，环起点/绕序/主投影/尺度，UV/法线/平滑域，独立 Three OBJLoader，SQLite 重启/历史通过。最终类型/构建通过：176 模块，main index-BNcwFhD4.js 1147.52 KB/gzip329.77 KB，worker obj-import.worker-DtGzOlyl.js 92.57 KB；体积提示保留。
+
+开发探索运行 2026-10-30T11:27:53.036Z 在 V 换算修正前，单列 exploratory-runtime；正式运行 2026-10-30T15:02:13.437Z 修正后通过，项目 0485ebc7-ea2d-4ebe-9567-4a2f72a2f407，恢复 33b87f6e-61a5-40e9-9681-b6d88e9a4b8b，任务 8e6bab53-3325-4c26-8ab3-e68f45007d52，r7。取消/无效输入、结果提示、一次导入/历史、组件移动/撤销恢复法线、OBJ 下载和属性重导入、重载/原生包、真实影片均通过，无页面错误。
+
+原创 C 形雕塑 16 源位置、10 原面，48 结果顶点、28 三角面，UV 和法线接缝、原创方格图片与旋转关键帧。实际 H.264 480×270/24 FPS/24 帧/1 秒无音轨，0/12/23 帧 PNG 差 0.935108、0.948858、1.028881/255，缺口露出背景且实体有贴图。examples/concave-sculpture.ffstudio/.mp4/.obj 及 source-polygons.obj 已由最终运行复制。真实查看导入面板及成片。
+
+smoke:mesh 回归 2026-10-30T15:06:57.191Z 通过，项目 630c56ee-b073-4c3c-9fab-204ce21338fa，任务 080e63fd-1156-4444-a5e6-45098e79c6fe；旧拾取/挤出/手柄/历史、OBJ/原生包及12帧影片，RGB差0.543794，无页面错误。未重跑全部媒体/骨架集成脚本。证据 docs/research/2026-10-29-obj-polygons.md 与 2026-10-30-obj-*-runtime.json。
+
+使用 npm.cmd run dev；正式 npm.cmd run build 后 npm.cmd start；集成 npm.cmd run smoke:obj。并行运行 PORT=4183、STUDIO_DATA_DIR=.local/obj-data，检查 STUDIO_URL=http://127.0.0.1:4183。用户 4173 仍为自启动的0.26后端，未停止或替换；需用户自己的进程重启才能加载新后端。不要清理 .local/data。收尾进程状态和最终提交以本轮最新工具记录为准。
+
+**下一项**：原生多边形面环与稳定组件身份，研究派生三角缓存、属性传播、选择映射和格式迁移后接入全套网格编辑。当前 Geometry 所有面仍为三角索引；core/mesh.ts、geometry.ts、render/mesh-edit.ts 与 mesh-spatial.ts、ui/MeshPanel/Inspector/App、model/迁移均要纳入。不能仅添加 faces 字段却让旧命令漏更新；新格式应在独立数据目录验证，保护用户正在运行的旧后端。完整建模、UV、材质、物理、媒体多片段/波纹/转场、合成和 AI 范围保留；Seedance 无凭据，不制造结果。REA 6.7.0 保持，本轮无额外引擎，最新官方要求记录见0.27。
+
+## 0.27 历史恢复入口
 
 基线 0.26 已提交推送 a66b902。本轮新增 clip-editing.ts 共享纯规划，UI 草稿释放复用 clip.update，不新增模型字段。左裁剪 sourceIn+=delta*rate 保留未折返时间；移动保留源入点/时长；右裁剪保持源入点。碰撞/范围错误不改其他片段。吸附检查距离最近的合法候选，包含其他片段、边界和整帧播放头；空轨和缩放为临时视图。没有波纹/多片段/转场/媒体变速或专业规模性能证明。
 

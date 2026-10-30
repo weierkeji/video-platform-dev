@@ -4,7 +4,7 @@ import { evaluatedBaseTransform } from '../core/evaluate';
 import { activeTracks, rotationProperty, quaternionFromEuler } from '../core/animation';
 import { ActionPanel } from './ActionPanel';
 import { ActionSelect } from './ActionSelect';
-import { importOBJ } from '../core/geometry';
+import { OBJImportPanel } from './OBJImportPanel';
 import {
   id,
   type Asset,
@@ -82,6 +82,7 @@ export function App() {
     [retargetOpen, setRetargetOpen] = useState(false),
     [reduceOpen, setReduceOpen] = useState(false),
     [copyIds, setCopyIds] = useState<string[] | null>(null),
+    [objFile, setObjFile] = useState<File | null>(null),
     [commandText, setCommandText] = useState(
       '[\n  { "type": "project.rename", "name": "新作品" }\n]',
     ),
@@ -100,6 +101,7 @@ export function App() {
     if (previous?.id !== next.project.id) {
       setRestEditing(false);
       setCopyIds(null);
+      setObjFile(null);
     }
     setMeshSelection((selection) => {
       if (!selection || previous?.id !== next.project.id) return null;
@@ -285,7 +287,7 @@ export function App() {
   }, [playing, envelope?.project.timeline.fps, envelope?.project.timeline.duration]);
   useEffect(() => {
     const listener = (e: KeyboardEvent) => {
-      if (exchangeOpen || retargetOpen || reduceOpen || newDialog || copyIds) return;
+      if (exchangeOpen || retargetOpen || reduceOpen || newDialog || copyIds || objFile) return;
       if ((e.target as HTMLElement).closest('input,textarea,select,[contenteditable]')) return;
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
@@ -367,6 +369,7 @@ export function App() {
     retargetOpen,
     reduceOpen,
     copyIds,
+    objFile,
     newDialog,
   ]);
   const projectId = envelope?.project.id;
@@ -586,7 +589,7 @@ export function App() {
         <div className="brand">
           <b>F</b>
           <span>
-            FRAMEFORGE<small>创作工作台 · 0.27</small>
+            FRAMEFORGE<small>创作工作台 · 0.28</small>
           </span>
         </div>
         <select aria-label="切换项目" value={p.id} onChange={(e) => void load(e.target.value)}>
@@ -1168,7 +1171,9 @@ export function App() {
       </div>
       <Timeline
         p={p}
-        disabled={busy || exchangeOpen || retargetOpen || reduceOpen || newDialog || !!copyIds}
+        disabled={
+          busy || exchangeOpen || retargetOpen || reduceOpen || newDialog || !!copyIds || !!objFile
+        }
         frame={frame}
         setFrame={(f) => {
           setPlaying(false);
@@ -1412,19 +1417,35 @@ export function App() {
         accept=".obj"
         onChange={(event) => {
           const file = event.target.files?.[0];
-          if (file)
-            void (async () => {
-              try {
-                const geometry = importOBJ(await file.text());
-                geometry.name = file.name.slice(0, 160);
-                await send([{ type: 'geometry.import', sceneId, geometry }], '导入 OBJ 网格');
-              } catch (e) {
-                fail(e);
-              }
-            })();
+          if (file) {
+            setError('');
+            setPlaying(false);
+            setObjFile(file);
+          }
           event.target.value = '';
         }}
       />
+      {objFile && (
+        <OBJImportPanel
+          key={p.id + sceneId}
+          file={objFile}
+          sceneId={sceneId}
+          busy={busy}
+          saveError={error}
+          send={send}
+          onClose={() => setObjFile(null)}
+          onImported={(entityId) => {
+            setObjFile(null);
+            setSelected(entityId);
+            setMeshSelection(null);
+            setSelectedKey(null);
+            setSelectedClip(null);
+            setRestEditing(false);
+            setWorkspace('studio');
+            setView('scene');
+          }}
+        />
+      )}
       {copyIds && (
         <HierarchyCopyPanel
           key={p.id}

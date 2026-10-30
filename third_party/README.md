@@ -69,3 +69,5 @@ glTF 解析/序列化由本仓库按公开格式独立实现；Three.js 负责�
 0.26 没有新增依赖或第三方源码修改。全项目数据用户统计、按组/逐对象独立化、输入/容量检查、事务与 UI 为本仓库独立实现；Blender 4.5 Data-Blocks/Make Single User 的官方搜索抓取仅提供用户数量及复制引用的公开行为参考，直接页面 402 未绕过。independent-sculptures 复用本仓库原创分段柱体、骨架和动作，自编 16×16 方格 PNG，无下载模型、图片或生成资产。Three.js 提供渲染/数学，FFmpeg 编码，Khronos 校验 GLB；REA 本地 6.7.0 MIT 保留，未运行额外引擎。
 
 0.27 没有新增依赖或第三方源码修改。片段时间规划、候选吸附、指针/键盘交互与事务集成为本仓库独立实现。Blender 4.5 Editing Strips 官方搜索内容仅作公开行为参考；直接页面 402 未绕过。edited-sequence 使用本仓库原创蒙皮柱体与动作，视频/音调由已列明的 FFmpeg testsrc2、sine 本地合成，素材来源随包保留，没有下载模型/音视频或外部生成。REA 当前 main 6.8.0 的说明/安装/MIT 已读，本地 6.7.0 保持，未运行额外引擎。
+
+0.28 没有新增依赖或复制第三方源码。Newell 法线、简单多边形耳切、OBJ 解析/序列化、属性域映射、worker 与 UI 由本仓库按通用数学及公开格式独立编写。Blender 4.5 官方搜索文本和 Wavefront 原格式说明的公开存档搜索文本用于行为/格式参考；直接读取受限的情况已记录，未绕过。Three.js 0.180.0 的 OBJLoader 仅作为独立导出检查，现有 Texture.flipY/OBJLoader/MTLLoader 代码用于核对纹理方向，不复制到产品。concave-sculpture 的 C 形截面、厚度、UV、法线、动作及方格 PNG 均为本仓库原创，Three.js 渲染、FFmpeg 编码；无外部模型/图片或 AI 生成。REA 6.7.0 MIT 保持，未新增分析引擎。

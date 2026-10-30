@@ -1,6 +1,6 @@
 {
   "name": "frameforge-studio",
-  "version": "0.27.0",
+  "version": "0.28.0",
   "private": true,
   "type": "module",
   "license": "MIT",
@@ -40,7 +40,8 @@
     "smoke:objects": "tsx scripts/object-group-smoke.ts",
     "smoke:hierarchy": "tsx scripts/hierarchy-copy-smoke.ts",
     "smoke:data-users": "tsx scripts/data-users-smoke.ts",
-    "smoke:clips": "tsx scripts/clip-editing-smoke.ts"
+    "smoke:clips": "tsx scripts/clip-editing-smoke.ts",
+    "smoke:obj": "tsx scripts/obj-smoke.ts"
   },
   "dependencies": {
     "react": "19.1.1",

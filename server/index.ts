@@ -258,7 +258,7 @@ server.on('request', async (req, res) => {
       } catch {}
       json(res, {
         status: 'ok',
-        version: '0.27.0',
+        version: '0.28.0',
         browser: !!browser,
         providers: [providerStatus()],
       });

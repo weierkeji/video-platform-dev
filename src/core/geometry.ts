@@ -134,36 +134,7 @@ export function extrudeFace(g: Geometry, face: number, distance: number) {
   delete g.tangents;
 }
 
-export function exportOBJ(geometry: Geometry) {
-  return `# Frameforge local mesh, metres\no ${geometry.name.replace(/[^\w-]/g, '_')}\n${geometry.positions.map((p) => `v ${p.join(' ')}`).join('\n')}\n${geometry.triangles.map((t) => `f ${t.map((i) => i + 1).join(' ')}`).join('\n')}\n`;
-}
-
-export function importOBJ(text: string): Geometry {
-  const g: Geometry = { id: id(), name: 'Imported mesh', positions: [], triangles: [] };
-  if (text.length > 20_000_000) throw new Error('OBJ 超出 20 MB 限制');
-  for (const line of text.split(/\r?\n/)) {
-    const [type, ...parts] = line.trim().split(/\s+/);
-    if (type === 'v') {
-      if (parts.length < 3) throw new Error('OBJ 顶点格式错误');
-      g.positions.push(parts.slice(0, 3).map(Number) as Vec3);
-    }
-    if (type === 'f') {
-      const indices = parts.map((s) => {
-        const i = Number(s.split('/')[0]);
-        return i > 0 ? i - 1 : g.positions.length + i;
-      });
-      if (
-        indices.length < 3 ||
-        indices.some((i) => !Number.isInteger(i) || i < 0 || i >= g.positions.length)
-      )
-        throw new Error('OBJ 面索引错误');
-      // Convex polygon fan; concave polygon triangulation is not supported yet.
-      for (let i = 1; i < indices.length - 1; i++)
-        g.triangles.push([indices[0], indices[i], indices[i + 1]]);
-    }
-  }
-  return g;
-}
+export { exportOBJ, importOBJ } from './obj';
 
 /** Box projection in local space, splitting only vertices at UV seams; shape is unchanged. */
 export function projectUV(g: Geometry, channel: 0 | 1) {
